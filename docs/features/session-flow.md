@@ -98,10 +98,11 @@ Detailed implementation spec: `docs/features/live-session.md`
 
 Controls:
 
-- mark hand
-- tilt +1
+- hand to review
+- tilt state
+- energy state
+- micro-intention
 - quick note
-- low energy
 
 The screen should be low-friction:
 
@@ -116,22 +117,25 @@ Coach AI can appear only as small contextual guidance, not as the main input sur
 
 Purpose: two-minute review to create learning and accountability.
 
+Detailed implementation spec: `docs/features/post-session-review.md`
+
 Inputs:
 
-- simple result
-- focus
-- energy
-- tilt
-- one good decision
-- one mistake to review
-- marked hands
+- simple optional result
+- filtered timeline summary
+- pending hands
+- focus follow-through
+- where decision quality dropped
+- best decision
+- hand or pattern to review
 - next action
 
 Output:
 
 - session summary
-- data available for Coach AI feedback
-- one next improvement action
+- priority hands
+- main pattern
+- one improvement action
 
 ## Data Model Draft
 
@@ -156,15 +160,21 @@ Output:
 - tiltRiskStart
 - decisionQualityRisk
 - startRecommendation
-- markedHandsCount
-- tiltCount
-- lowEnergyCount
+- pendingHandsCount
+- currentTilt
+- currentEnergy
+- energyAverage
+- tiltPeak
 - quickNotes
-- postFocus
-- postEnergy
-- postTilt
+- latestMicroIntention
+- resultType
+- resultNote
+- focusFollowed
+- decisionQualityDrop
 - goodDecision
-- mistakeToReview
+- handOrPatternToReview
+- mainPattern
+- improvementAction
 - nextAction
 - updatedAt
 
