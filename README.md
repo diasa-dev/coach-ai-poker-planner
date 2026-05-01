@@ -49,6 +49,19 @@ Then open:
 http://localhost:3100
 ```
 
+To keep the Coach AI dev server running in the background:
+
+```bash
+npm run dev:coach:bg
+```
+
+Check or stop it with:
+
+```bash
+npm run dev:coach:status
+npm run dev:coach:stop
+```
+
 Build:
 
 ```bash

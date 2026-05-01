@@ -742,11 +742,7 @@ function AuthControls() {
 function ClerkAuthControls() {
   const { isLoaded, isSignedIn } = useUser();
 
-  if (!isLoaded) {
-    return <span className="auth-status">A carregar</span>;
-  }
-
-  if (isSignedIn) {
+  if (isLoaded && isSignedIn) {
     return (
       <div className="auth-controls">
         <div className="signed-in-menu" aria-label="Conta">
