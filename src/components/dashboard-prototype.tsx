@@ -5,7 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { api } from "../../convex/_generated/api";
-import { Id } from "../../convex/_generated/dataModel";
+import { Doc, Id } from "../../convex/_generated/dataModel";
 
 type SessionMode = "pre" | "during" | "post";
 type ScoreKey = "sleep" | "energy" | "focus" | "stress";
@@ -115,13 +115,31 @@ export function DashboardPrototype() {
 }
 
 function PersistedDashboardPrototype() {
+  const { isLoaded, isSignedIn } = useUser();
+  const dailyPlan = useQuery(
+    api.dailyPlan.getToday,
+    isLoaded && isSignedIn ? { date: todayKey } : "skip",
+  );
+  const seedToday = useMutation(api.dailyPlan.seedToday);
   const toggleStoredCommitment = useMutation(api.dailyPlan.toggleCommitment);
   const updateStoredCheckIn = useMutation(api.dailyPlan.updateCheckIn);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || dailyPlan === undefined) return;
+
+    if (!dailyPlan.checkIn || dailyPlan.commitments.length === 0) {
+      void seedToday({ date: todayKey });
+    }
+  }, [dailyPlan, isLoaded, isSignedIn, seedToday]);
+
+  if (isLoaded && isSignedIn && dailyPlan === undefined) {
+    return <DashboardLoading />;
+  }
 
   return (
     <DashboardView
       renderSync={(setScores, setTasks) => (
-        <DailyPlanSync date={todayKey} setScores={setScores} setTasks={setTasks} />
+        <DailyPlanSync dailyPlan={dailyPlan} setScores={setScores} setTasks={setTasks} />
       )}
       onScoreStored={(key, value) => {
         void updateStoredCheckIn({
@@ -140,6 +158,17 @@ function PersistedDashboardPrototype() {
         return true;
       }}
     />
+  );
+}
+
+function DashboardLoading() {
+  return (
+    <main className="loading-shell" aria-live="polite">
+      <div>
+        <strong>Coach AI</strong>
+        <span>A carregar plano...</span>
+      </div>
+    </main>
   );
 }
 
@@ -671,11 +700,23 @@ function DashboardView({
 }
 
 function DailyPlanSync({
-  date,
+  dailyPlan,
   setScores,
   setTasks,
 }: {
-  date: string;
+  dailyPlan:
+    | {
+        checkIn:
+          | {
+              sleep: number;
+              energy: number;
+              focus: number;
+              stress: number;
+            }
+          | null;
+        commitments: Doc<"commitments">[];
+      }
+    | undefined;
   setScores: Dispatch<
     SetStateAction<{
       sleep: number;
@@ -686,21 +727,6 @@ function DailyPlanSync({
   >;
   setTasks: Dispatch<SetStateAction<DashboardTask[]>>;
 }) {
-  const { isLoaded, isSignedIn } = useUser();
-  const dailyPlan = useQuery(
-    api.dailyPlan.getToday,
-    isLoaded && isSignedIn ? { date } : "skip",
-  );
-  const seedToday = useMutation(api.dailyPlan.seedToday);
-
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn || dailyPlan === undefined) return;
-
-    if (!dailyPlan.checkIn || dailyPlan.commitments.length === 0) {
-      void seedToday({ date });
-    }
-  }, [dailyPlan, date, isLoaded, isSignedIn, seedToday]);
-
   useEffect(() => {
     if (!dailyPlan?.checkIn) return;
 
