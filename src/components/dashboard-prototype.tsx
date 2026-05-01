@@ -1,13 +1,33 @@
 "use client";
 
 import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
+import { useMutation, useQuery } from "convex/react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
+import { api } from "../../convex/_generated/api";
+import { Id } from "../../convex/_generated/dataModel";
 
 type SessionMode = "pre" | "during" | "post";
+type ScoreKey = "sleep" | "energy" | "focus" | "stress";
+type CommitmentTone = "default" | "accent" | "soft";
+type DashboardTask = {
+  id: string;
+  convexId?: Id<"commitments">;
+  title: string;
+  detail: string;
+  phase: string;
+  tone: CommitmentTone;
+  done: boolean;
+};
 
 const isAuthConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+const isDataConfigured = Boolean(
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_CONVEX_URL,
+);
 
-const initialTasks = [
+const todayKey = new Date().toISOString().slice(0, 10);
+
+const initialTasks: DashboardTask[] = [
   {
     id: "review-icm",
     title: "Rever 20 mãos ICM",
@@ -87,6 +107,61 @@ const coachMessages = [
 ];
 
 export function DashboardPrototype() {
+  if (isDataConfigured) {
+    return <PersistedDashboardPrototype />;
+  }
+
+  return <DashboardView />;
+}
+
+function PersistedDashboardPrototype() {
+  const toggleStoredCommitment = useMutation(api.dailyPlan.toggleCommitment);
+  const updateStoredCheckIn = useMutation(api.dailyPlan.updateCheckIn);
+
+  return (
+    <DashboardView
+      renderSync={(setScores, setTasks) => (
+        <DailyPlanSync date={todayKey} setScores={setScores} setTasks={setTasks} />
+      )}
+      onScoreStored={(key, value) => {
+        void updateStoredCheckIn({
+          date: todayKey,
+          field: key,
+          value,
+        });
+      }}
+      onToggleStored={(task) => {
+        if (!task.convexId) return false;
+
+        void toggleStoredCommitment({
+          id: task.convexId,
+          done: !task.done,
+        });
+        return true;
+      }}
+    />
+  );
+}
+
+function DashboardView({
+  onScoreStored,
+  onToggleStored,
+  renderSync,
+}: {
+  onScoreStored?: (key: ScoreKey, value: number) => void;
+  onToggleStored?: (task: DashboardTask) => boolean;
+  renderSync?: (
+    setScores: Dispatch<
+      SetStateAction<{
+        sleep: number;
+        energy: number;
+        focus: number;
+        stress: number;
+      }>
+    >,
+    setTasks: Dispatch<SetStateAction<DashboardTask[]>>,
+  ) => ReactNode;
+}) {
   const [darkMode, setDarkMode] = useState(
     () => typeof window !== "undefined" && window.localStorage.getItem("theme") === "dark",
   );
@@ -116,6 +191,12 @@ export function DashboardPrototype() {
   }, [scores]);
 
   function toggleTask(taskId: string) {
+    const task = tasks.find((currentTask) => currentTask.id === taskId);
+
+    if (task && onToggleStored?.(task)) {
+      return;
+    }
+
     setTasks((currentTasks) =>
       currentTasks.map((task) =>
         task.id === taskId ? { ...task, done: !task.done } : task,
@@ -147,8 +228,18 @@ export function DashboardPrototype() {
     setReply("");
   }
 
+  function updateScore(key: ScoreKey, value: number) {
+    setScores((currentScores) => ({
+      ...currentScores,
+      [key]: value,
+    }));
+
+    onScoreStored?.(key, value);
+  }
+
   return (
     <div className="app-shell">
+      {renderSync?.(setScores, setTasks)}
       <aside className="sidebar" aria-label="Navegação principal">
         <div className="brand">
           <div className="brand-mark">✦</div>
@@ -537,10 +628,10 @@ export function DashboardPrototype() {
               </div>
               <div className="score-list">
                 {[
-                  ["sleep", "Sono"],
-                  ["energy", "Energia"],
-                  ["focus", "Foco"],
-                  ["stress", "Stress"],
+                  ["sleep", "Sono"] as const,
+                  ["energy", "Energia"] as const,
+                  ["focus", "Foco"] as const,
+                  ["stress", "Stress"] as const,
                 ].map(([key, label]) => (
                   <label key={key}>
                     {label}
@@ -548,13 +639,8 @@ export function DashboardPrototype() {
                       type="range"
                       min="1"
                       max="5"
-                      value={scores[key as keyof typeof scores]}
-                      onChange={(event) =>
-                        setScores((currentScores) => ({
-                          ...currentScores,
-                          [key]: Number(event.target.value),
-                        }))
-                      }
+                      value={scores[key]}
+                      onChange={(event) => updateScore(key, Number(event.target.value))}
                     />
                   </label>
                 ))}
@@ -582,6 +668,67 @@ export function DashboardPrototype() {
       </main>
     </div>
   );
+}
+
+function DailyPlanSync({
+  date,
+  setScores,
+  setTasks,
+}: {
+  date: string;
+  setScores: Dispatch<
+    SetStateAction<{
+      sleep: number;
+      energy: number;
+      focus: number;
+      stress: number;
+    }>
+  >;
+  setTasks: Dispatch<SetStateAction<DashboardTask[]>>;
+}) {
+  const { isLoaded, isSignedIn } = useUser();
+  const dailyPlan = useQuery(
+    api.dailyPlan.getToday,
+    isLoaded && isSignedIn ? { date } : "skip",
+  );
+  const seedToday = useMutation(api.dailyPlan.seedToday);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || dailyPlan === undefined) return;
+
+    if (!dailyPlan.checkIn || dailyPlan.commitments.length === 0) {
+      void seedToday({ date });
+    }
+  }, [dailyPlan, date, isLoaded, isSignedIn, seedToday]);
+
+  useEffect(() => {
+    if (!dailyPlan?.checkIn) return;
+
+    setScores({
+      sleep: dailyPlan.checkIn.sleep,
+      energy: dailyPlan.checkIn.energy,
+      focus: dailyPlan.checkIn.focus,
+      stress: dailyPlan.checkIn.stress,
+    });
+  }, [dailyPlan?.checkIn, setScores]);
+
+  useEffect(() => {
+    if (!dailyPlan || dailyPlan.commitments.length === 0) return;
+
+    setTasks(
+      dailyPlan.commitments.map((commitment) => ({
+        id: commitment._id,
+        convexId: commitment._id,
+        title: commitment.title,
+        detail: commitment.detail,
+        phase: commitment.phase,
+        tone: commitment.tone,
+        done: commitment.done,
+      })),
+    );
+  }, [dailyPlan, setTasks]);
+
+  return null;
 }
 
 function AuthControls() {
