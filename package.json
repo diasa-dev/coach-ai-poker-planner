@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
+    "dev:coach": "next dev --webpack -H 0.0.0.0 -p 3100",
     "build": "next build --webpack",
+    "start:coach": "next start -H 0.0.0.0 -p 3100",
     "start": "next start",
     "lint": "eslint"
   },

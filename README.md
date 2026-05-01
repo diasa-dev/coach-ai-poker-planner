@@ -36,6 +36,19 @@ Start the local app:
 npm run dev
 ```
 
+If another local project is already using port 3000, use the dedicated Coach AI
+port:
+
+```bash
+npm run dev:coach
+```
+
+Then open:
+
+```bash
+http://localhost:3100
+```
+
 Build:
 
 ```bash
