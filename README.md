@@ -19,7 +19,9 @@ Planned next:
 
 - Create Clerk and Convex projects
 - Add local environment values
-- Persist the daily check-in and commitments
+- Define the Planning System MVP spec
+- Redesign dashboard/navigation around monthly targets, weekly plans, and daily execution
+- Persist weekly planning data before daily check-ins and commitments
 - Keep AI Coach mocked until real data flow is stable
 
 ## Local Development
