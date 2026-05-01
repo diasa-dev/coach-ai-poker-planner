@@ -63,11 +63,8 @@ Inputs should be short and performance-oriented:
 - focus
 - stress
 - tilt risk
-- platform
-- planned start time
 - max tables
-- tournament/session type
-- late registration allowed
+- decision quality risk
 - main session focus
 - one quality rule
 - one or more if-then anti-tilt plans
@@ -77,7 +74,7 @@ Output:
 - clear start recommendation
 - session intention
 - anti-tilt plan
-- constraints for the session, such as max tables or no extra late registration
+- constraints for the session, such as max tables and the quality rule
 
 Recommended start decision states:
 
@@ -97,11 +94,12 @@ Purpose: ultra-fast capture without interrupting play.
 
 This should be a dedicated session screen, not inside the Coach AI chat.
 
+Detailed implementation spec: `docs/features/live-session.md`
+
 Controls:
 
 - mark hand
 - tilt +1
-- break done
 - quick note
 - low energy
 
@@ -156,10 +154,10 @@ Output:
 - focusStart
 - stressStart
 - tiltRiskStart
+- decisionQualityRisk
 - startRecommendation
 - markedHandsCount
 - tiltCount
-- breaksDone
 - lowEnergyCount
 - quickNotes
 - postFocus
