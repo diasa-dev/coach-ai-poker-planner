@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 type Recommendation = {
@@ -25,6 +26,7 @@ const defaultIfThenPlans = [
 ];
 
 export function SessionPrepare() {
+  const router = useRouter();
   const [scores, setScores] = useState({
     sleep: 4,
     energy: 4,
@@ -264,7 +266,10 @@ export function SessionPrepare() {
                 className="primary-button"
                 disabled={!canStart}
                 type="button"
-                onClick={() => setSavedState("active")}
+                onClick={() => {
+                  setSavedState("active");
+                  router.push("/session/live");
+                }}
               >
                 Iniciar sessão
               </button>
