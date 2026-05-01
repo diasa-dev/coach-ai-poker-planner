@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Coach AI - Poker Performance Planner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegação principal">
+        <div class="brand">
+          <div class="brand-mark">✦</div>
+          <div>
+            <strong>Coach AI</strong>
+            <span>Planner do Jogador</span>
+          </div>
+        </div>
+
+        <nav class="nav-list">
+          <button class="nav-item active" type="button"><span>⌂</span>Início</button>
+          <button class="nav-item placeholder" type="button" aria-disabled="true"><span>◎</span>Objetivos</button>
+          <button class="nav-item placeholder" type="button" aria-disabled="true"><span>◷</span>Sessões</button>
+          <button class="nav-item placeholder" type="button" aria-disabled="true"><span>✓</span>Revisão</button>
+          <button class="nav-item placeholder" type="button" aria-disabled="true"><span>▥</span>Análises</button>
+          <button class="nav-item placeholder" type="button" aria-disabled="true"><span>✎</span>Notas</button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <button class="nav-item muted" type="button"><span>⚙</span>Definições</button>
+          <button class="nav-item muted" type="button"><span>?</span>Ajuda</button>
+          <div class="profile">
+            <img
+              src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=96&q=80"
+              alt="Diogo Silva"
+            />
+            <div>
+              <strong>Diogo Silva</strong>
+              <span>Profissional online</span>
+            </div>
+            <span class="profile-arrow">›</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="dashboard">
+        <header class="topbar">
+          <div>
+            <h1>Bom dia, Diogo!</h1>
+            <p>Quinta-feira, 30 de abril · foco em qualidade de decisão</p>
+          </div>
+          <div class="topbar-actions">
+            <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Ativar dark mode">
+              <span class="theme-icon">☾</span>
+            </button>
+            <div class="streak"><span>🔥</span><strong>7</strong> dias de consistência</div>
+            <button class="primary-button" type="button">✦ Atualizar plano</button>
+          </div>
+        </header>
+
+        <section class="hero-grid">
+          <article class="hero-card today-card">
+            <div class="hero-copy">
+              <span class="eyebrow">Prioridade #1</span>
+              <h2>Tomar melhores decisões no late game.</h2>
+              <p>O plano de hoje está reduzido ao essencial: preparar, jogar com intenção, rever rápido.</p>
+            </div>
+            <div class="readiness-meter" aria-label="Prontidão para sessão">
+              <strong id="readiness-score">82</strong>
+              <span>Prontidão</span>
+            </div>
+          </article>
+
+          <article class="metric-card">
+            <span>Plano de hoje</span>
+            <strong id="completed-count">4/6</strong>
+            <small>ações essenciais</small>
+          </article>
+          <article class="metric-card">
+            <span>Estudo semanal</span>
+            <strong>7h 20m</strong>
+            <small>61% da meta</small>
+          </article>
+          <article class="metric-card">
+            <span>Volume MTT</span>
+            <strong>18</strong>
+            <small>torneios esta semana</small>
+          </article>
+          <article class="metric-card">
+            <span>Revisão</span>
+            <strong>42</strong>
+            <small>mãos marcadas</small>
+          </article>
+        </section>
+
+        <section class="layout-grid">
+          <div class="left-column">
+            <section class="panel commitments-panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>Compromissos de hoje</h2>
+                  <p>Preparar · jogar · rever · recuperar</p>
+                </div>
+                <span class="count-pill" id="task-count-badge">4/6 feito</span>
+              </div>
+              <div class="commitment-progress" aria-hidden="true"><span id="commitment-progress-fill"></span></div>
+
+              <div class="task-list" id="task-list">
+                <label class="task-item">
+                  <input type="checkbox" checked />
+                  <span class="task-content"><strong>Rever 20 mãos ICM</strong><small>20 min · antes de abrir mesas</small></span>
+                  <span class="task-phase">Preparar</span>
+                </label>
+                <label class="task-item">
+                  <input type="checkbox" checked />
+                  <span class="task-content"><strong>Definir mesas máximas</strong><small>6 mesas enquanto estiver deep</small></span>
+                  <span class="task-phase">Preparar</span>
+                </label>
+                <label class="task-item">
+                  <input type="checkbox" />
+                  <span class="task-content"><strong>2 torneios online principais</strong><small>sem late reg extra fora do plano</small></span>
+                  <span class="task-phase accent">Jogar</span>
+                </label>
+                <label class="task-item">
+                  <input type="checkbox" checked />
+                  <span class="task-content"><strong>Marcar spots ICM</strong><small>mínimo 5 mãos para revisão</small></span>
+                  <span class="task-phase accent">Jogar</span>
+                </label>
+                <label class="task-item">
+                  <input type="checkbox" />
+                  <span class="task-content"><strong>Review pós-sessão</strong><small>2 min · 1 decisão boa + 1 erro</small></span>
+                  <span class="task-phase soft">Rever</span>
+                </label>
+                <label class="task-item">
+                  <input type="checkbox" checked />
+                  <span class="task-content"><strong>Dormir 7h+</strong><small>sem sessão extra se energia cair</small></span>
+                  <span class="task-phase soft">Recuperar</span>
+                </label>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Objetivos em cascata</h2>
+                <button class="link-button" type="button">Editar</button>
+              </div>
+              <div class="goal-stack">
+                <div><span>Ano</span><strong>Melhorar decisão e rotina profissional</strong></div>
+                <div><span>Trimestre</span><strong>Reduzir erros ICM em 20%</strong></div>
+                <div><span>Mês</span><strong>20h de estudo + 120 mãos revistas</strong></div>
+                <div><span>Semana</span><strong>5 blocos de estudo curtos</strong></div>
+                <div class="active"><span>Hoje</span><strong>1 takeaway aplicado na sessão</strong></div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Plano se/então</h2>
+                <button class="link-button" type="button">+ Novo</button>
+              </div>
+              <div class="if-plan">
+                <span>Se eu perder um pote grande...</span>
+                <strong>então faço 3 respirações, marco a mão e espero uma órbita.</strong>
+              </div>
+              <div class="if-plan">
+                <span>Se sentir tilt acima de 3/5...</span>
+                <strong>então reduzo mesas e ativo pausa de 5 min.</strong>
+              </div>
+            </section>
+          </div>
+
+          <section class="panel coach-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>✦ Coach AI</h2>
+                <p>Foco, accountability e próxima ação</p>
+              </div>
+              <button class="icon-button" type="button" aria-label="Preferências do Coach">☷</button>
+            </div>
+
+            <div class="coach-feed" id="coach-feed">
+              <article class="coach-message action-message">
+                <div class="message-header"><strong>✦ Coach AI</strong><time>09:15</time></div>
+                <span class="eyebrow">Próxima melhor ação</span>
+                <h3>Faz 20 minutos de ICM antes de abrir mesas.</h3>
+                <p>O teu maior leak recente aparece em decisões de call no late game. Hoje não precisas de mais tarefas; precisas de uma execução limpa.</p>
+                <div class="quick-actions">
+                  <button type="button">Começar bloco de estudo</button>
+                  <button type="button">Ver mãos marcadas</button>
+                  <button type="button">Ajustar plano</button>
+                </div>
+              </article>
+
+              <article class="coach-message">
+                <div class="message-header"><strong>✦ Coach AI</strong><time>09:17</time></div>
+                <p>Checklist mental para hoje:</p>
+                <ul>
+                  <li>Qualidade de decisão &gt; volume.</li>
+                  <li>Máximo 6 mesas enquanto estiveres deep.</li>
+                  <li>Marca mãos com pressão ICM, não só bad beats.</li>
+                </ul>
+              </article>
+
+              <article class="user-message">
+                <div class="message-header"><strong>Tu</strong><time>09:18</time></div>
+                <p>Prioridade confirmada: menos decisões automáticas em spots de pressão.</p>
+              </article>
+            </div>
+
+            <section class="session-mode">
+              <div class="mode-tabs" role="tablist" aria-label="Fluxo de sessão">
+                <button class="active" type="button" data-mode="pre">Pré-sessão</button>
+                <button type="button" data-mode="live">Durante sessão</button>
+                <button type="button" data-mode="post">Pós-sessão</button>
+              </div>
+
+              <div class="mode-panel active" data-panel="pre">
+                <div class="check-grid">
+                  <label><input type="checkbox" checked /> Sono ok</label>
+                  <label><input type="checkbox" checked /> Água e comida</label>
+                  <label><input type="checkbox" /> Mesas máximas definidas</label>
+                  <label><input type="checkbox" checked /> Plano anti-tilt pronto</label>
+                </div>
+              </div>
+
+              <div class="mode-panel" data-panel="live">
+                <div class="live-capture">
+                  <button type="button">Marcar mão</button>
+                  <button type="button">Pausa feita</button>
+                  <button type="button">Tilt +1</button>
+                  <button type="button">Nota rápida</button>
+                </div>
+              </div>
+
+              <div class="mode-panel" data-panel="post">
+                <div class="post-grid">
+                  <label>Foco <input type="range" min="1" max="5" value="4" /></label>
+                  <label>Energia <input type="range" min="1" max="5" value="3" /></label>
+                  <input type="text" placeholder="1 decisão boa" />
+                  <input type="text" placeholder="1 mão a rever" />
+                </div>
+              </div>
+            </section>
+
+            <form class="reply-box" id="reply-form">
+              <input id="reply-input" type="text" placeholder="Responder ao Coach..." />
+              <button class="primary-button" type="submit">Responder</button>
+            </form>
+          </section>
+
+          <div class="right-column">
+            <section class="panel session-card">
+              <div class="panel-heading">
+                <h2>Próxima sessão</h2>
+                <button class="link-button" type="button">Calendário</button>
+              </div>
+              <div class="session-header">
+                <span class="time-pill">Hoje, 19:30</span>
+                <span class="status-pill">Confirmada</span>
+              </div>
+              <h3>Online High Roller Series</h3>
+              <p>$2.100 · Dia 2 · lobby online</p>
+              <dl class="details-list">
+                <div><dt>Plataforma</dt><dd>GGPoker</dd></div>
+                <div><dt>Mesas máx.</dt><dd>6</dd></div>
+                <div><dt>Late reg</dt><dd>Fechado</dd></div>
+                <div><dt>Foco</dt><dd>ICM calmo</dd></div>
+              </dl>
+              <button class="primary-button full" type="button">Preparar grind online</button>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Check-in rápido</h2>
+                <span class="count-pill">60s</span>
+              </div>
+              <div class="score-list">
+                <label>Sono <input class="score-input" type="range" min="1" max="5" value="4" /></label>
+                <label>Energia <input class="score-input" type="range" min="1" max="5" value="4" /></label>
+                <label>Foco <input class="score-input" type="range" min="1" max="5" value="5" /></label>
+                <label>Stress <input class="score-input" type="range" min="1" max="5" value="2" /></label>
+              </div>
+            </section>
+
+            <section class="panel weekly-card">
+              <div class="panel-heading">
+                <h2>Review semanal</h2>
+                <button class="link-button" type="button">Abrir</button>
+              </div>
+              <p><strong>Padrão:</strong> foco cai depois de 3h de sessão. O melhor ajuste é planear pausa obrigatória no segundo break.</p>
+              <div class="progress-line"><span style="width: 72%"></span></div>
+              <small class="progress-label">72% alinhado com o plano</small>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
