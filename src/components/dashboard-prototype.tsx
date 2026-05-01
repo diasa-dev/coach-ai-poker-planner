@@ -1,8 +1,11 @@
 "use client";
 
+import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type SessionMode = "pre" | "during" | "post";
+
+const isAuthConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
 const initialTasks = [
   {
@@ -218,6 +221,7 @@ export function DashboardPrototype() {
             <button className="primary-button" type="button">
               ✦ Atualizar plano
             </button>
+            <AuthControls />
           </div>
         </header>
 
@@ -576,6 +580,42 @@ export function DashboardPrototype() {
           </div>
         </section>
       </main>
+    </div>
+  );
+}
+
+function AuthControls() {
+  if (!isAuthConfigured) {
+    return <span className="auth-status">Modo demo</span>;
+  }
+
+  return <ClerkAuthControls />;
+}
+
+function ClerkAuthControls() {
+  const { isLoaded, isSignedIn } = useUser();
+
+  if (!isLoaded) {
+    return <span className="auth-status">A carregar</span>;
+  }
+
+  if (isSignedIn) {
+    return (
+      <div className="auth-controls">
+        <div className="signed-in-menu" aria-label="Conta">
+          <UserButton />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="auth-controls">
+      <SignInButton mode="modal">
+        <button className="secondary-button auth-button" type="button">
+          Entrar
+        </button>
+      </SignInButton>
     </div>
   );
 }

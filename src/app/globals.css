@@ -316,6 +316,40 @@ h1 {
   color: var(--blue);
 }
 
+.auth-controls {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+}
+
+.auth-button {
+  min-width: 78px;
+}
+
+.auth-status {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.signed-in-menu {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
 .full {
   width: 100%;
 }
