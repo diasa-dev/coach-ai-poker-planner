@@ -863,8 +863,7 @@ time {
   margin-top: 12px;
 }
 
-.reply-box input,
-.score-list input[type="range"] {
+.reply-box input {
   width: 100%;
 }
 
@@ -932,24 +931,66 @@ dd {
   font-weight: 700;
 }
 
-.score-list {
+.readiness-card {
   display: grid;
-  gap: 13px;
-  margin-top: 14px;
+  gap: 14px;
 }
 
-.score-list label {
-  display: grid;
-  grid-template-columns: 72px 1fr;
-  align-items: center;
+.readiness-summary {
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 8px;
+  background: var(--blue-soft);
+  padding: 14px;
+}
+
+.readiness-summary div {
+  display: flex;
+  align-items: baseline;
   gap: 10px;
+  margin-bottom: 8px;
+}
+
+.readiness-summary strong {
+  color: var(--blue);
+  font-size: 34px;
+  line-height: 1;
+}
+
+.readiness-summary span {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.readiness-summary p {
   color: var(--muted);
   font-size: 13px;
+}
+
+.readiness-factors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.readiness-factors div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.readiness-factors span {
+  color: var(--muted);
   font-weight: 800;
 }
 
-input[type="range"] {
-  accent-color: var(--blue);
+.readiness-factors strong {
+  color: var(--text);
 }
 
 .weekly-card p {

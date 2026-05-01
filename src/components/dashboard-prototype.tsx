@@ -7,7 +7,6 @@ import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { api } from "../../convex/_generated/api";
 import { Doc, Id } from "../../convex/_generated/dataModel";
 
-type ScoreKey = "sleep" | "energy" | "focus" | "stress";
 type CommitmentTone = "default" | "accent" | "soft";
 type DashboardTask = {
   id: string;
@@ -121,7 +120,6 @@ function PersistedDashboardPrototype() {
   );
   const seedToday = useMutation(api.dailyPlan.seedToday);
   const toggleStoredCommitment = useMutation(api.dailyPlan.toggleCommitment);
-  const updateStoredCheckIn = useMutation(api.dailyPlan.updateCheckIn);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn || dailyPlan === undefined) return;
@@ -140,13 +138,6 @@ function PersistedDashboardPrototype() {
       renderSync={(setScores, setTasks) => (
         <DailyPlanSync dailyPlan={dailyPlan} setScores={setScores} setTasks={setTasks} />
       )}
-      onScoreStored={(key, value) => {
-        void updateStoredCheckIn({
-          date: todayKey,
-          field: key,
-          value,
-        });
-      }}
       onToggleStored={(task) => {
         if (!task.convexId) return false;
 
@@ -172,11 +163,9 @@ function DashboardLoading() {
 }
 
 function DashboardView({
-  onScoreStored,
   onToggleStored,
   renderSync,
 }: {
-  onScoreStored?: (key: ScoreKey, value: number) => void;
   onToggleStored?: (task: DashboardTask) => boolean;
   renderSync?: (
     setScores: Dispatch<
@@ -216,6 +205,18 @@ function DashboardView({
       ((scores.sleep + scores.energy + scores.focus + (6 - scores.stress)) / 20) * 100;
     return Math.round(rawScore);
   }, [scores]);
+  const readinessLabel =
+    readiness >= 80
+      ? "Pronto para preparar"
+      : readiness >= 65
+        ? "Preparar com cautela"
+        : "Rever antes de jogar";
+  const readinessFactors = [
+    ["Sono", scores.sleep],
+    ["Energia", scores.energy],
+    ["Foco", scores.focus],
+    ["Stress", scores.stress],
+  ] as const;
 
   function toggleTask(taskId: string) {
     const task = tasks.find((currentTask) => currentTask.id === taskId);
@@ -253,15 +254,6 @@ function DashboardView({
       },
     ]);
     setReply("");
-  }
-
-  function updateScore(key: ScoreKey, value: number) {
-    setScores((currentScores) => ({
-      ...currentScores,
-      [key]: value,
-    }));
-
-    onScoreStored?.(key, value);
   }
 
   return (
@@ -573,34 +565,33 @@ function DashboardView({
                 </div>
               </dl>
               <button className="primary-button full" type="button">
-                Preparar grind online
+                Preparar sessão
               </button>
             </section>
 
-            <section className="panel">
+            <section className="panel readiness-card">
               <div className="panel-heading">
-                <h2>Check-in rápido</h2>
-                <span className="count-pill">60s</span>
+                <h2>Prontidão para sessão</h2>
+                <span className="count-pill">Resumo</span>
               </div>
-              <div className="score-list">
-                {[
-                  ["sleep", "Sono"] as const,
-                  ["energy", "Energia"] as const,
-                  ["focus", "Foco"] as const,
-                  ["stress", "Stress"] as const,
-                ].map(([key, label]) => (
-                  <label key={key}>
-                    {label}
-                    <input
-                      type="range"
-                      min="1"
-                      max="5"
-                      value={scores[key]}
-                      onChange={(event) => updateScore(key, Number(event.target.value))}
-                    />
-                  </label>
+              <div className="readiness-summary">
+                <div>
+                  <strong>{readiness}</strong>
+                  <span>{readinessLabel}</span>
+                </div>
+                <p>O check-in completo fica no fluxo de preparação.</p>
+              </div>
+              <div className="readiness-factors" aria-label="Fatores de prontidão">
+                {readinessFactors.map(([label, value]) => (
+                  <div key={label}>
+                    <span>{label}</span>
+                    <strong>{value}/5</strong>
+                  </div>
                 ))}
               </div>
+              <button className="secondary-button full" type="button">
+                Preparar sessão
+              </button>
             </section>
 
             <section className="panel weekly-card">
