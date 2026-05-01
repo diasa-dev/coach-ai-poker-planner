@@ -54,6 +54,8 @@ This is the first core session screen. It starts from the dashboard CTA:
 
 `Dashboard -> Preparar sessão -> /session/prepare`
 
+Detailed implementation spec: `docs/features/session-prepare.md`
+
 Inputs should be short and performance-oriented:
 
 - sleep
