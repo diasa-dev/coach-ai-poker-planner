@@ -37,6 +37,8 @@ Inputs:
 - focus: 1-5
 - stress: 1-5
 - tilt risk: 1-5
+- decision quality risk
+- main session focus
 
 Output:
 
@@ -46,23 +48,18 @@ Output:
 
 ### 2. Session Plan
 
-Purpose: define the game environment before the player is emotionally involved.
+Purpose: define the minimum constraints before the player is emotionally involved.
 
 Inputs:
 
-- platform
-- session type
-- planned start time
 - max tables
-- late registration allowed
-- main session focus
+- one quality rule
 
 Default copy examples:
 
-- `MTT online`
 - `6 mesas no máximo`
-- `Sem late reg extra fora do plano`
-- `ICM calmo no late game`
+- `Decisão de qualidade > volume.`
+- `ICM calmo no late game.`
 
 ### 3. Performance Guardrails
 
@@ -124,12 +121,9 @@ For the first UI slice, the button may stop at prepared state if the live route 
 - userId
 - date
 - status: planned | prepared | active | reviewed
-- platform
-- sessionType
-- plannedStartTime
 - maxTables
-- lateRegistrationAllowed
 - mainFocus
+- decisionQualityRisk
 - qualityRule
 - ifThenPlans
 - sleepStart
@@ -158,7 +152,9 @@ For the first UI slice, the button may stop at prepared state if the live route 
 Build only `/session/prepare` with local/default state first:
 
 - readiness controls
-- session constraints
+- decision quality risk
+- main focus
+- max table constraint
 - quality rule
 - if-then plans
 - calculated recommendation
@@ -216,7 +212,12 @@ The player can still type a custom value.
 
 Reason: presets keep the flow fast, while custom input avoids forcing the wrong constraint.
 
+### First Start Behavior
+
+Before the live route exists, `Iniciar sessão` keeps the player on `/session/prepare` and shows a local `Sessão iniciada` state.
+
+Reason: live session capture is a separate product area and needs its own Product Discovery Workflow before implementation.
+
 ## Remaining Product Questions
 
-- What should happen after `Iniciar sessão` before the live route exists?
-- Should the first implementation persist prepared sessions immediately, or start with local state and add Convex in the following slice?
+- Should the first persisted version store prepared sessions in Convex immediately, or keep one more local UX iteration first?

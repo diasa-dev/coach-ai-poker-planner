@@ -12,10 +12,12 @@ The app should not become a complex financial tracker or a heavy Notion-style wo
 - Few inputs, high value.
 - The dashboard is action-oriented: "what matters now?" and "what is the next best action?".
 - The AI Coach is adaptive: calm when there is stress/tilt, more direct when there is repeated procrastination.
+- Evidence-informed by default: product decisions should be grounded in relevant research, proven performance methods, and real-world usage patterns when available.
 - Privacy by default.
 - Build phase by phase.
 - Do not create generic full pages without a real flow, data model, and purpose.
 - The current dashboard is the visual reference; other areas should be designed only when their flow and data are clear.
+- Scientific or performance-based ideas must be translated into simple, usable flows. Do not make the app heavy just to expose the theory behind a feature.
 
 ## Language Rules
 
@@ -195,7 +197,8 @@ AI Coach:
 - Build in small slices.
 - Do not create full pages without a real flow.
 - Do not let generic prototypes guide product decisions.
-- Before implementing each area, define: objective, data, flow, success criteria.
+- Before implementing or significantly changing each product area, run product discovery first: research relevant evidence, brainstorm options with the founder, ask decision questions one at a time, then document the approved spec.
+- Before implementing each approved area, define: objective, evidence-informed principles, data, flow, UX boundaries, success criteria, and out-of-scope items.
 - Always validate with build/lint/test when available.
 - Keep the app simple, intuitive, and not overwhelming.
 
@@ -217,4 +220,3 @@ Out of scope:
 - Billing.
 - Complete goals/sessions/reviews pages.
 - Advanced analytics.
-

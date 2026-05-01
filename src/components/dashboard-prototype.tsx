@@ -2,6 +2,7 @@
 
 import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { api } from "../../convex/_generated/api";
@@ -564,9 +565,9 @@ function DashboardView({
                   <dd>ICM calmo</dd>
                 </div>
               </dl>
-              <button className="primary-button full" type="button">
+              <Link className="primary-button full button-link" href="/session/prepare">
                 Preparar sessão
-              </button>
+              </Link>
             </section>
 
             <section className="panel readiness-card">
@@ -589,9 +590,9 @@ function DashboardView({
                   </div>
                 ))}
               </div>
-              <button className="secondary-button full" type="button">
+              <Link className="secondary-button full button-link" href="/session/prepare">
                 Preparar sessão
-              </button>
+              </Link>
             </section>
 
             <section className="panel weekly-card">

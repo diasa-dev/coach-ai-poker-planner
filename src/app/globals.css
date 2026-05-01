@@ -74,12 +74,23 @@ body.dark-mode {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
 button {
   cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
 }
 
 .app-shell {
@@ -328,11 +339,15 @@ h1 {
 
 .primary-button,
 .secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 42px;
   border: 0;
   border-radius: 8px;
   padding: 0 18px;
   font-weight: 700;
+  text-align: center;
 }
 
 .primary-button {
@@ -382,6 +397,10 @@ h1 {
 
 .full {
   width: 100%;
+}
+
+.button-link {
+  display: flex;
 }
 
 .hero-grid {
@@ -979,7 +998,7 @@ dd {
   gap: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--surface-muted);
+  background: var(--surface-soft);
   padding: 10px 12px;
   font-size: 13px;
 }
@@ -1023,6 +1042,254 @@ dd {
   display: block;
   margin-top: 6px;
   text-align: right;
+}
+
+.prepare-shell {
+  min-height: 100vh;
+  padding: 28px;
+}
+
+.prepare-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  max-width: 1180px;
+  margin: 0 auto 18px;
+}
+
+.prepare-topbar h1 {
+  margin-top: 10px;
+}
+
+.prepare-topbar p {
+  max-width: 620px;
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.prepare-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  max-width: 1180px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+.prepare-main,
+.prepare-side {
+  display: grid;
+  gap: 16px;
+}
+
+.prepare-side {
+  position: sticky;
+  top: 18px;
+}
+
+.prepare-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.prepare-score-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.prepare-score,
+.wide-field,
+.if-then-list label,
+.override-field {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.prepare-score {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 12px;
+}
+
+.prepare-score span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.prepare-score strong {
+  color: var(--text);
+}
+
+.prepare-score input[type="range"] {
+  width: 100%;
+  accent-color: var(--blue);
+}
+
+.table-presets input,
+.wide-field input,
+.wide-field textarea,
+.if-then-list textarea,
+.override-field textarea {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0 12px;
+  outline: none;
+}
+
+.if-then-list textarea,
+.override-field textarea {
+  min-height: 82px;
+  resize: vertical;
+  padding-block: 10px;
+  line-height: 1.45;
+}
+
+.table-presets input:focus,
+.wide-field input:focus,
+.wide-field textarea:focus,
+.if-then-list textarea:focus,
+.override-field textarea:focus {
+  border-color: rgba(37, 99, 235, 0.55);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.prepare-control-block {
+  display: grid;
+  gap: 10px;
+}
+
+.prepare-control-block > span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.table-presets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(48px, 1fr)) 90px;
+  gap: 8px;
+}
+
+.preset-button {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.preset-button.active {
+  border-color: color-mix(in srgb, var(--blue) 46%, var(--line));
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.if-then-list {
+  display: grid;
+  gap: 12px;
+}
+
+.add-plan-button {
+  justify-self: start;
+}
+
+.recommendation-card {
+  display: grid;
+  gap: 12px;
+  border-color: color-mix(in srgb, var(--green) 32%, var(--line));
+}
+
+.recommendation-card.restricted {
+  border-color: color-mix(in srgb, var(--amber) 38%, var(--line));
+}
+
+.recommendation-card.not-recommended {
+  border-color: color-mix(in srgb, var(--risk) 38%, var(--line));
+}
+
+.recommendation-card > strong {
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.recommendation-card p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.recommendation-score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 12px;
+}
+
+.recommendation-score span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.recommendation-score strong {
+  color: var(--blue);
+  font-size: 28px;
+}
+
+.prepare-summary {
+  display: grid;
+  gap: 14px;
+}
+
+.prepare-summary h2 {
+  font-size: 15px;
+}
+
+.prepare-summary dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.prepare-summary dl div {
+  display: grid;
+  gap: 3px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+}
+
+.prepare-summary dd {
+  font-size: 14px;
+}
+
+.save-status {
+  border-radius: 8px;
+  background: var(--green-soft);
+  color: var(--green);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.prepare-actions {
+  display: grid;
+  gap: 10px;
 }
 
 @media (max-width: 1220px) {
@@ -1139,12 +1406,25 @@ dd {
 
   .hero-grid,
   .layout-grid,
-  .right-column {
+  .right-column,
+  .prepare-grid {
     grid-template-columns: 1fr;
   }
 
   .right-column {
     grid-column: auto;
+  }
+
+  .prepare-shell {
+    padding: 18px 14px 28px;
+  }
+
+  .prepare-topbar {
+    display: grid;
+  }
+
+  .prepare-side {
+    position: static;
   }
 
   .hero-card {
@@ -1163,9 +1443,23 @@ dd {
 
   .topbar-actions,
   .hero-card,
+  .prepare-score-grid,
+  .table-presets,
   .check-grid,
   .post-grid {
     display: grid;
+  }
+
+  .prepare-score-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-presets {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .table-presets input {
+    grid-column: 1 / -1;
   }
 
   .readiness-meter {
