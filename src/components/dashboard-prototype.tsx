@@ -7,7 +7,6 @@ import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { api } from "../../convex/_generated/api";
 import { Doc, Id } from "../../convex/_generated/dataModel";
 
-type SessionMode = "pre" | "during" | "post";
 type ScoreKey = "sleep" | "energy" | "focus" | "stress";
 type CommitmentTone = "default" | "accent" | "soft";
 type DashboardTask = {
@@ -195,7 +194,6 @@ function DashboardView({
     () => typeof window !== "undefined" && window.localStorage.getItem("theme") === "dark",
   );
   const [tasks, setTasks] = useState(initialTasks);
-  const [mode, setMode] = useState<SessionMode>("pre");
   const [reply, setReply] = useState("");
   const [messages, setMessages] = useState(coachMessages);
   const [scores, setScores] = useState({
@@ -528,77 +526,6 @@ function DashboardView({
                 </article>
               ))}
             </div>
-
-            <section className="session-mode">
-              <div className="mode-tabs" role="tablist" aria-label="Fluxo de sessão">
-                <button
-                  className={mode === "pre" ? "active" : ""}
-                  type="button"
-                  onClick={() => setMode("pre")}
-                >
-                  Pré-sessão
-                </button>
-                <button
-                  className={mode === "during" ? "active" : ""}
-                  type="button"
-                  onClick={() => setMode("during")}
-                >
-                  Durante sessão
-                </button>
-                <button
-                  className={mode === "post" ? "active" : ""}
-                  type="button"
-                  onClick={() => setMode("post")}
-                >
-                  Pós-sessão
-                </button>
-              </div>
-
-              {mode === "pre" ? (
-                <div className="mode-panel active">
-                  <div className="check-grid">
-                    <label>
-                      <input type="checkbox" defaultChecked /> Sono ok
-                    </label>
-                    <label>
-                      <input type="checkbox" defaultChecked /> Água e comida
-                    </label>
-                    <label>
-                      <input type="checkbox" /> Mesas máximas definidas
-                    </label>
-                    <label>
-                      <input type="checkbox" defaultChecked /> Plano anti-tilt pronto
-                    </label>
-                  </div>
-                </div>
-              ) : null}
-
-              {mode === "during" ? (
-                <div className="mode-panel active">
-                  <div className="live-capture">
-                    <button type="button">Marcar mão</button>
-                    <button type="button">Pausa feita</button>
-                    <button type="button">Tilt +1</button>
-                    <button type="button">Nota rápida</button>
-                  </div>
-                </div>
-              ) : null}
-
-              {mode === "post" ? (
-                <div className="mode-panel active">
-                  <div className="post-grid">
-                    <label>
-                      Foco <input type="range" min="1" max="5" defaultValue="4" />
-                    </label>
-                    <label>
-                      Energia <input type="range" min="1" max="5" defaultValue="3" />
-                    </label>
-                    <input type="text" placeholder="1 decisão boa" />
-                    <input type="text" placeholder="1 mão a rever" />
-                  </div>
-                </div>
-              ) : null}
-            </section>
 
             <form className="reply-box" onSubmit={handleReply}>
               <input

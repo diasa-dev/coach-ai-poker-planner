@@ -18,3 +18,4 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Do not start the next slice without user confirmation.
 - Keep user-facing UI copy in Portuguese from Portugal. Keep code, schema, commits, and technical documentation in English.
 - Do not create generic full pages without a real flow, data model, and product purpose.
+- Before implementing a major product area or section, first create or update a feature spec covering objective, user flow, data model, UX boundaries, success criteria, and out-of-scope items. Do not implement that area until the user approves the spec.
