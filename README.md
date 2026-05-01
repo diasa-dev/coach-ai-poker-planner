@@ -17,8 +17,8 @@ Implemented:
 
 Planned next:
 
-- Install and configure Convex
-- Install and configure Clerk
+- Create Clerk and Convex projects
+- Add local environment values
 - Persist the daily check-in and commitments
 - Keep AI Coach mocked until real data flow is stable
 
@@ -48,9 +48,14 @@ Lint:
 npm run lint
 ```
 
+## Environment
+
+Copy `.env.example` to `.env.local` and fill in the Clerk and Convex values when
+those projects exist. Without those values, the dashboard remains available in
+mock mode.
+
 ## Notes
 
 User-facing UI should be Portuguese from Portugal.
 
 Code, schema, commits, and technical docs should stay in English.
-
