@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 type TimelineEvent = {
@@ -39,6 +40,7 @@ function currentTime() {
 }
 
 export function LiveSession() {
+  const router = useRouter();
   const [currentTilt, setCurrentTilt] = useState(0);
   const [currentEnergy, setCurrentEnergy] = useState(4);
   const [tiltValues, setTiltValues] = useState<number[]>([]);
@@ -152,7 +154,10 @@ export function LiveSession() {
           <button
             className="primary-button danger-button"
             type="button"
-            onClick={() => setSessionEnded(true)}
+            onClick={() => {
+              setSessionEnded(true);
+              router.push("/session/review");
+            }}
           >
             Terminar sessão
           </button>

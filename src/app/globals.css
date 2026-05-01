@@ -1547,6 +1547,218 @@ dd {
   border-color: color-mix(in srgb, var(--green) 34%, var(--line));
 }
 
+.review-shell {
+  min-height: 100vh;
+  padding: 28px;
+}
+
+.review-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  max-width: 1180px;
+  margin: 0 auto 18px;
+}
+
+.review-topbar h1 {
+  margin-top: 10px;
+}
+
+.review-topbar p {
+  max-width: 660px;
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.review-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 16px;
+  max-width: 1180px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+.review-main,
+.review-side {
+  display: grid;
+  gap: 16px;
+}
+
+.review-side {
+  position: sticky;
+  top: 18px;
+}
+
+.review-summary-panel,
+.review-panel,
+.review-result-card,
+.improvement-card {
+  display: grid;
+  gap: 14px;
+}
+
+.review-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.review-metric-grid div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 13px;
+}
+
+.review-metric-grid span,
+.improvement-card span,
+.review-result-card label,
+.review-question-list label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.review-metric-grid strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 28px;
+}
+
+.filtered-timeline {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.filtered-timeline li {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.review-question-list {
+  display: grid;
+  gap: 12px;
+}
+
+.review-question-list label,
+.review-result-card label {
+  display: grid;
+  gap: 8px;
+}
+
+.review-question-list textarea {
+  min-height: 78px;
+  resize: vertical;
+}
+
+.review-question-list textarea,
+.review-result-card input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 10px 12px;
+  outline: none;
+}
+
+.review-result-card input {
+  min-height: 42px;
+}
+
+.review-question-list textarea:focus,
+.review-result-card input:focus {
+  border-color: rgba(37, 99, 235, 0.55);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.priority-hand-list {
+  display: grid;
+  gap: 9px;
+}
+
+.priority-hand {
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 12px;
+  text-align: left;
+}
+
+.priority-hand.active {
+  border-color: color-mix(in srgb, var(--blue) 46%, var(--line));
+  background: var(--blue-soft);
+}
+
+.priority-hand span {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.priority-hand strong {
+  font-size: 14px;
+}
+
+.result-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.result-choice {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.result-choice.active {
+  border-color: color-mix(in srgb, var(--green) 42%, var(--line));
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.improvement-card {
+  border-color: color-mix(in srgb, var(--green) 34%, var(--line));
+}
+
+.improvement-card div {
+  display: grid;
+  gap: 5px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+}
+
+.improvement-card div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.improvement-card p {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 @media (max-width: 1220px) {
   .app-shell {
     grid-template-columns: 78px minmax(0, 1fr);
@@ -1664,7 +1876,8 @@ dd {
   .right-column,
   .prepare-grid,
   .live-grid,
-  .live-plan-strip {
+  .live-plan-strip,
+  .review-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1681,16 +1894,19 @@ dd {
   }
 
   .prepare-side,
-  .live-side {
+  .live-side,
+  .review-side {
     position: static;
   }
 
-  .live-shell {
+  .live-shell,
+  .review-shell {
     padding: 18px 14px 28px;
   }
 
   .live-topbar,
-  .live-topbar-actions {
+  .live-topbar-actions,
+  .review-topbar {
     display: grid;
   }
 
@@ -1739,7 +1955,9 @@ dd {
   }
 
   .quick-note-compose,
-  .live-state-grid {
+  .live-state-grid,
+  .review-metric-grid,
+  .result-choice-grid {
     grid-template-columns: 1fr;
   }
 
