@@ -14,6 +14,7 @@ const eslintConfig = defineConfig([
     "node_modules/**",
     "node_modules.partial/**",
     "next-env.d.ts",
+    "convex/_generated/**",
   ]),
 ]);
 
