@@ -4,7 +4,7 @@
 
 Help the player capture important session events with minimal attention cost while protecting the plan created in session preparation.
 
-The live session screen should be a one-tap capture surface for online poker tournaments. It should not become a dashboard, tracker, chat, or analysis page.
+The live session screen should be a fast capture surface for online poker tournaments. It should not become a dashboard, tracker, chat, or analysis page.
 
 ## Product Rationale
 
@@ -13,8 +13,10 @@ During a tournament session, the player's main task is playing poker. The app sh
 The live session flow should be designed around:
 
 - low interruption cost
-- one-tap event capture
+- fast state capture with timestamps
 - visible session constraints
+- pending hand review accountability
+- break-based micro-intentions
 - short contextual regulation when risk signals increase
 - clean data for the post-session review
 
@@ -51,16 +53,71 @@ Always visible:
 
 This information should be compact and readable at a glance.
 
-### 2. Event Capture
+### 2. State Capture
 
-Purpose: capture useful signals in one tap.
+Purpose: capture useful state changes with timestamped context.
 
-First version events:
+First version state inputs:
 
-- `Marcar mão`
-- `Tilt +1`
-- `Energia baixa`
-- `Nota rápida`
+- tilt scale: `0-5`
+- energy scale: `1-5`
+
+Each value selection creates a timeline event:
+
+- `22:05 · Tilt 3/5`
+- `22:18 · Energia 2/5`
+
+Do not use `Tilt +1` or `Energia baixa` counters as the primary model. Tilt and energy are states that fluctuate, not only events that increment.
+
+### 3. Hands To Review
+
+Purpose: make important hands hard to forget without replacing the player's tracker, screenshots, or Discord workflow.
+
+First version flow:
+
+- click `Mão para rever`
+- choose a template
+- optional short note
+- save to pending review list
+
+Default templates:
+
+- `ICM`
+- `Big pot`
+- `Bluff catch`
+- `All-in marginal`
+- `River difícil`
+- `Exploit / read`
+- `Erro emocional`
+
+Example:
+
+- `21:15 · Mão para rever · ICM · AQo BB vs BTN`
+
+This should create pending review accountability for the dashboard and post-session review.
+
+### 4. Break Micro-Intention
+
+Purpose: use tournament breaks as natural reset points without tracking break completion.
+
+First version flow:
+
+- choose a micro-intention template
+- optionally edit the text
+- save for the next block
+
+Default templates:
+
+- `Mais calma`
+- `Menos mesas`
+- `ICM consciente`
+- `Sem autopilot`
+- `Decisões mais lentas`
+- `Proteger energia`
+
+Example:
+
+- `22:55 · Micro-intenção · Sem autopilot em spots ICM`
 
 Out of first version:
 
@@ -69,7 +126,7 @@ Out of first version:
 - financial results
 - table-by-table tracking
 
-### 3. Quick Note
+### 5. Quick Note
 
 Purpose: capture unexpected context without long writing.
 
@@ -94,15 +151,17 @@ Future:
 
 Do not build template settings in the first live session slice.
 
-### 4. Session State
+### 6. Session State
 
 Purpose: show whether the session is drifting from the plan without creating analysis mode.
 
 Always visible:
 
-- marked hands count
-- tilt count
-- low energy count
+- pending hands count
+- current tilt
+- current energy
+- energy average
+- tilt peak
 
 Avoid:
 
@@ -110,18 +169,34 @@ Avoid:
 - events per hour
 - profit/loss
 - hand history import
-- dense notes list
+- dense timeline
 
-### 5. Coach AI Context
+### 7. Timeline
 
-Purpose: provide very short regulation prompts when risk signals appear.
+Purpose: confirm capture without turning the screen into analysis.
+
+Show only the latest 3-5 events in a small side list.
+
+Timeline event types:
+
+- handToReview
+- tiltState
+- energyState
+- microIntention
+- quickNote
+
+The complete timeline belongs in post-session review or future analysis, not as the main live screen.
+
+### 8. Coach AI Context
+
+Purpose: provide very short regulation prompts when risk signals or drift appear.
 
 The Coach must be contextual and lightweight, not a chat.
 
 Examples:
 
-- `2 sinais de tilt. Volta à regra de qualidade.`
-- `Energia baixa registada. Evita abrir mesas extra.`
+- `Tilt 4/5. Volta à regra de qualidade.`
+- `Energia média 2/5. Evita abrir mesas extra.`
 - `Já marcaste 5 mãos. Chega para review, agora volta ao foco.`
 
 Rules:
@@ -131,7 +206,7 @@ Rules:
 - no dense analysis
 - only show guidance when it can reduce risk or restore focus
 
-### 6. Finish Session
+### 9. Finish Session
 
 Primary action:
 
@@ -153,10 +228,12 @@ Reason: review is most valuable while the session is still fresh, and this close
 - mainFocus
 - maxTables
 - qualityRule
-- markedHandsCount
-- tiltCount
-- lowEnergyCount
-- quickNotes
+- pendingHandsCount
+- currentTilt
+- currentEnergy
+- energyAverage
+- tiltPeak
+- latestMicroIntention
 - startedAt
 - endedAt
 - updatedAt
@@ -165,14 +242,15 @@ Reason: review is most valuable while the session is still fresh, and this close
 
 - sessionId
 - userId
-- type: markedHand | tilt | lowEnergy | quickNote
+- type: handToReview | tiltState | energyState | microIntention | quickNote
+- value
 - template
 - note
 - createdAt
 
 ## UX Principles
 
-- One tap for core events.
+- One tap for scale values and common templates.
 - Large controls.
 - Minimal text.
 - No dashboard layout.
@@ -183,11 +261,27 @@ Reason: review is most valuable while the session is still fresh, and this close
 
 ## Success Criteria
 
-- Player can capture a core event in one tap.
+- Player can capture tilt and energy state in one tap.
+- Player can mark a hand for review in under 10 seconds.
+- Player can set a break micro-intention in under 10 seconds.
 - Player can add a quick note in under 10 seconds.
 - Player can see focus, max tables, and quality rule without searching.
-- Player can see marked hands, tilt, and low energy counts at a glance.
+- Player can see pending hands, current tilt, current energy, energy average, and tilt peak at a glance.
 - Session finish moves directly into review.
+
+## Dashboard Summary After Session
+
+The dashboard should not show the full timeline.
+
+It may show:
+
+- pending hands count
+- energy average
+- tilt peak
+
+Example:
+
+`4 mãos por rever · energia média 3/5 · tilt pico 4/5`
 
 ## Out Of Scope For First Implementation
 
@@ -206,10 +300,13 @@ Recommended first slice:
 - create `/session/live`
 - use local/default state only
 - show focus, max tables, and quality rule from defaults
-- add one-tap event buttons
+- replace increment counters with tilt and energy scale buttons
+- add hand-to-review capture with templates and short note
+- add break micro-intention capture with templates and editable text
+- add latest timeline side list
 - add quick note templates and short input
-- show counts
-- show simple contextual Coach message based on counts
+- show current state and derived summary
+- show simple contextual Coach message based on current state and timeline
 - `Terminar sessão` can point to a placeholder review route only after the post-session review discovery/spec exists
 
 Do not implement post-session review until its Product Discovery Workflow is complete.

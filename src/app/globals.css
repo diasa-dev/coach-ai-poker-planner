@@ -1378,54 +1378,63 @@ dd {
   gap: 14px;
 }
 
-.live-action-grid {
+.state-scale-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
-.live-action-button {
+.state-scale {
   display: grid;
-  min-height: 190px;
-  align-content: space-between;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-  padding: 18px;
-  text-align: left;
-  box-shadow: var(--small-shadow);
+  background: var(--surface-soft);
+  padding: 14px;
+  gap: 10px;
 }
 
-.live-action-button span {
-  font-size: 17px;
+.state-scale > span {
+  color: var(--muted);
+  font-size: 13px;
   font-weight: 900;
 }
 
-.live-action-button strong {
-  font-size: 46px;
-  line-height: 1;
+.state-scale div {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
 }
 
-.live-action-button.mark-hand {
-  border-color: color-mix(in srgb, var(--blue) 34%, var(--line));
-  background: linear-gradient(135deg, var(--blue-soft), var(--surface));
+.scale-button {
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 950;
 }
 
-.live-action-button.tilt {
-  border-color: color-mix(in srgb, var(--risk) 34%, var(--line));
-  background: linear-gradient(135deg, var(--risk-soft), var(--surface));
+.scale-button.active.tilt {
+  border-color: color-mix(in srgb, var(--risk) 46%, var(--line));
+  background: var(--risk-soft);
+  color: var(--risk);
 }
 
-.live-action-button.energy {
-  border-color: color-mix(in srgb, var(--amber) 34%, var(--line));
-  background: linear-gradient(135deg, var(--amber-soft), var(--surface));
+.scale-button.active.energy {
+  border-color: color-mix(in srgb, var(--green) 42%, var(--line));
+  background: var(--green-soft);
+  color: var(--green);
 }
 
 .note-template-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
+}
+
+.hand-template-grid {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
 .note-template {
@@ -1473,7 +1482,7 @@ dd {
 
 .live-state-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -1519,6 +1528,12 @@ dd {
 
 .recent-notes-card li strong {
   font-size: 13px;
+}
+
+.recent-notes-card li time {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 900;
 }
 
 .recent-notes-card li span {
@@ -1679,13 +1694,13 @@ dd {
     display: grid;
   }
 
-  .live-action-grid,
+  .state-scale-grid,
   .note-template-grid {
     grid-template-columns: 1fr;
   }
 
-  .live-action-button {
-    min-height: 118px;
+  .state-scale div {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
   .hero-card {
