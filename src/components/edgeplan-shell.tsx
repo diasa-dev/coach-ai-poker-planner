@@ -15,10 +15,12 @@ import {
   Sun,
   Target,
 } from "lucide-react";
+import { useConvexAuth, useQuery } from "convex/react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
+import { api } from "../../convex/_generated/api";
 
 const navItems = [
   { href: "/", label: "Hoje", icon: Sun },
@@ -38,6 +40,14 @@ function isActivePath(pathname: string, href: string) {
 
 export function EdgePlanShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const hasPersistenceConfig = Boolean(
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_CONVEX_URL,
+  );
+  const { isAuthenticated } = useConvexAuth();
+  const activeSession = useQuery(
+    api.pokerSession.getActive,
+    hasPersistenceConfig && isAuthenticated ? {} : "skip",
+  );
   const currentItem =
     navItems.find((item) => isActivePath(pathname, item.href)) ??
     (pathname.startsWith("/settings")
@@ -57,9 +67,9 @@ export function EdgePlanShell({ children }: { children: ReactNode }) {
           />
         </Link>
 
-        <Link className="ep-session-cta" href="/sessions">
+        <Link className={activeSession ? "ep-session-cta active-session" : "ep-session-cta"} href="/sessions">
           <Play size={16} aria-hidden="true" />
-          <span>Iniciar sessão</span>
+          <span>{activeSession ? `Sessão ativa · ${formatSessionDuration(activeSession.startedAt)}` : "Iniciar sessão"}</span>
         </Link>
 
         <nav className="ep-nav" aria-label="Navegação principal">
@@ -126,4 +136,11 @@ export function EdgePlanShell({ children }: { children: ReactNode }) {
       </div>
     </div>
   );
+}
+
+function formatSessionDuration(startedAt: number) {
+  const minutes = Math.max(0, Math.floor((Date.now() - startedAt) / 60000));
+  const hours = Math.floor(minutes / 60);
+  const remaining = minutes % 60;
+  return hours ? `${hours}h ${remaining}m` : `${remaining}m`;
 }

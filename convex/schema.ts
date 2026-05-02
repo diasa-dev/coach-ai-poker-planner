@@ -85,6 +85,61 @@ export default defineSchema({
     .index("by_daily_plan", ["dailyPlanId"])
     .index("by_user_daily_plan", ["userId", "dailyPlanId"]),
 
+  pokerSessions: defineTable({
+    userId: v.string(),
+    date: v.string(),
+    weeklyPlanId: v.optional(v.id("weeklyPlans")),
+    weeklyPlanBlockId: v.optional(v.id("weeklyPlanBlocks")),
+    status: v.union(
+      v.literal("active"),
+      v.literal("reviewPending"),
+      v.literal("reviewed"),
+    ),
+    sessionFocus: v.string(),
+    weeklyFocus: v.string(),
+    blockLabel: v.optional(v.string()),
+    maxTables: v.number(),
+    currentTables: v.number(),
+    energy: v.number(),
+    focusScore: v.number(),
+    tilt: v.number(),
+    handsToReview: v.number(),
+    microIntention: v.optional(v.string()),
+    isPaused: v.boolean(),
+    startedAt: v.number(),
+    endedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_status", ["userId", "status"])
+    .index("by_user_date", ["userId", "date"]),
+
+  pokerSessionEvents: defineTable({
+    userId: v.string(),
+    sessionId: v.id("pokerSessions"),
+    type: v.union(
+      v.literal("started"),
+      v.literal("checkup"),
+      v.literal("hand"),
+      v.literal("note"),
+      v.literal("microIntention"),
+      v.literal("paused"),
+      v.literal("resumed"),
+      v.literal("finished"),
+    ),
+    title: v.string(),
+    detail: v.string(),
+    template: v.optional(v.string()),
+    note: v.optional(v.string()),
+    energy: v.optional(v.number()),
+    focusScore: v.optional(v.number()),
+    tilt: v.optional(v.number()),
+    tables: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_user_session", ["userId", "sessionId"]),
+
   dailyCheckIns: defineTable({
     userId: v.string(),
     date: v.string(),

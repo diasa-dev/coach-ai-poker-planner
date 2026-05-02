@@ -2752,6 +2752,16 @@ dd {
   background: var(--ep-accent-primary-hover);
 }
 
+.ep-session-cta.active-session {
+  border: 1px solid rgba(34, 197, 213, 0.42);
+  background: rgba(34, 197, 213, 0.13);
+  color: var(--ep-accent-primary);
+}
+
+.ep-session-cta.active-session svg {
+  fill: currentColor;
+}
+
 .ep-nav {
   display: grid;
   gap: 1px;
