@@ -1,18 +1,5 @@
-import { PagePlaceholder } from "@/components/page-placeholder";
+import { MonthlyTargets } from "@/components/monthly-targets";
 
 export default function MonthlyPage() {
-  return (
-    <PagePlaceholder
-      eyebrow="Ritmo operacional"
-      title="Objetivos mensais"
-      description="Define alvos mensais para orientar o plano semanal."
-      primaryAction="Definir objetivos"
-      items={[
-        "Grind",
-        "Estudo",
-        "Review",
-        "Desporto",
-      ]}
-    />
-  );
+  return <MonthlyTargets />;
 }

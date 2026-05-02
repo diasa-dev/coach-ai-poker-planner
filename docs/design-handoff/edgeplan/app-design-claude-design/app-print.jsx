@@ -97,40 +97,44 @@ function PrintApp() {
         </PrintShell>
       </PrintScreen>
 
-      <PrintScreen label="03 — Plano semanal">
+      <PrintScreen label="03 — Plano semanal (execução)">
         <PrintShell route="weekly"><Weekly/></PrintShell>
       </PrintScreen>
 
-      <PrintScreen label="04 — Objetivos mensais">
+      <PrintScreen label="04 — Planear semana (criação)">
+        <PrintShell route="weekly"><WeeklyPlanningMode onCancel={noop} onSave={noop}/></PrintShell>
+      </PrintScreen>
+
+      <PrintScreen label="05 — Objetivos mensais">
         <PrintShell route="monthly"><Monthly/></PrintShell>
       </PrintScreen>
 
-      <PrintScreen label="05 — Sessões">
+      <PrintScreen label="06 — Sessões">
         <PrintShell route="sessions"><Sessions setRoute={noop}/></PrintShell>
       </PrintScreen>
 
-      <PrintScreen label="06 — Sessão ativa">
+      <PrintScreen label="07 — Sessão ativa">
         <PrintShell route="active">
           <ActiveSession onFinish={noop} onCheckup={noop} onHand={noop}
             onNote={noop} onIntent={noop}/>
         </PrintShell>
       </PrintScreen>
 
-      <PrintScreen label="07 — Estudo">
+      <PrintScreen label="08 — Estudo">
         <PrintShell route="study"><Study/></PrintShell>
       </PrintScreen>
 
-      <PrintScreen label="08 — Revisão semanal">
+      <PrintScreen label="09 — Revisão semanal">
         <PrintShell route="review">
           <WeeklyReview onStartConversation={noop} onPrepareNextWeek={noop}/>
         </PrintShell>
       </PrintScreen>
 
-      <PrintScreen label="09 — Coach AI">
+      <PrintScreen label="10 — Coach AI">
         <PrintShell route="coach"><Coach/></PrintShell>
       </PrintScreen>
 
-      <PrintScreen label="10 — Definições / Privacidade">
+      <PrintScreen label="11 — Definições / Privacidade">
         <PrintShell route="settings"><Settings/></PrintShell>
       </PrintScreen>
     </>

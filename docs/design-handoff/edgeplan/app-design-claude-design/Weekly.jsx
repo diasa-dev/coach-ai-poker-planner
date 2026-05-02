@@ -650,3 +650,4 @@ function EditBlockDrawer({ day, block, onClose, onChange }) {
 }
 
 window.Weekly = Weekly;
+window.WeeklyPlanningMode = PlanningMode;

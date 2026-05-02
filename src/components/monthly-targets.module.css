@@ -1,0 +1,476 @@
+.annualStrip,
+.annualStripMissing,
+.emptyState,
+.targetTable,
+.editorPanel,
+.summaryPanel,
+.contextGrid article {
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-md);
+  background: var(--ep-bg-surface);
+  box-shadow: var(--ep-shadow-sm);
+}
+
+.annualStrip,
+.annualStripMissing {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.annualStrip {
+  background:
+    linear-gradient(135deg, rgba(34, 197, 213, 0.12), transparent 44%),
+    var(--ep-bg-surface);
+}
+
+.annualStripMissing {
+  border-color: rgba(208, 140, 42, 0.34);
+  background:
+    linear-gradient(135deg, rgba(208, 140, 42, 0.11), transparent 44%),
+    var(--ep-bg-surface);
+}
+
+.annualHeader,
+.panelHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.annualHeader span,
+.panelHeading span {
+  display: block;
+  color: var(--ep-fg-3);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.annualHeader h2,
+.panelHeading h2,
+.emptyState h2,
+.contextGrid h2 {
+  margin: 3px 0 0;
+  color: var(--ep-fg-1);
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.annualStrip p,
+.annualStripMissing p,
+.emptyState p,
+.contextGrid p,
+.editorEmpty p {
+  color: var(--ep-fg-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.annualStrip small {
+  color: var(--ep-fg-3);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.textButton,
+.iconButton {
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface);
+  color: var(--ep-fg-2);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.textButton {
+  min-height: 30px;
+  padding: 0 10px;
+}
+
+.priorityList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.priorityList span {
+  border: 1px solid rgba(34, 197, 213, 0.36);
+  border-radius: 999px;
+  background: rgba(34, 197, 213, 0.1);
+  color: var(--ep-navy-800);
+  padding: 5px 9px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.missingDirection {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) max-content;
+  gap: 10px;
+  align-items: center;
+}
+
+.missingDirection svg {
+  color: var(--amber);
+}
+
+.missingDirection strong {
+  display: block;
+  color: var(--ep-fg-1);
+  font-size: 13px;
+}
+
+.emptyState {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) max-content;
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+}
+
+.emptyState svg {
+  color: var(--ep-accent-primary-hover);
+}
+
+.monthlyLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.38fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.targetTable {
+  overflow: hidden;
+}
+
+.tableHeader,
+.targetRow {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(160px, 0.74fr) minmax(100px, 0.42fr) minmax(130px, 0.5fr) minmax(120px, 0.35fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.tableHeader {
+  border-bottom: 1px solid var(--ep-border-1);
+  background: var(--ep-bg-surface-2);
+  padding: 11px 14px;
+}
+
+.tableHeader span {
+  color: var(--ep-fg-3);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.targetRow {
+  border-bottom: 1px solid var(--ep-border-1);
+  padding: 13px 14px;
+}
+
+.targetRow:last-child {
+  border-bottom: 0;
+}
+
+.categoryCell {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.categoryIcon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: var(--ep-radius-sm);
+  background: color-mix(in srgb, var(--accent) 14%, var(--ep-bg-surface));
+  color: var(--accent);
+}
+
+.categoryCell strong,
+.progressCell strong,
+.valueCell {
+  color: var(--ep-fg-1);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.categoryCell small,
+.progressCell small {
+  display: block;
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--ep-fg-3);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progressCell {
+  display: grid;
+  gap: 5px;
+}
+
+.progressTrack {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--ep-bg-surface-2);
+}
+
+.progressTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.pacePill {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 9px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.missing,
+.none {
+  background: var(--ep-bg-surface-2);
+  color: var(--ep-fg-2);
+}
+
+.behind {
+  background: var(--pill-adjusted-bg);
+  color: var(--pill-adjusted-fg);
+}
+
+.on {
+  background: var(--pill-active-bg);
+  color: var(--pill-active-fg);
+}
+
+.ahead,
+.complete {
+  background: var(--pill-done-bg);
+  color: var(--pill-done-fg);
+}
+
+.iconButton {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 9px;
+}
+
+.iconButton:hover,
+.textButton:hover {
+  border-color: rgba(34, 197, 213, 0.54);
+  color: var(--ep-navy-800);
+}
+
+.sideStack {
+  display: grid;
+  gap: 16px;
+}
+
+.editorPanel,
+.summaryPanel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.activeDot {
+  border-radius: 999px;
+  background: var(--pill-active-bg);
+  color: var(--pill-active-fg) !important;
+  padding: 5px 8px;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+.editorForm {
+  display: grid;
+  gap: 10px;
+}
+
+.editorForm label {
+  display: grid;
+  gap: 6px;
+  color: var(--ep-fg-3);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.editorForm input,
+.editorForm select {
+  min-height: 34px;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface);
+  color: var(--ep-fg-1);
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.secondaryFields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.editorActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.editorEmpty {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 92px;
+  border: 1px dashed var(--ep-border-2);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface-2);
+  padding: 14px;
+}
+
+.editorEmpty svg {
+  color: var(--ep-fg-3);
+}
+
+.errorText {
+  border: 1px solid rgba(197, 72, 63, 0.24);
+  border-radius: var(--ep-radius-sm);
+  background: var(--pill-notdone-bg);
+  color: var(--pill-notdone-fg);
+  padding: 8px 9px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.summaryPanel ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.summaryPanel li {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 3px 8px;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface-2);
+  padding: 9px;
+}
+
+.summaryPanel li span {
+  color: var(--ep-fg-3);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.summaryPanel li strong {
+  color: var(--ep-fg-1);
+  font-size: 12px;
+}
+
+.summaryPanel li small {
+  grid-column: 2;
+  color: var(--ep-fg-3);
+  font-size: 12px;
+}
+
+.summaryPanel svg {
+  color: var(--ep-accent-primary-hover);
+}
+
+.contextGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.contextGrid article {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  padding: 14px;
+}
+
+.contextGrid svg {
+  color: var(--ep-accent-primary-hover);
+}
+
+@media (max-width: 1120px) {
+  .monthlyLayout,
+  .contextGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .tableHeader {
+    display: none;
+  }
+
+  .targetRow {
+    grid-template-columns: minmax(0, 1fr) minmax(130px, 0.5fr);
+  }
+
+  .progressCell,
+  .valueCell,
+  .targetRow .pacePill {
+    grid-column: 1;
+  }
+
+  .iconButton {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+}
+
+@media (max-width: 640px) {
+  .missingDirection,
+  .emptyState,
+  .targetRow,
+  .contextGrid article {
+    grid-template-columns: 1fr;
+  }
+
+  .annualHeader,
+  .editorActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .secondaryFields {
+    grid-template-columns: 1fr;
+  }
+
+  .iconButton {
+    grid-column: auto;
+    grid-row: auto;
+    justify-self: stretch;
+  }
+}

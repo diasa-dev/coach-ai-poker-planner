@@ -1,0 +1,689 @@
+.statusGrid,
+.sessionLayout,
+.activeLayout {
+  display: grid;
+  gap: 16px;
+}
+
+.statusGrid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.statusCard,
+.historyPanel,
+.summaryPanel,
+.coachPanel,
+.focusBanner,
+.capturePanel,
+.timelinePanel,
+.passiveCoach,
+.modal {
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-md);
+  background: var(--ep-bg-surface);
+  box-shadow: var(--ep-shadow-sm);
+}
+
+.statusCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+}
+
+.statusCard span,
+.summaryPanel > span,
+.coachPanel span,
+.panelHead span,
+.focusBanner span,
+.intentBox span,
+.stateCell span,
+.stateCellWarning span,
+.templatePicker > span,
+.rating > span {
+  display: block;
+  color: var(--ep-fg-3);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.statusCard h2,
+.panelHead h2 {
+  margin: 3px 0 4px;
+  color: var(--ep-fg-1);
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.statusCard p,
+.coachPanel p,
+.passiveCoach p {
+  color: var(--ep-fg-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.sessionLayout {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.32fr);
+  align-items: start;
+}
+
+.historyPanel {
+  overflow: hidden;
+}
+
+.tableHeader,
+.tableRow {
+  display: grid;
+  grid-template-columns: 76px minmax(220px, 1fr) 82px 82px 70px 66px 124px 34px;
+  gap: 10px;
+  align-items: center;
+}
+
+.tableHeader {
+  border-bottom: 1px solid var(--ep-border-1);
+  background: var(--ep-bg-surface-2);
+  padding: 11px 14px;
+}
+
+.tableHeader span {
+  color: var(--ep-fg-3);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.tableRow {
+  border-bottom: 1px solid var(--ep-border-1);
+  padding: 13px 14px;
+}
+
+.tableRow:last-child {
+  border-bottom: 0;
+}
+
+.tableRow strong {
+  overflow: hidden;
+  color: var(--ep-fg-1);
+  font-size: 13px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mono {
+  color: var(--ep-fg-2);
+  font: var(--t-mono-sm);
+}
+
+.statusPill {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0 9px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.active {
+  background: var(--pill-active-bg, rgba(34, 197, 213, 0.12));
+  color: var(--pill-active-fg, #126b77);
+}
+
+.pending {
+  background: var(--pill-adjusted-bg, #fceedc);
+  color: var(--pill-adjusted-fg, #8b5a14);
+}
+
+.reviewed {
+  background: var(--pill-done-bg, #e2f5ec);
+  color: var(--pill-done-fg, #1f7a57);
+}
+
+.iconButton {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface);
+  color: var(--ep-fg-2);
+}
+
+.sideStack {
+  display: grid;
+  gap: 16px;
+}
+
+.summaryPanel,
+.coachPanel,
+.passiveCoach {
+  padding: 16px;
+}
+
+.summaryPanel dl {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.summaryPanel div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface-2);
+  padding: 10px;
+}
+
+.summaryPanel dt {
+  color: var(--ep-fg-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.summaryPanel dd {
+  margin: 0;
+  color: var(--ep-fg-1);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.coachPanel {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  background:
+    linear-gradient(135deg, rgba(34, 197, 213, 0.1), transparent 44%),
+    var(--ep-bg-surface);
+}
+
+.coachPanel svg,
+.passiveCoach svg {
+  color: var(--ep-accent-primary-hover);
+}
+
+.coachPanel small,
+.passiveCoach small,
+.timelinePanel small,
+.focusBanner small {
+  display: block;
+  color: var(--ep-fg-3);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.activePage {
+  display: grid;
+  gap: 16px;
+}
+
+.focusBanner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(190px, 0.24fr);
+  gap: 14px;
+  overflow: hidden;
+  padding: 18px;
+  background:
+    linear-gradient(135deg, rgba(13, 27, 42, 0.96), rgba(30, 58, 138, 0.9)),
+    var(--ep-navy-800);
+  color: #ffffff;
+}
+
+.focusBanner h2 {
+  margin: 12px 0 6px;
+  color: #ffffff;
+  font-size: 26px;
+  line-height: 1.12;
+}
+
+.focusBanner p {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 15px;
+}
+
+.focusBanner span,
+.focusBanner small,
+.intentBox span {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.timerBox {
+  display: grid;
+  align-content: center;
+  justify-items: end;
+  text-align: right;
+}
+
+.timerBox strong {
+  color: #ffffff;
+  font: 700 30px/1.1 var(--font-mono);
+}
+
+.intentBox {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--ep-radius-md);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 12px;
+}
+
+.intentBox strong {
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.stateStrip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.stateCell,
+.stateCellWarning {
+  display: grid;
+  min-height: 76px;
+  align-content: center;
+  gap: 3px;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-md);
+  background: var(--ep-bg-surface);
+  padding: 12px;
+}
+
+.stateCell strong,
+.stateCellWarning strong {
+  color: var(--ep-fg-1);
+  font-size: 17px;
+}
+
+.stateCellWarning {
+  border-color: rgba(208, 140, 42, 0.36);
+  background: linear-gradient(135deg, rgba(208, 140, 42, 0.1), transparent 62%), var(--ep-bg-surface);
+}
+
+.stateCellWarning small {
+  color: #8b5a14;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.activeLayout {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.36fr);
+  align-items: start;
+}
+
+.capturePanel {
+  grid-column: 1 / -1;
+  padding: 16px;
+}
+
+.panelHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.captureGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.captureButton {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-areas:
+    "icon title"
+    "icon detail";
+  gap: 2px 10px;
+  min-height: 82px;
+  align-items: center;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-md);
+  background: var(--ep-bg-surface-2);
+  color: var(--ep-fg-1);
+  padding: 12px;
+  text-align: left;
+}
+
+.captureButton span {
+  grid-area: icon;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: var(--ep-radius-sm);
+  background: rgba(34, 197, 213, 0.14);
+  color: var(--ep-accent-primary-hover);
+}
+
+.captureButton strong {
+  grid-area: title;
+  font-size: 13px;
+}
+
+.captureButton small {
+  grid-area: detail;
+  color: var(--ep-fg-3);
+  font-size: 12px;
+}
+
+.timelinePanel {
+  padding: 16px;
+}
+
+.timelinePanel ol {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timelinePanel li {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+  border-bottom: 1px solid var(--ep-border-1);
+  padding-bottom: 10px;
+}
+
+.timelinePanel li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.timelinePanel time {
+  color: var(--ep-fg-3);
+  font: var(--t-mono-sm);
+}
+
+.timelinePanel strong {
+  display: block;
+  color: var(--ep-fg-1);
+  font-size: 13px;
+}
+
+.activeSide {
+  display: grid;
+  gap: 10px;
+}
+
+.actionButton {
+  gap: 7px;
+}
+
+.passiveCoach {
+  display: grid;
+  gap: 9px;
+}
+
+.passiveCoach div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.passiveCoach em {
+  border-radius: 999px;
+  background: var(--ep-bg-surface-2);
+  color: var(--ep-fg-3);
+  padding: 4px 7px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgba(13, 27, 42, 0.56);
+  padding: 20px;
+}
+
+.modal {
+  display: grid;
+  gap: 16px;
+  width: min(720px, 100%);
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: auto;
+  padding: 18px;
+}
+
+.modal header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modal h2 {
+  margin: 0;
+  color: var(--ep-fg-1);
+  font-size: 20px;
+}
+
+.modal header button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface-2);
+  color: var(--ep-fg-2);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.formGrid label,
+.inlineField {
+  display: grid;
+  gap: 6px;
+  color: var(--ep-fg-3);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.formGrid input,
+.formGrid select,
+.formGrid textarea,
+.inlineField input,
+.financialInputs input,
+.financialInputs select {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface);
+  color: var(--ep-fg-1);
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.formGrid textarea {
+  min-height: 82px;
+  resize: vertical;
+  padding: 10px;
+  line-height: 1.45;
+}
+
+.fullField {
+  grid-column: 1 / -1;
+}
+
+.templatePicker {
+  display: grid;
+  gap: 8px;
+}
+
+.templatePicker div,
+.rating div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.templatePicker button,
+.rating button {
+  min-height: 30px;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-md);
+  background: var(--ep-bg-surface);
+  color: var(--ep-fg-2);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.selectedTemplate,
+.selectedRating {
+  border-color: rgba(34, 197, 213, 0.5) !important;
+  background: rgba(34, 197, 213, 0.14) !important;
+  color: var(--ep-navy-800) !important;
+}
+
+.ratingGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.rating {
+  display: grid;
+  gap: 8px;
+}
+
+.financialBox {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-md);
+  background: var(--ep-bg-surface-2);
+  padding: 14px;
+}
+
+.financialBox svg {
+  color: var(--ep-fg-3);
+}
+
+.financialBox strong {
+  display: block;
+  color: var(--ep-fg-1);
+  font-size: 13px;
+}
+
+.financialInputs {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.toggleLine {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--ep-fg-2);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.toggleLine input {
+  margin-top: 2px;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 1120px) {
+  .sessionLayout,
+  .activeLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .tableHeader {
+    display: none;
+  }
+
+  .tableRow {
+    grid-template-columns: 74px minmax(0, 1fr) 104px 32px;
+  }
+
+  .tableRow span:nth-of-type(2),
+  .tableRow span:nth-of-type(3),
+  .tableRow span:nth-of-type(4),
+  .tableRow span:nth-of-type(5) {
+    display: none;
+  }
+
+  .captureGrid,
+  .stateStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .statusCard,
+  .focusBanner {
+    grid-template-columns: 1fr;
+  }
+
+  .statusCard {
+    align-items: stretch;
+  }
+
+  .timerBox {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .captureGrid,
+  .stateStrip,
+  .formGrid,
+  .ratingGrid,
+  .financialInputs {
+    grid-template-columns: 1fr;
+  }
+
+  .tableRow {
+    grid-template-columns: minmax(0, 1fr) 104px 32px;
+  }
+
+  .tableRow .mono:first-child {
+    display: none;
+  }
+}

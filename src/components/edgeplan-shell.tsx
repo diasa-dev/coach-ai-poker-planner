@@ -3,9 +3,10 @@
 import {
   Bell,
   BookOpen,
-  CalendarCheck2,
   CalendarDays,
+  Compass,
   MessageSquareText,
+  Moon,
   Play,
   Search,
   Settings,
@@ -22,6 +23,7 @@ import { ReactNode } from "react";
 const navItems = [
   { href: "/", label: "Hoje", icon: Sun },
   { href: "/weekly", label: "Plano semanal", icon: CalendarDays },
+  { href: "/annual", label: "Direção anual", icon: Compass },
   { href: "/monthly", label: "Objetivos mensais", icon: Target },
   { href: "/sessions", label: "Sessões", icon: Spade },
   { href: "/study", label: "Estudo", icon: BookOpen },
@@ -48,7 +50,7 @@ export function EdgePlanShell({ children }: { children: ReactNode }) {
         <Link className="ep-brand" href="/" aria-label="Ir para Hoje">
           <Image
             src="/edgeplan/logo-horizontal-white.svg"
-            width={156}
+            width={184}
             height={60}
             alt="EdgePlan"
             priority
@@ -92,8 +94,8 @@ export function EdgePlanShell({ children }: { children: ReactNode }) {
         <div className="ep-profile" aria-label="Perfil">
           <span>JM</span>
           <div>
-            <strong>Jogador MTT</strong>
-            <small>Modo demo</small>
+            <strong>João M.</strong>
+            <small>Pro · MTT</small>
           </div>
         </div>
       </aside>
@@ -105,14 +107,17 @@ export function EdgePlanShell({ children }: { children: ReactNode }) {
             <strong>{currentItem.label}</strong>
           </div>
           <div className="ep-topbar-actions">
+            {pathname === "/" ? (
+              <strong className="ep-screen-label">02 — HOJE (DEPOIS DE PREPARAR)</strong>
+            ) : null}
             <button type="button" aria-label="Procurar">
               <Search size={18} aria-hidden="true" />
             </button>
+            <button type="button" aria-label="Tema">
+              <Moon size={18} aria-hidden="true" />
+            </button>
             <button type="button" aria-label="Notificações">
               <Bell size={18} aria-hidden="true" />
-            </button>
-            <button type="button" aria-label="Disciplina">
-              <CalendarCheck2 size={18} aria-hidden="true" />
             </button>
           </div>
         </header>
