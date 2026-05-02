@@ -78,7 +78,7 @@ function blockLabel(type: PlanBlockType) {
 }
 
 export function TodayExecution() {
-  const todayBlocks = useMemo(getTodayBlocks, []);
+  const todayBlocks = useMemo(() => getTodayBlocks(), []);
   const [commitments, setCommitments] = useState(initialCommitments);
   const [prepareOpen, setPrepareOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);

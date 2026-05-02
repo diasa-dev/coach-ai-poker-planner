@@ -9,6 +9,7 @@
  */
 
 import type * as dailyPlan from "../dailyPlan.js";
+import type * as weeklyPlan from "../weeklyPlan.js";
 
 import type {
   ApiFromModules,
@@ -18,6 +19,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   dailyPlan: typeof dailyPlan;
+  weeklyPlan: typeof weeklyPlan;
 }>;
 
 /**

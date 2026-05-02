@@ -3942,6 +3942,65 @@ dd {
   max-width: 1440px;
 }
 
+.wp-demo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid rgba(217, 138, 0, 0.32);
+  border-radius: var(--radius-md);
+  background: rgba(255, 247, 230, 0.88);
+  padding: 10px 12px;
+}
+
+.wp-demo-banner.is-real {
+  border-color: rgba(34, 197, 213, 0.34);
+  background: rgba(34, 197, 213, 0.08);
+}
+
+.wp-demo-banner strong,
+.wp-demo-banner span,
+.wp-demo-banner small {
+  display: block;
+}
+
+.wp-demo-banner strong {
+  color: var(--fg-1);
+  font: 700 13px/1.25 var(--font-sans);
+}
+
+.wp-demo-banner span,
+.wp-demo-banner small {
+  color: var(--fg-2);
+  font: var(--t-small);
+}
+
+.wp-demo-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.wp-demo-actions label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--fg-3);
+  font: 700 11px/1 var(--font-sans);
+  text-transform: uppercase;
+}
+
+.wp-demo-actions select {
+  min-height: 28px;
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--fg-1);
+  padding: 0 8px;
+  font: 600 12px/1 var(--font-sans);
+}
+
 .wp-page-head,
 .wpp-head {
   display: flex;

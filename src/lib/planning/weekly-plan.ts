@@ -18,6 +18,8 @@ export type PlanBlock = {
 
 export type PlanDay = {
   date: string;
+  isoDate?: string;
+  dayIndex?: number;
   label: string;
   summary: string;
   isToday?: boolean;
@@ -51,6 +53,68 @@ export const weeklyPlanPresets = [
   "Semana recuperação",
   "Personalizada",
 ];
+
+export type StoredPlanStatus = "draft" | "active" | "reviewed" | "archived";
+export type StoredBlockType = "grind" | "study" | "review" | "sport" | "rest" | "admin";
+export type StoredBlockStatus = "planned" | "done" | "adjusted" | "notDone";
+
+export type StoredWeeklyPlanBlock = {
+  _id?: string;
+  dayIndex: number;
+  type: StoredBlockType;
+  title: string;
+  targetLabel?: string;
+  status: StoredBlockStatus;
+  order: number;
+};
+
+const dayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const monthLabels = [
+  "Jan",
+  "Fev",
+  "Mar",
+  "Abr",
+  "Mai",
+  "Jun",
+  "Jul",
+  "Ago",
+  "Set",
+  "Out",
+  "Nov",
+  "Dez",
+];
+
+const storedToUiType: Record<StoredBlockType, PlanBlockType> = {
+  grind: "Grind",
+  study: "Estudo",
+  review: "Review",
+  sport: "Desporto",
+  rest: "Descanso",
+  admin: "Admin",
+};
+
+const uiToStoredType: Record<PlanBlockType, StoredBlockType> = {
+  Grind: "grind",
+  Estudo: "study",
+  Review: "review",
+  Desporto: "sport",
+  Descanso: "rest",
+  Admin: "admin",
+};
+
+const storedToUiStatus: Record<StoredBlockStatus, PlanBlockStatus> = {
+  planned: "Planeado",
+  done: "Feito",
+  adjusted: "Ajustado",
+  notDone: "Não feito",
+};
+
+const uiToStoredStatus: Record<PlanBlockStatus, StoredBlockStatus> = {
+  Planeado: "planned",
+  Feito: "done",
+  Ajustado: "adjusted",
+  "Não feito": "notDone",
+};
 
 export const initialPlanDays: PlanDay[] = [
   {
@@ -240,6 +304,80 @@ export function createPlanBlock(dayDate: string, draft: BlockDraft): PlanBlock {
   };
 }
 
+export function getTodayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function formatWeekRange(weekStartDate: string) {
+  const start = parseIsoDate(weekStartDate);
+  const end = addDays(start, 6);
+  return `${formatDayMonth(start)}–${formatDayMonth(end)}`;
+}
+
+export function buildPlanDaysFromStoredBlocks({
+  blocks,
+  today,
+  weekStartDate,
+}: {
+  blocks: StoredWeeklyPlanBlock[];
+  today: string;
+  weekStartDate: string;
+}) {
+  const todayTime = parseIsoDate(today).getTime();
+
+  return Array.from({ length: 7 }, (_, dayIndex) => {
+    const date = addDays(parseIsoDate(weekStartDate), dayIndex);
+    const isoDate = toIsoDate(date);
+    const dayBlocks = blocks
+      .filter((block) => block.dayIndex === dayIndex)
+      .sort((a, b) => a.order - b.order)
+      .map<PlanBlock>((block) => ({
+        id: block._id ?? `${isoDate}-${block.order}`,
+        type: storedToUiType[block.type],
+        title: block.title,
+        target: block.targetLabel,
+        status: storedToUiStatus[block.status],
+      }));
+
+    return {
+      date: formatDayMonth(date),
+      isoDate,
+      dayIndex,
+      label: dayLabels[date.getUTCDay()],
+      summary: getDaySummary(dayBlocks),
+      isToday: isoDate === today,
+      isPast: date.getTime() < todayTime,
+      isOff: dayBlocks.length > 0 && dayBlocks.every((block) => block.type === "Descanso"),
+      blocks: dayBlocks,
+    };
+  });
+}
+
+export function toStoredPlanBlocks(days: PlanDay[]) {
+  return days.flatMap((day, fallbackDayIndex) =>
+    day.blocks.map((block, order) => ({
+      dayIndex: day.dayIndex ?? fallbackDayIndex,
+      type: uiToStoredType[block.type],
+      title: block.title,
+      targetLabel: block.target,
+      status: uiToStoredStatus[block.status],
+      order,
+    })),
+  );
+}
+
+export function createCleanDraftFromDays(days: PlanDay[]) {
+  return days.map((day) => ({
+    ...day,
+    isPast: false,
+    blocks: day.blocks.map((block) => ({
+      ...block,
+      id: `${day.isoDate ?? day.date}-${block.id}-${Date.now()}`,
+      status: "Planeado" as const,
+    })),
+  }));
+}
+
 export function getWeeklyDistribution(days: PlanDay[]) {
   const counts = days
     .flatMap((day) => day.blocks)
@@ -327,4 +465,22 @@ function getCategoryMinutes(days: PlanDay[], type: PlanBlockType) {
     .flatMap((day) => day.blocks)
     .filter((block) => block.type === type)
     .reduce((total, block) => total + parsePlanTarget(block.target), 0);
+}
+
+function parseIsoDate(value: string) {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function toIsoDate(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function formatDayMonth(date: Date) {
+  return `${date.getUTCDate()} ${monthLabels[date.getUTCMonth()]}`;
 }

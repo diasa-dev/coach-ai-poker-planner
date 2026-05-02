@@ -10,18 +10,25 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useMemo, useState } from "react";
+import { api } from "../../convex/_generated/api";
 import {
   blockTypes,
+  buildPlanDaysFromStoredBlocks,
+  createCleanDraftFromDays,
   createEmptyBlockDraft,
   createPlanBlock,
+  formatWeekRange,
   formatPlanMinutes,
   getBlockClassName,
   getDaySummary,
+  getTodayIsoDate,
   getWeeklyTimeTotals,
   initialPlanDays,
   initialWeeklyFocus,
   parsePlanTarget,
+  toStoredPlanBlocks,
   weeklyPlanPresets,
   type BlockDraft,
   type PlanBlock,
@@ -31,6 +38,31 @@ import {
 } from "@/lib/planning/weekly-plan";
 
 const planOrder = ["Grind", "Estudo", "Review", "Desporto", "Descanso", "Admin"] as const;
+const hasPersistenceConfig = Boolean(
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_CONVEX_URL,
+);
+const todayIsoDate = getTodayIsoDate();
+
+type SaveState = "idle" | "saving" | "saved" | "error";
+type PlanStatus = "draft" | "active" | "reviewed" | "archived";
+type WeeklyPlanWorkspaceProps = {
+  demoReason?: string;
+  hasPersistence: boolean;
+  hasPreviousPlan?: boolean;
+  initialDays?: PlanDay[];
+  initialFocus?: string;
+  initialPlanStatus?: PlanStatus;
+  onCopyPreviousWeek?: () => Promise<void>;
+  onSavePlan?: (payload: {
+    days: PlanDay[];
+    focus: string;
+    status: "draft" | "active";
+  }) => Promise<void>;
+  onWeekStartDayChange?: (weekStartDay: number) => Promise<void>;
+  saveState?: SaveState;
+  weekRange?: string;
+  weekStartDay?: number;
+};
 
 function statusClass(status: PlanBlockStatus) {
   if (status === "Feito") return "done";
@@ -62,11 +94,139 @@ function getDistributionSegments(blocks: PlanBlock[]) {
 }
 
 export function WeeklyPlan() {
+  if (!hasPersistenceConfig) {
+    return (
+      <WeeklyPlanWorkspace
+        demoReason="Clerk ou Convex ainda não estão configurados. As alterações ficam apenas neste draft local."
+        hasPersistence={false}
+        initialPlanStatus="draft"
+        saveState="idle"
+        weekRange="Semana demo"
+        weekStartDay={1}
+      />
+    );
+  }
+
+  return <PersistedWeeklyPlan />;
+}
+
+function PersistedWeeklyPlan() {
+  const { isAuthenticated, isLoading } = useConvexAuth();
+  const weeklyPlan = useQuery(
+    api.weeklyPlan.getCurrent,
+    isAuthenticated ? { today: todayIsoDate } : "skip",
+  );
+  const saveWeeklyPlan = useMutation(api.weeklyPlan.save);
+  const copyPreviousWeek = useMutation(api.weeklyPlan.copyPreviousWeek);
+  const setWeekStartDay = useMutation(api.weeklyPlan.setWeekStartDay);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+
+  if (isLoading || (isAuthenticated && weeklyPlan === undefined)) {
+    return (
+      <section className="ep-page ep-weekly-page wp-page">
+        <div className="wp-demo-banner">A carregar plano semanal...</div>
+      </section>
+    );
+  }
+
+  if (!isAuthenticated || !weeklyPlan) {
+    return (
+      <WeeklyPlanWorkspace
+        demoReason="Sessão não iniciada. Estás a ver dados mock; entra para guardar o plano no Convex."
+        hasPersistence={false}
+        initialPlanStatus="draft"
+        saveState="idle"
+        weekRange="Semana demo"
+        weekStartDay={1}
+      />
+    );
+  }
+
+  const initialDays = weeklyPlan.currentPlan
+    ? buildPlanDaysFromStoredBlocks({
+        blocks: weeklyPlan.currentBlocks,
+        today: todayIsoDate,
+        weekStartDate: weeklyPlan.weekStartDate,
+      })
+    : initialPlanDays;
+  const workspaceKey = [
+    weeklyPlan.weekStartDate,
+    weeklyPlan.weekStartDay,
+    weeklyPlan.currentPlan?._id ?? "empty",
+    weeklyPlan.currentPlan?.updatedAt ?? 0,
+    weeklyPlan.currentBlocks.length,
+  ].join(":");
+
+  return (
+    <WeeklyPlanWorkspace
+      key={workspaceKey}
+      hasPersistence
+      hasPreviousPlan={weeklyPlan.hasPreviousPlan}
+      initialDays={initialDays}
+      initialFocus={weeklyPlan.currentPlan?.focus ?? initialWeeklyFocus}
+      initialPlanStatus={weeklyPlan.currentPlan?.status ?? "draft"}
+      onCopyPreviousWeek={async () => {
+        setSaveState("saving");
+        try {
+          await copyPreviousWeek({
+            weekStartDate: weeklyPlan.weekStartDate,
+            previousWeekStartDate: weeklyPlan.previousWeekStartDate,
+          });
+          setSaveState("saved");
+        } catch {
+          setSaveState("error");
+        }
+      }}
+      onSavePlan={async ({ days, focus, status }) => {
+        setSaveState("saving");
+        try {
+          await saveWeeklyPlan({
+            weekStartDate: weeklyPlan.weekStartDate,
+            focus,
+            status,
+            blocks: toStoredPlanBlocks(days),
+          });
+          setSaveState("saved");
+        } catch {
+          setSaveState("error");
+        }
+      }}
+      onWeekStartDayChange={async (weekStartDay) => {
+        setSaveState("saving");
+        try {
+          await setWeekStartDay({ weekStartDay });
+          setSaveState("saved");
+        } catch {
+          setSaveState("error");
+        }
+      }}
+      saveState={saveState}
+      weekRange={formatWeekRange(weeklyPlan.weekStartDate)}
+      weekStartDay={weeklyPlan.weekStartDay}
+    />
+  );
+}
+
+function WeeklyPlanWorkspace({
+  demoReason,
+  hasPersistence,
+  hasPreviousPlan,
+  initialDays = initialPlanDays,
+  initialFocus = initialWeeklyFocus,
+  initialPlanStatus = "draft",
+  onCopyPreviousWeek,
+  onSavePlan,
+  onWeekStartDayChange,
+  saveState = "idle",
+  weekRange = "12–18 Mai",
+  weekStartDay = 1,
+}: WeeklyPlanWorkspaceProps) {
   const [mode, setMode] = useState<"execution" | "planning">("execution");
   const [view, setView] = useState<"full" | "from-today">("full");
   const [collapsedPast, setCollapsedPast] = useState(true);
-  const [weeklyFocus, setWeeklyFocus] = useState(initialWeeklyFocus);
-  const [days, setDays] = useState(initialPlanDays);
+  const [weeklyFocus, setWeeklyFocus] = useState(initialFocus);
+  const [planStatus, setPlanStatus] = useState<PlanStatus>(initialPlanStatus);
+  const [days, setDays] = useState(initialDays);
   const [addingDay, setAddingDay] = useState<string | null>(null);
   const [draftBlock, setDraftBlock] = useState(createEmptyBlockDraft);
   const [editing, setEditing] = useState<{ dayDate: string; block: PlanBlock } | null>(null);
@@ -83,6 +243,37 @@ export function WeeklyPlan() {
     setDays((currentDays) =>
       currentDays.map((day) => (day.date === dayDate ? getNextDay(day) : day)),
     );
+  }
+
+  async function handleCopyPreviousWeek() {
+    if (onCopyPreviousWeek) {
+      await onCopyPreviousWeek();
+      setPlanStatus("draft");
+      setMode("planning");
+      return;
+    }
+
+    setDays(createCleanDraftFromDays(days));
+    setPlanStatus("draft");
+    setMode("planning");
+  }
+
+  async function handleSave(status: "draft" | "active") {
+    if (!weeklyFocus.trim()) return;
+
+    if (onSavePlan) {
+      await onSavePlan({ days, focus: weeklyFocus.trim(), status });
+    }
+
+    setWeeklyFocus(weeklyFocus.trim());
+    setPlanStatus(status);
+    setMode("execution");
+  }
+
+  async function handleWeekStartDayChange(value: string) {
+    if (onWeekStartDayChange) {
+      await onWeekStartDayChange(Number(value));
+    }
   }
 
   function addBlock(dayDate: string, blockType?: PlanBlockType) {
@@ -191,13 +382,25 @@ export function WeeklyPlan() {
   if (mode === "planning") {
     return (
       <section className="ep-page ep-weekly-page wpp-page">
+        <PlanModeBanner
+          demoReason={demoReason}
+          hasPersistence={hasPersistence}
+          onWeekStartDayChange={handleWeekStartDayChange}
+          saveState={saveState}
+          weekStartDay={weekStartDay}
+        />
         <div className="wpp-head">
           <div>
-            <span>Semana 18 · 12–18 Mai</span>
+            <span>{weekRange} · {getPlanStatusLabel(planStatus)}</span>
             <h1>Planear semana</h1>
           </div>
           <div className="ep-page-actions">
-            <button className="ep-button secondary" type="button">
+            <button
+              className="ep-button secondary"
+              type="button"
+              onClick={handleCopyPreviousWeek}
+              disabled={hasPersistence && !hasPreviousPlan}
+            >
               <Copy size={14} aria-hidden="true" />
               Copiar semana anterior
             </button>
@@ -208,9 +411,22 @@ export function WeeklyPlan() {
             <button className="ep-button secondary" type="button" onClick={() => setMode("execution")}>
               Cancelar
             </button>
-            <button className="ep-button primary" type="button" onClick={() => setMode("execution")}>
+            <button
+              className="ep-button secondary"
+              type="button"
+              onClick={() => handleSave("draft")}
+              disabled={!weeklyFocus.trim() || saveState === "saving"}
+            >
+              Guardar draft
+            </button>
+            <button
+              className="ep-button primary"
+              type="button"
+              onClick={() => handleSave("active")}
+              disabled={!weeklyFocus.trim() || saveState === "saving"}
+            >
               <Check size={14} aria-hidden="true" />
-              Guardar plano
+              Ativar plano
             </button>
           </div>
         </div>
@@ -284,9 +500,16 @@ export function WeeklyPlan() {
 
   return (
     <section className="ep-page ep-weekly-page wp-page">
+      <PlanModeBanner
+        demoReason={demoReason}
+        hasPersistence={hasPersistence}
+        onWeekStartDayChange={handleWeekStartDayChange}
+        saveState={saveState}
+        weekStartDay={weekStartDay}
+      />
       <div className="ep-page-header wp-page-head">
         <div>
-          <span>Semana 18 · 12–18 Mai</span>
+          <span>{weekRange} · {getPlanStatusLabel(planStatus)}</span>
           <h1>Plano semanal</h1>
           <p>
             Foco · <strong>{weeklyFocus}</strong>
@@ -309,7 +532,12 @@ export function WeeklyPlan() {
               A partir de hoje
             </button>
           </div>
-          <button className="ep-button secondary" type="button">
+          <button
+            className="ep-button secondary"
+            type="button"
+            onClick={handleCopyPreviousWeek}
+            disabled={hasPersistence && !hasPreviousPlan}
+          >
             <Copy size={14} aria-hidden="true" />
             Copiar semana anterior
           </button>
@@ -370,6 +598,52 @@ export function WeeklyPlan() {
         />
       ) : null}
     </section>
+  );
+}
+
+function PlanModeBanner({
+  demoReason,
+  hasPersistence,
+  onWeekStartDayChange,
+  saveState,
+  weekStartDay,
+}: {
+  demoReason?: string;
+  hasPersistence: boolean;
+  onWeekStartDayChange: (value: string) => void;
+  saveState: SaveState;
+  weekStartDay: number;
+}) {
+  return (
+    <div className={hasPersistence ? "wp-demo-banner is-real" : "wp-demo-banner"}>
+      <div>
+        <strong>{hasPersistence ? "Dados reais ligados" : "Modo demo/mock"}</strong>
+        <span>
+          {hasPersistence
+            ? "Este plano fica persistido quando guardas draft ou ativar plano."
+            : demoReason}
+        </span>
+      </div>
+      <div className="wp-demo-actions">
+        <label>
+          Semana começa
+          <select
+            value={weekStartDay}
+            onChange={(event) => onWeekStartDayChange(event.target.value)}
+            disabled={!hasPersistence || saveState === "saving"}
+          >
+            <option value={1}>Segunda</option>
+            <option value={2}>Terça</option>
+            <option value={3}>Quarta</option>
+            <option value={4}>Quinta</option>
+            <option value={5}>Sexta</option>
+            <option value={6}>Sábado</option>
+            <option value={0}>Domingo</option>
+          </select>
+        </label>
+        <small>{getSaveStateLabel(saveState)}</small>
+      </div>
+    </div>
   );
 }
 
@@ -742,4 +1016,22 @@ function getDefaultTarget(type: PlanBlockType) {
     Descanso: "—",
     Admin: "20m",
   }[type];
+}
+
+function getPlanStatusLabel(status: PlanStatus) {
+  return {
+    draft: "Draft",
+    active: "Plano ativo",
+    reviewed: "Revisto",
+    archived: "Arquivado",
+  }[status];
+}
+
+function getSaveStateLabel(state: SaveState) {
+  return {
+    idle: "Sem alterações guardadas nesta sessão",
+    saving: "A guardar...",
+    saved: "Guardado",
+    error: "Erro ao guardar",
+  }[state];
 }
