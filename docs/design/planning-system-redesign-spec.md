@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Redesign the Coach AI Poker Planner app around the MVP planning system, poker-session flow, and Coach AI before implementing more product behavior.
+Redesign Uplinea around the MVP planning system, poker-session flow, and Coach AI before implementing more product behavior.
 
 The app should not feel like a generic poker dashboard, a calendar, a financial tracker, or an AI chat wrapper. The MVP should feel like a performance operating system for professional online poker players:
 

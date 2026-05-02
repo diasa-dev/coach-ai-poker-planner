@@ -1,4 +1,4 @@
-# Coach AI Poker Planner
+# Uplinea
 
 Dashboard-first productivity and accountability app for professional online poker tournament players.
 

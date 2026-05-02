@@ -2,7 +2,7 @@
 
 ## Objective
 
-Create the operational planning spine for Coach AI Poker Planner.
+Create the operational planning spine for Uplinea.
 
 The system should help a professional online poker player translate annual direction into monthly targets, a realistic weekly plan, daily execution, reviews, and a better next plan.
 

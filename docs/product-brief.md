@@ -1,4 +1,4 @@
-# Coach AI Poker Planner - Product Brief
+# Uplinea Product Brief
 
 ## Vision
 
