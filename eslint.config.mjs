@@ -15,6 +15,7 @@ const eslintConfig = defineConfig([
     "node_modules.partial/**",
     "next-env.d.ts",
     "convex/_generated/**",
+    "docs/design-handoff/**",
   ]),
 ]);
 

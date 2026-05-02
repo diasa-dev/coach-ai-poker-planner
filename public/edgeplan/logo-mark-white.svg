@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" role="img" aria-label="EdgePlan">
+  <rect x="14" y="120" width="32" height="68" rx="16" fill="#FFFFFF"></rect>
+  <rect x="58" y="78" width="32" height="110" rx="16" fill="#FFFFFF"></rect>
+  <path d="M118 28 a16 16 0 0 1 32 0 V 124 L 134 144 L 118 124 Z" fill="#FFFFFF"></path>
+  <path d="&#xA;    M 134 96&#xA;    C 134 108, 116 116, 108 130&#xA;    C 100 144, 102 158, 114 162&#xA;    C 124 165, 132 160, 134 152&#xA;    C 134 158, 132 168, 124 174&#xA;    L 144 174&#xA;    C 136 168, 134 158, 134 152&#xA;    C 136 160, 144 165, 154 162&#xA;    C 166 158, 168 144, 160 130&#xA;    C 152 116, 134 108, 134 96 Z&#xA;  " fill="#FFFFFF"></path>
+</svg>
