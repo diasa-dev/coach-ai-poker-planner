@@ -52,7 +52,8 @@ start_server() {
 
   (
     cd "$ROOT_DIR"
-    setsid bash -lc 'source "$HOME/.nvm/nvm.sh" && nvm use >/dev/null && exec npm run dev:coach' \
+    export PORT
+    setsid bash -lc 'source "$HOME/.nvm/nvm.sh" && nvm use >/dev/null && exec npm run dev -- -H 0.0.0.0 -p "$PORT"' \
       >"$LOG_FILE" 2>&1 </dev/null &
     echo $! >"$PID_FILE"
   )

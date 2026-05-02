@@ -9,13 +9,17 @@ const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 
 export function AppProviders({ children }: { children: ReactNode }) {
-  if (!clerkPublishableKey || !convexUrl) {
+  if (!clerkPublishableKey) {
     return children;
   }
 
   return (
     <ClerkProvider publishableKey={clerkPublishableKey}>
-      <ConvexClerkProvider convexUrl={convexUrl}>{children}</ConvexClerkProvider>
+      {convexUrl ? (
+        <ConvexClerkProvider convexUrl={convexUrl}>{children}</ConvexClerkProvider>
+      ) : (
+        children
+      )}
     </ClerkProvider>
   );
 }
