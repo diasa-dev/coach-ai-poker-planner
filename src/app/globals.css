@@ -6230,6 +6230,17 @@ dd {
   gap: 10px;
 }
 
+.today-print-match .today-empty-blocks {
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #4b5565;
+  padding: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .today-print-match .today-block-row {
   grid-template-columns: 72px minmax(0, 1fr) 54px 92px 24px;
   min-height: 56px;

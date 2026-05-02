@@ -1,9 +1,14 @@
 "use client";
 
 import { Check, Edit3, MoreHorizontal, Play, Sparkles, X } from "lucide-react";
+import { useConvexAuth, useQuery } from "convex/react";
 import Link from "next/link";
 import { type ReactNode, useMemo, useState } from "react";
+import { api } from "../../convex/_generated/api";
 import {
+  buildPlanDaysFromStoredBlocks,
+  formatWeekRange,
+  getTodayIsoDate,
   initialPlanDays,
   initialWeeklyFocus,
   type PlanBlock,
@@ -12,8 +17,9 @@ import {
 } from "@/lib/planning/weekly-plan";
 
 type CommitmentStatus = "planned" | "done" | "adjusted" | "not-done";
-type CommitmentKind = "Revisão" | "Foco" | "Estudo";
+type CommitmentKind = PlanBlockType | "Foco" | "Revisão";
 type PlanChoice = "follow" | "adjust" | "reduce";
+type TodaySource = "demo" | "active" | "no-active-plan";
 
 type Commitment = {
   id: string;
@@ -57,8 +63,12 @@ const reasonOptions = [
   "Prioridade mudou",
   "Sem motivo claro",
 ];
+const hasPersistenceConfig = Boolean(
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_CONVEX_URL,
+);
+const todayIsoDate = getTodayIsoDate();
 
-function getTodayBlocks() {
+function getDemoTodayBlocks() {
   return initialPlanDays.find((day) => day.isToday)?.blocks ?? [];
 }
 
@@ -78,15 +88,100 @@ function blockLabel(type: PlanBlockType) {
 }
 
 export function TodayExecution() {
-  const todayBlocks = useMemo(() => getTodayBlocks(), []);
-  const [commitments, setCommitments] = useState(initialCommitments);
+  if (!hasPersistenceConfig) {
+    return (
+      <TodayWorkspace
+        source="demo"
+        sourceMessage="Clerk ou Convex ainda não estão configurados. Today está a usar dados mock."
+        todayBlocks={getDemoTodayBlocks()}
+        weeklyFocus={initialWeeklyFocus}
+        weekLabel="Semana demo"
+      />
+    );
+  }
+
+  return <PersistedTodayExecution />;
+}
+
+function PersistedTodayExecution() {
+  const { isAuthenticated, isLoading } = useConvexAuth();
+  const weeklyPlan = useQuery(
+    api.weeklyPlan.getCurrent,
+    isAuthenticated ? { today: todayIsoDate } : "skip",
+  );
+
+  if (isLoading || (isAuthenticated && weeklyPlan === undefined)) {
+    return (
+      <section className="ep-page today-page today-print-match">
+        <div className="wp-demo-banner">A carregar plano de hoje...</div>
+      </section>
+    );
+  }
+
+  if (!isAuthenticated || !weeklyPlan) {
+    return (
+      <TodayWorkspace
+        source="demo"
+        sourceMessage="Sessão não iniciada. Today está a usar dados mock até entrares."
+        todayBlocks={getDemoTodayBlocks()}
+        weeklyFocus={initialWeeklyFocus}
+        weekLabel="Semana demo"
+      />
+    );
+  }
+
+  const activePlan = weeklyPlan.currentPlan?.status === "active" ? weeklyPlan.currentPlan : null;
+  const activeDays = activePlan
+    ? buildPlanDaysFromStoredBlocks({
+        blocks: weeklyPlan.currentBlocks,
+        today: todayIsoDate,
+        weekStartDate: weeklyPlan.weekStartDate,
+      })
+    : [];
+  const todayBlocks = activeDays.find((day) => day.isToday)?.blocks ?? [];
+
+  return (
+    <TodayWorkspace
+      key={`${weeklyPlan.weekStartDate}:${activePlan?._id ?? "no-active"}:${activePlan?.updatedAt ?? 0}:${todayBlocks.length}`}
+      source={activePlan ? "active" : "no-active-plan"}
+      sourceMessage={
+        activePlan
+          ? "Today está a usar o plano semanal ativo."
+          : "Ainda não há plano semanal ativo. Ativa um plano em Plano semanal para ligar a execução de hoje."
+      }
+      todayBlocks={activePlan ? todayBlocks : []}
+      weeklyFocus={activePlan?.focus ?? "Sem plano semanal ativo."}
+      weekLabel={activePlan ? formatWeekRange(weeklyPlan.weekStartDate) : "Sem plano ativo"}
+    />
+  );
+}
+
+function TodayWorkspace({
+  source,
+  sourceMessage,
+  todayBlocks,
+  weeklyFocus,
+  weekLabel,
+}: {
+  source: TodaySource;
+  sourceMessage: string;
+  todayBlocks: PlanBlock[];
+  weeklyFocus: string;
+  weekLabel: string;
+}) {
+  const defaultCommitments = source === "demo" ? initialCommitments : [];
+  const [commitments, setCommitments] = useState(defaultCommitments);
   const [prepareOpen, setPrepareOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
   const [planChoice, setPlanChoice] = useState<PlanChoice>("follow");
   const [selectedCommitments, setSelectedCommitments] = useState(() =>
-    initialCommitments.map((commitment) => commitment.id),
+    getCommitmentOptions(source, todayBlocks).map((commitment) => commitment.id),
   );
 
+  const commitmentOptions = useMemo(
+    () => getCommitmentOptions(source, todayBlocks),
+    [source, todayBlocks],
+  );
   const completedCommitments = commitments.filter((commitment) => commitment.status === "done").length;
   const doneBlocks = todayBlocks.filter((block) => block.status === "Feito").length;
 
@@ -109,19 +204,20 @@ export function TodayExecution() {
   }
 
   function confirmPrepareDay() {
-    const selected = initialCommitments.filter((commitment) => selectedCommitments.includes(commitment.id));
-    setCommitments(selected.length ? selected.slice(0, 3) : initialCommitments.slice(0, 1));
+    const selected = commitmentOptions.filter((commitment) => selectedCommitments.includes(commitment.id));
+    setCommitments(selected.length ? selected.slice(0, 3) : commitmentOptions.slice(0, 1));
     setPrepareOpen(false);
   }
 
   return (
     <section className="ep-page today-page today-print-match">
+      <TodayModeBanner message={sourceMessage} source={source} />
       <div className="ep-page-header today-head">
         <div>
-          <span>Quinta · 14 Maio · Semana 18</span>
+          <span>{weekLabel}</span>
           <h1>Bom dia, João.</h1>
           <p>
-            Foco da semana · <strong>{initialWeeklyFocus}</strong>
+            Foco da semana · <strong>{weeklyFocus}</strong>
           </p>
         </div>
         <div className="today-head-actions">
@@ -144,7 +240,7 @@ export function TodayExecution() {
             onReasonChange={updateReason}
             onStatusChange={updateCommitment}
           />
-          <PlannedBlocksCard blocks={todayBlocks} doneBlocks={doneBlocks} />
+          <PlannedBlocksCard blocks={todayBlocks} doneBlocks={doneBlocks} source={source} />
         </main>
 
         <aside className="today-side">
@@ -161,6 +257,7 @@ export function TodayExecution() {
         <PrepareDayDialog
           onClose={() => setPrepareOpen(false)}
           onConfirm={confirmPrepareDay}
+          options={commitmentOptions}
           planChoice={planChoice}
           selectedCommitments={selectedCommitments}
           setPlanChoice={setPlanChoice}
@@ -178,6 +275,40 @@ export function TodayExecution() {
       ) : null}
     </section>
   );
+}
+
+function TodayModeBanner({ message, source }: { message: string; source: TodaySource }) {
+  return (
+    <div className={source === "active" ? "wp-demo-banner is-real" : "wp-demo-banner"}>
+      <div>
+        <strong>
+          {source === "active"
+            ? "Plano ativo ligado"
+            : source === "no-active-plan"
+              ? "Sem plano semanal ativo"
+              : "Modo demo/mock"}
+        </strong>
+        <span>{message}</span>
+      </div>
+      {source === "no-active-plan" ? (
+        <Link className="ep-button secondary" href="/weekly">
+          Ir para Plano semanal
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
+function getCommitmentOptions(source: TodaySource, todayBlocks: PlanBlock[]) {
+  if (source === "demo") return initialCommitments;
+
+  return todayBlocks.map<Commitment>((block) => ({
+    id: `block-${block.id}`,
+    kind: block.type,
+    text: block.title,
+    estimate: block.target ?? "sem alvo",
+    status: "planned",
+  }));
 }
 
 function CommitmentsCard({
@@ -202,59 +333,73 @@ function CommitmentsCard({
       </header>
       <p>Escolhidos esta manhã. O que ficar por fazer ao final do dia entra na revisão de amanhã.</p>
       <div className="today-commitment-list">
-        {commitments.map((commitment) => (
-          <div className={`today-commitment ${statusClass(commitment.status)}`} key={commitment.id}>
-            <div className="today-commitment-kind">
-              <span className={`today-chip ${kindClass(commitment.kind)}`}>{commitment.kind}</span>
-              <small>{commitment.estimate}</small>
-            </div>
-            <div className="today-commitment-body">
-              <strong>{commitment.text}</strong>
-              <div className="today-commitment-actions">
-                <button
-                  className={commitment.status === "done" ? "active" : undefined}
-                  type="button"
-                  onClick={() => onStatusChange(commitment.id, "done")}
-                >
-                  <Check size={13} aria-hidden="true" />
-                  Feito
-                </button>
-                <button
-                  className={commitment.status === "adjusted" ? "active" : undefined}
-                  type="button"
-                  onClick={() => onStatusChange(commitment.id, "adjusted")}
-                >
-                  <Edit3 size={12} aria-hidden="true" />
-                  Ajustar
-                </button>
-                <button
-                  className={commitment.status === "not-done" ? "active" : undefined}
-                  type="button"
-                  onClick={() => onStatusChange(commitment.id, "not-done")}
-                >
-                  <X size={13} aria-hidden="true" />
-                  Não feito
-                </button>
+        {commitments.length ? (
+          commitments.map((commitment) => (
+            <div className={`today-commitment ${statusClass(commitment.status)}`} key={commitment.id}>
+              <div className="today-commitment-kind">
+                <span className={`today-chip ${kindClass(commitment.kind)}`}>{commitment.kind}</span>
+                <small>{commitment.estimate}</small>
               </div>
-              {commitment.status === "adjusted" || commitment.status === "not-done" ? (
-                <label className="today-reason">
-                  Motivo opcional
-                  <select value={commitment.reason} onChange={(event) => onReasonChange(commitment.id, event.target.value)}>
-                    {reasonOptions.map((reason) => (
-                      <option key={reason}>{reason}</option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
+              <div className="today-commitment-body">
+                <strong>{commitment.text}</strong>
+                <div className="today-commitment-actions">
+                  <button
+                    className={commitment.status === "done" ? "active" : undefined}
+                    type="button"
+                    onClick={() => onStatusChange(commitment.id, "done")}
+                  >
+                    <Check size={13} aria-hidden="true" />
+                    Feito
+                  </button>
+                  <button
+                    className={commitment.status === "adjusted" ? "active" : undefined}
+                    type="button"
+                    onClick={() => onStatusChange(commitment.id, "adjusted")}
+                  >
+                    <Edit3 size={12} aria-hidden="true" />
+                    Ajustar
+                  </button>
+                  <button
+                    className={commitment.status === "not-done" ? "active" : undefined}
+                    type="button"
+                    onClick={() => onStatusChange(commitment.id, "not-done")}
+                  >
+                    <X size={13} aria-hidden="true" />
+                    Não feito
+                  </button>
+                </div>
+                {commitment.status === "adjusted" || commitment.status === "not-done" ? (
+                  <label className="today-reason">
+                    Motivo opcional
+                    <select value={commitment.reason} onChange={(event) => onReasonChange(commitment.id, event.target.value)}>
+                      {reasonOptions.map((reason) => (
+                        <option key={reason}>{reason}</option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+              </div>
             </div>
+          ))
+        ) : (
+          <div className="today-empty-blocks">
+            Ainda não preparaste o dia. Usa os blocos planeados abaixo para escolher 1 a 3 compromissos.
           </div>
-        ))}
+        )}
       </div>
     </article>
   );
 }
 
-function PlannedBlocksCard({ blocks, doneBlocks }: { blocks: PlanBlock[]; doneBlocks: number }) {
+function PlannedBlocksCard({
+  blocks,
+  doneBlocks,
+  source,
+}: {
+  blocks: PlanBlock[];
+  doneBlocks: number;
+  source: TodaySource;
+}) {
   return (
     <article className="today-panel today-blocks-card">
       <header className="today-card-head">
@@ -266,17 +411,25 @@ function PlannedBlocksCard({ blocks, doneBlocks }: { blocks: PlanBlock[]; doneBl
         <small>{doneBlocks} / {blocks.length} feitos</small>
       </header>
       <div className="today-block-list">
-        {blocks.map((block) => (
-          <div className={`today-block-row ${kindClass(block.type)} st-${statusClass(block.status)}`} key={block.id}>
-            <span>{blockLabel(block.type)}</span>
-            <strong>{block.title}</strong>
-            <small>{block.target ?? "—"}</small>
-            <i>{block.status}</i>
-            <button type="button" aria-label={`Mais ações para ${block.title}`}>
-              <MoreHorizontal size={15} aria-hidden="true" />
-            </button>
+        {blocks.length ? (
+          blocks.map((block) => (
+            <div className={`today-block-row ${kindClass(block.type)} st-${statusClass(block.status)}`} key={block.id}>
+              <span>{blockLabel(block.type)}</span>
+              <strong>{block.title}</strong>
+              <small>{block.target ?? "—"}</small>
+              <i>{block.status}</i>
+              <button type="button" aria-label={`Mais ações para ${block.title}`}>
+                <MoreHorizontal size={15} aria-hidden="true" />
+              </button>
+            </div>
+          ))
+        ) : (
+          <div className="today-empty-blocks">
+            {source === "no-active-plan"
+              ? "Ativa um plano semanal para veres aqui os blocos planeados de hoje."
+              : "Não há blocos planeados para hoje."}
           </div>
-        ))}
+        )}
       </div>
     </article>
   );
@@ -355,6 +508,7 @@ function CoachCard() {
 function PrepareDayDialog({
   onClose,
   onConfirm,
+  options,
   planChoice,
   selectedCommitments,
   setPlanChoice,
@@ -362,6 +516,7 @@ function PrepareDayDialog({
 }: {
   onClose: () => void;
   onConfirm: () => void;
+  options: Commitment[];
   planChoice: PlanChoice;
   selectedCommitments: string[];
   setPlanChoice: (choice: PlanChoice) => void;
@@ -397,21 +552,27 @@ function PrepareDayDialog({
         {planChoice === "reduce" ? <div className="today-reduce-prompt">Qual é o mínimo que ainda torna o dia útil?</div> : null}
         <div className="today-pick-list">
           <span>Escolhe 1 a 3 compromissos</span>
-          {initialCommitments.map((commitment) => (
-            <label className={selectedCommitments.includes(commitment.id) ? "selected" : undefined} key={commitment.id}>
-              <input
-                checked={selectedCommitments.includes(commitment.id)}
-                onChange={() => toggleCommitment(commitment.id)}
-                type="checkbox"
-              />
-              <div>
-                <strong>{commitment.text}</strong>
-                <small>
-                  {commitment.kind} · {commitment.estimate}
-                </small>
-              </div>
-            </label>
-          ))}
+          {options.length ? (
+            options.map((commitment) => (
+              <label className={selectedCommitments.includes(commitment.id) ? "selected" : undefined} key={commitment.id}>
+                <input
+                  checked={selectedCommitments.includes(commitment.id)}
+                  onChange={() => toggleCommitment(commitment.id)}
+                  type="checkbox"
+                />
+                <div>
+                  <strong>{commitment.text}</strong>
+                  <small>
+                    {commitment.kind} · {commitment.estimate}
+                  </small>
+                </div>
+              </label>
+            ))
+          ) : (
+            <div className="today-empty-blocks">
+              Não há blocos planeados para transformar em compromissos hoje.
+            </div>
+          )}
         </div>
       </div>
       <div className="today-dialog-foot">
