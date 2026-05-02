@@ -13,6 +13,9 @@ Implemented:
 - Tailwind v4 global styling
 - Dashboard prototype migrated to React
 - Product brief in `docs/product-brief.md`
+- Planning system redesign spec in `docs/design/planning-system-redesign-spec.md`
+- Planning system text wireframes in `docs/design/planning-system-wireframes.md`
+- Poker session flow spec in `docs/features/poker-session-flow.md`
 - Static prototype preserved in `docs/prototype-static/`
 
 Planned next:
@@ -20,9 +23,21 @@ Planned next:
 - Create Clerk and Convex projects
 - Add local environment values
 - Define the Planning System MVP spec
-- Redesign dashboard/navigation around monthly targets, weekly plans, and daily execution
+- Redesign dashboard/navigation around annual direction, monthly targets, weekly plans, and daily execution
+- Include poker sessions and Coach AI as active design-system surfaces
 - Persist weekly planning data before daily check-ins and commitments
 - Keep AI Coach mocked until real data flow is stable
+
+## Product Design Source Of Truth
+
+The active MVP redesign is defined by:
+
+- `docs/features/planning-system.md` for the planning-system product model.
+- `docs/features/poker-session-flow.md` for poker session capture and review.
+- `docs/design/planning-system-redesign-spec.md` for approved redesign decisions.
+- `docs/design/planning-system-wireframes.md` for implementation-ready screen structure.
+
+The static prototype is historical reference only. The archived session-flow docs are historical inputs; the active session direction lives in `docs/features/poker-session-flow.md`.
 
 ## Local Development
 

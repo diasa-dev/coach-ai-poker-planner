@@ -1,0 +1,9 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" fill="none">
+  <defs>
+    <pattern id="ep-dot" x="0" y="0" width="14" height="14" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.4" fill="#22C5D5" opacity="0.55"></circle>
+    </pattern>
+  </defs>
+  <rect width="200" height="120" fill="url(#ep-dot)"></rect>
+</svg>

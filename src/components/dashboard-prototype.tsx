@@ -1,684 +1,502 @@
 "use client";
 
 import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
-import { useMutation, useQuery } from "convex/react";
-import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import type { Dispatch, ReactNode, SetStateAction } from "react";
-import { api } from "../../convex/_generated/api";
-import { Doc, Id } from "../../convex/_generated/dataModel";
+import { useState } from "react";
 
-type CommitmentTone = "default" | "accent" | "soft";
-type DashboardTask = {
+type CommitmentStatus = "pending" | "done" | "adjusted" | "missed";
+
+type Commitment = {
   id: string;
-  convexId?: Id<"commitments">;
   title: string;
   detail: string;
-  phase: string;
-  tone: CommitmentTone;
-  done: boolean;
+  source: string;
+  status: CommitmentStatus;
 };
 
-const isAuthConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
-const isDataConfigured = Boolean(
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_CONVEX_URL,
+type PlannedBlock = {
+  id: string;
+  type: string;
+  title: string;
+  target: string;
+};
+
+type PlanningDay = {
+  id: string;
+  label: string;
+  date: string;
+  isToday?: boolean;
+  chips: Array<{
+    label: string;
+    tone: "grind" | "study" | "review" | "sport" | "rest" | "admin";
+    status?: "done" | "adjusted" | "missed";
+  }>;
+  extra?: number;
+};
+
+const isAuthConfigured = Boolean(
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
 );
 
-const todayKey = new Date().toISOString().slice(0, 10);
+const navItems = ["Hoje", "Plano semanal", "Objetivos mensais", "Estudo", "Review"];
 
-const initialTasks: DashboardTask[] = [
+const plannedBlocks: PlannedBlock[] = [
   {
-    id: "review-icm",
-    title: "Rever 20 mãos ICM",
-    detail: "20 min · antes de abrir mesas",
-    phase: "Preparar",
-    tone: "default",
-    done: true,
+    id: "study-icm",
+    type: "Estudo",
+    title: "Spots ICM de call",
+    target: "45 min",
   },
   {
-    id: "max-tables",
-    title: "Definir mesas máximas",
-    detail: "6 mesas enquanto estiver deep",
-    phase: "Preparar",
-    tone: "default",
-    done: true,
+    id: "grind-main",
+    type: "Grind",
+    title: "Sessão principal MTT",
+    target: "1 sessão",
   },
   {
-    id: "main-events",
-    title: "2 torneios online principais",
-    detail: "sem late reg extra fora do plano",
-    phase: "Jogar",
-    tone: "accent",
-    done: false,
-  },
-  {
-    id: "mark-icm",
-    title: "Marcar spots ICM",
-    detail: "mínimo 5 mãos para revisão",
-    phase: "Jogar",
-    tone: "accent",
-    done: true,
-  },
-  {
-    id: "post-session-review",
-    title: "Review pós-sessão",
-    detail: "2 min · 1 decisão boa + 1 erro",
-    phase: "Rever",
-    tone: "soft",
-    done: false,
-  },
-  {
-    id: "sleep",
-    title: "Dormir 7h+",
-    detail: "sem sessão extra se energia cair",
-    phase: "Recuperar",
-    tone: "soft",
-    done: true,
+    id: "review-hands",
+    type: "Review",
+    title: "Mãos marcadas ontem",
+    target: "20 mãos",
   },
 ];
 
-const coachMessages = [
+const initialCommitments: Commitment[] = [
   {
-    id: "coach-action",
-    kind: "coach",
-    time: "09:15",
-    action: true,
-    title: "Faz 20 minutos de ICM antes de abrir mesas.",
-    body: "O teu maior leak recente aparece em decisões de call no late game. Hoje não precisas de mais tarefas; precisas de uma execução limpa.",
+    id: "commit-study",
+    title: "Rever spots ICM antes do grind",
+    detail: "45 min · foco em calls no late game",
+    source: "Bloco de estudo",
+    status: "pending",
   },
   {
-    id: "coach-checklist",
-    kind: "coach",
-    time: "09:17",
-    body: "Checklist mental para hoje:",
-    bullets: [
-      "Qualidade de decisão > volume.",
-      "Máximo 6 mesas enquanto estiveres deep.",
-      "Marca mãos com pressão ICM, não só bad beats.",
+    id: "commit-grind",
+    title: "Fazer uma sessão MTT sem late reg extra",
+    detail: "seguir o volume planeado, sem compensar",
+    source: "Bloco de grind",
+    status: "pending",
+  },
+  {
+    id: "commit-review",
+    title: "Fechar 20 mãos para review",
+    detail: "marcar padrões, não bad beats",
+    source: "Bloco de review",
+    status: "pending",
+  },
+];
+
+const planningWeek: PlanningDay[] = [
+  {
+    id: "thu",
+    label: "Qui",
+    date: "30",
+    chips: [
+      { label: "Descanso", tone: "rest", status: "done" },
+      { label: "Plano", tone: "admin", status: "done" },
     ],
   },
   {
-    id: "user-priority",
-    kind: "user",
-    time: "09:18",
-    body: "Prioridade confirmada: menos decisões automáticas em spots de pressão.",
+    id: "fri",
+    label: "Sex",
+    date: "1",
+    isToday: true,
+    chips: [
+      { label: "Estudo", tone: "study" },
+      { label: "Grind", tone: "grind" },
+      { label: "Review", tone: "review" },
+    ],
+  },
+  {
+    id: "sat",
+    label: "Sab",
+    date: "2",
+    chips: [
+      { label: "Sport", tone: "sport" },
+      { label: "Estudo", tone: "study" },
+      { label: "Grind", tone: "grind" },
+    ],
+    extra: 1,
+  },
+  {
+    id: "sun",
+    label: "Dom",
+    date: "3",
+    chips: [
+      { label: "Grind", tone: "grind" },
+      { label: "Grind", tone: "grind" },
+      { label: "Descanso", tone: "rest" },
+    ],
+    extra: 2,
+  },
+  {
+    id: "mon",
+    label: "Seg",
+    date: "4",
+    chips: [
+      { label: "Review", tone: "review" },
+      { label: "Sport", tone: "sport" },
+    ],
+  },
+  {
+    id: "tue",
+    label: "Ter",
+    date: "5",
+    chips: [
+      { label: "Estudo", tone: "study" },
+      { label: "Admin", tone: "admin" },
+    ],
+  },
+  {
+    id: "wed",
+    label: "Qua",
+    date: "6",
+    chips: [
+      { label: "Review", tone: "review" },
+      { label: "Descanso", tone: "rest" },
+    ],
+  },
+];
+
+const monthlyPace = [
+  { category: "Grind", status: "no ritmo", value: "8/16 sessões", tone: "good" },
+  { category: "Estudo", status: "abaixo", value: "3/6h", tone: "warning" },
+  { category: "Review", status: "ok", value: "40/80 mãos", tone: "good" },
+  { category: "Sport", status: "abaixo", value: "1/4 sessões", tone: "warning" },
+] as const;
+
+const coachFindings = [
+  "Domingo tem muito grind e pouco descanso antes.",
+  "O estudo está abaixo do ritmo mensal.",
+  "Há review planeado, mas está concentrado tarde na semana.",
+];
+
+const coachSuggestions = [
+  {
+    title: "Adicionar descanso leve antes de domingo",
+    detail: "Criar um bloco de descanso na sexta à noite para proteger energia.",
+  },
+  {
+    title: "Antecipar review de mãos",
+    detail: "Mover 20 mãos de segunda para sábado de manhã.",
   },
 ];
 
 export function DashboardPrototype() {
-  if (isDataConfigured) {
-    return <PersistedDashboardPrototype />;
-  }
+  const [dayPrepared, setDayPrepared] = useState(false);
+  const [coachOpen, setCoachOpen] = useState(false);
+  const [commitments, setCommitments] = useState(initialCommitments);
 
-  return <DashboardView />;
-}
+  const doneCount = commitments.filter((commitment) => commitment.status === "done").length;
 
-function PersistedDashboardPrototype() {
-  const { isLoaded, isSignedIn } = useUser();
-  const dailyPlan = useQuery(
-    api.dailyPlan.getToday,
-    isLoaded && isSignedIn ? { date: todayKey } : "skip",
-  );
-  const seedToday = useMutation(api.dailyPlan.seedToday);
-  const toggleStoredCommitment = useMutation(api.dailyPlan.toggleCommitment);
-
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn || dailyPlan === undefined) return;
-
-    if (!dailyPlan.checkIn || dailyPlan.commitments.length === 0) {
-      void seedToday({ date: todayKey });
-    }
-  }, [dailyPlan, isLoaded, isSignedIn, seedToday]);
-
-  if (isLoaded && isSignedIn && dailyPlan === undefined) {
-    return <DashboardLoading />;
-  }
-
-  return (
-    <DashboardView
-      renderSync={(setScores, setTasks) => (
-        <DailyPlanSync dailyPlan={dailyPlan} setScores={setScores} setTasks={setTasks} />
-      )}
-      onToggleStored={(task) => {
-        if (!task.convexId) return false;
-
-        void toggleStoredCommitment({
-          id: task.convexId,
-          done: !task.done,
-        });
-        return true;
-      }}
-    />
-  );
-}
-
-function DashboardLoading() {
-  return (
-    <main className="loading-shell" aria-live="polite">
-      <div>
-        <strong>Coach AI</strong>
-        <span>A carregar plano...</span>
-      </div>
-    </main>
-  );
-}
-
-function DashboardView({
-  onToggleStored,
-  renderSync,
-}: {
-  onToggleStored?: (task: DashboardTask) => boolean;
-  renderSync?: (
-    setScores: Dispatch<
-      SetStateAction<{
-        sleep: number;
-        energy: number;
-        focus: number;
-        stress: number;
-      }>
-    >,
-    setTasks: Dispatch<SetStateAction<DashboardTask[]>>,
-  ) => ReactNode;
-}) {
-  const [darkMode, setDarkMode] = useState(
-    () => typeof window !== "undefined" && window.localStorage.getItem("theme") === "dark",
-  );
-  const [tasks, setTasks] = useState(initialTasks);
-  const [reply, setReply] = useState("");
-  const [messages, setMessages] = useState(coachMessages);
-  const [scores, setScores] = useState({
-    sleep: 4,
-    energy: 4,
-    focus: 5,
-    stress: 2,
-  });
-
-  useEffect(() => {
-    document.body.classList.toggle("dark-mode", darkMode);
-    window.localStorage.setItem("theme", darkMode ? "dark" : "light");
-  }, [darkMode]);
-
-  const completedTasks = tasks.filter((task) => task.done).length;
-  const taskProgress = (completedTasks / tasks.length) * 100;
-
-  const readiness = useMemo(() => {
-    const rawScore =
-      ((scores.sleep + scores.energy + scores.focus + (6 - scores.stress)) / 20) * 100;
-    return Math.round(rawScore);
-  }, [scores]);
-  const readinessLabel =
-    readiness >= 80
-      ? "Pronto para preparar"
-      : readiness >= 65
-        ? "Preparar com cautela"
-        : "Rever antes de jogar";
-  const readinessFactors = [
-    ["Sono", scores.sleep],
-    ["Energia", scores.energy],
-    ["Foco", scores.focus],
-    ["Stress", scores.stress],
-  ] as const;
-
-  function toggleTask(taskId: string) {
-    const task = tasks.find((currentTask) => currentTask.id === taskId);
-
-    if (task && onToggleStored?.(task)) {
-      return;
-    }
-
-    setTasks((currentTasks) =>
-      currentTasks.map((task) =>
-        task.id === taskId ? { ...task, done: !task.done } : task,
+  function updateCommitment(id: string, status: CommitmentStatus) {
+    setCommitments((current) =>
+      current.map((commitment) =>
+        commitment.id === id ? { ...commitment, status } : commitment,
       ),
     );
   }
 
-  function handleReply(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmedReply = reply.trim();
-    if (!trimmedReply) return;
-
-    setMessages((currentMessages) => [
-      ...currentMessages,
-      {
-        id: `user-${Date.now()}`,
-        kind: "user",
-        time: "agora",
-        body: trimmedReply,
-      },
-      {
-        id: `coach-${Date.now()}`,
-        kind: "coach",
-        time: "agora",
-        body: "Boa. Vou transformar isso numa ação simples para o plano de hoje.",
-        bullets: ["Escolhe quando vais executar.", "Define como vais medir se cumpriste."],
-      },
-    ]);
-    setReply("");
-  }
-
   return (
-    <div className="app-shell">
-      {renderSync?.(setScores, setTasks)}
-      <aside className="sidebar" aria-label="Navegação principal">
-        <div className="brand">
-          <div className="brand-mark">✦</div>
+    <div className="planner-shell">
+      <aside className="planner-sidebar" aria-label="Navegação principal">
+        <div className="planner-brand">
+          <span className="planner-brand-mark" aria-hidden="true">
+            CA
+          </span>
           <div>
             <strong>Coach AI</strong>
-            <span>Planner do Jogador</span>
+            <span>Poker Planner</span>
           </div>
         </div>
 
-        <nav className="nav-list">
-          <button className="nav-item active" type="button">
-            <span>⌂</span>Início
-          </button>
-          <button className="nav-item placeholder" type="button" aria-disabled="true">
-            <span>◎</span>Objetivos
-          </button>
-          <button className="nav-item placeholder" type="button" aria-disabled="true">
-            <span>◷</span>Sessões
-          </button>
-          <button className="nav-item placeholder" type="button" aria-disabled="true">
-            <span>✓</span>Revisão
-          </button>
-          <button className="nav-item placeholder" type="button" aria-disabled="true">
-            <span>▥</span>Análises
-          </button>
-          <button className="nav-item placeholder" type="button" aria-disabled="true">
-            <span>✎</span>Notas
-          </button>
+        <nav className="planner-nav">
+          {navItems.map((item) => (
+            <button
+              className={item === "Hoje" ? "planner-nav-item active" : "planner-nav-item"}
+              type="button"
+              key={item}
+            >
+              <span aria-hidden="true">{item.slice(0, 1)}</span>
+              {item}
+            </button>
+          ))}
         </nav>
 
-        <div className="sidebar-footer">
-          <button className="nav-item muted" type="button">
-            <span>⚙</span>Definições
+        <div className="planner-sidebar-footer">
+          <button className="planner-nav-item muted" type="button">
+            <span aria-hidden="true">D</span>
+            Definições
           </button>
-          <button className="nav-item muted" type="button">
-            <span>?</span>Ajuda
-          </button>
-          <div className="profile">
-            <div className="profile-avatar" aria-hidden="true">
-              DS
-            </div>
+          <div className="planner-user">
+            <span>DS</span>
             <div>
               <strong>Diogo Silva</strong>
-              <span>Profissional online</span>
+              <small>Semana: quinta a quarta</small>
             </div>
-            <span className="profile-arrow">›</span>
           </div>
         </div>
       </aside>
 
-      <main className="dashboard">
-        <header className="topbar">
+      <main className="planner-main">
+        <header className="planner-topbar">
           <div>
-            <h1>Bom dia, Diogo!</h1>
-            <p>Quinta-feira, 30 de abril · foco em qualidade de decisão</p>
+            <span className="planner-kicker">Sexta-feira, 1 de maio</span>
+            <h1>Hoje</h1>
+            <p>Foco da semana: proteger energia para domingo.</p>
           </div>
-          <div className="topbar-actions">
-            <button
-              className="theme-toggle"
-              type="button"
-              aria-label={darkMode ? "Ativar light mode" : "Ativar dark mode"}
-              onClick={() => setDarkMode((current) => !current)}
-            >
-              <span className="theme-icon">{darkMode ? "☀" : "☾"}</span>
-            </button>
-            <div className="streak">
-              <span>🔥</span>
-              <strong>7</strong> dias de consistência
-            </div>
-            <button className="primary-button" type="button">
-              ✦ Atualizar plano
-            </button>
+          <div className="planner-topbar-actions">
+            <span className="planner-mode-pill">
+              {dayPrepared ? "Dia preparado" : "Dia por preparar"}
+            </span>
             <AuthControls />
           </div>
         </header>
 
-        <section className="hero-grid">
-          <article className="hero-card today-card">
-            <div className="hero-copy">
-              <span className="eyebrow">Prioridade #1</span>
-              <h2>Tomar melhores decisões no late game.</h2>
-              <p>
-                O plano de hoje está reduzido ao essencial: preparar, jogar com
-                intenção, rever rápido.
-              </p>
-            </div>
-            <div className="readiness-meter" aria-label="Prontidão para sessão">
-              <strong>{readiness}</strong>
-              <span>Prontidão</span>
-            </div>
-          </article>
-
-          <article className="metric-card">
-            <span>Plano de hoje</span>
-            <strong>
-              {completedTasks}/{tasks.length}
-            </strong>
-            <small>ações essenciais</small>
-          </article>
-          <article className="metric-card">
-            <span>Estudo semanal</span>
-            <strong>7h 20m</strong>
-            <small>61% da meta</small>
-          </article>
-          <article className="metric-card">
-            <span>Volume MTT</span>
-            <strong>18</strong>
-            <small>torneios esta semana</small>
-          </article>
-          <article className="metric-card">
-            <span>Revisão</span>
-            <strong>42</strong>
-            <small>mãos marcadas</small>
-          </article>
-        </section>
-
-        <section className="layout-grid">
-          <div className="left-column">
-            <section className="panel commitments-panel">
-              <div className="panel-heading">
-                <div>
-                  <h2>Compromissos de hoje</h2>
-                  <p>Preparar · jogar · rever · recuperar</p>
-                </div>
-                <span className="count-pill">
-                  {completedTasks}/{tasks.length} feito
-                </span>
-              </div>
-              <div className="commitment-progress" aria-hidden="true">
-                <span style={{ width: `${taskProgress}%` }} />
-              </div>
-
-              <div className="task-list">
-                {tasks.map((task) => (
-                  <label className="task-item" key={task.id}>
-                    <input
-                      type="checkbox"
-                      checked={task.done}
-                      onChange={() => toggleTask(task.id)}
-                    />
-                    <span className="task-content">
-                      <strong>{task.title}</strong>
-                      <small>{task.detail}</small>
-                    </span>
-                    <span
-                      className={[
-                        "task-phase",
-                        task.tone === "accent" ? "accent" : "",
-                        task.tone === "soft" ? "soft" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    >
-                      {task.phase}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </section>
-
-            <section className="panel">
-              <div className="panel-heading">
-                <h2>Objetivos em cascata</h2>
-                <button className="link-button" type="button">
-                  Editar
-                </button>
-              </div>
-              <div className="goal-stack">
-                <div>
-                  <span>Ano</span>
-                  <strong>Melhorar decisão e rotina profissional</strong>
-                </div>
-                <div>
-                  <span>Trimestre</span>
-                  <strong>Reduzir erros ICM em 20%</strong>
-                </div>
-                <div>
-                  <span>Mês</span>
-                  <strong>20h de estudo + 120 mãos revistas</strong>
-                </div>
-                <div>
-                  <span>Semana</span>
-                  <strong>5 blocos de estudo curtos</strong>
-                </div>
-                <div className="active">
-                  <span>Hoje</span>
-                  <strong>1 takeaway aplicado na sessão</strong>
-                </div>
-              </div>
-            </section>
-
-            <section className="panel">
-              <div className="panel-heading">
-                <h2>Plano se/então</h2>
-                <button className="link-button" type="button">
-                  + Novo
-                </button>
-              </div>
-              <div className="if-plan">
-                <span>Se eu perder um pote grande...</span>
-                <strong>então faço 3 respirações, marco a mão e espero uma órbita.</strong>
-              </div>
-              <div className="if-plan">
-                <span>Se sentir tilt acima de 3/5...</span>
-                <strong>então reduzo mesas e ativo pausa de 5 min.</strong>
-              </div>
-            </section>
-          </div>
-
-          <section className="panel coach-panel">
-            <div className="panel-heading">
+        <section className="planner-grid">
+          <div className="planner-primary">
+            <section className="planner-panel planner-action-panel">
               <div>
-                <h2>✦ Coach AI</h2>
-                <p>Foco, accountability e próxima ação</p>
+                <span className="planner-kicker">Próxima ação</span>
+                <h2>{dayPrepared ? "Executar os compromissos de hoje" : "Preparar o dia"}</h2>
+                <p>
+                  {dayPrepared
+                    ? "Mantém o dia focado nos compromissos escolhidos. Ajusta só se o contexto mudar."
+                    : "Transforma os blocos planeados em 1 a 3 compromissos concretos para hoje."}
+                </p>
               </div>
-              <button className="icon-button" type="button" aria-label="Preferências do Coach">
-                ☷
-              </button>
-            </div>
-
-            <div className="coach-feed">
-              {messages.map((message) => (
-                <article
-                  className={[
-                    message.kind === "user" ? "user-message" : "coach-message",
-                    "action" in message && message.action ? "action-message" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  key={message.id}
+              {dayPrepared ? (
+                <div className="planner-action-buttons">
+                  <button className="planner-secondary-button" type="button">
+                    Ajustar dia
+                  </button>
+                  <button className="planner-primary-button" type="button">
+                    Fechar dia
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className="planner-primary-button"
+                  type="button"
+                  onClick={() => setDayPrepared(true)}
                 >
-                  <div className="message-header">
-                    <strong>{message.kind === "user" ? "Tu" : "✦ Coach AI"}</strong>
-                    <time>{message.time}</time>
-                  </div>
-                  {"action" in message && message.action ? (
-                    <>
-                      <span className="eyebrow">Próxima melhor ação</span>
-                      <h3>{message.title}</h3>
-                    </>
-                  ) : null}
-                  <p>{message.body}</p>
-                  {"bullets" in message && message.bullets ? (
-                    <ul>
-                      {message.bullets.map((bullet) => (
-                        <li key={bullet}>{bullet}</li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  {"action" in message && message.action ? (
-                    <div className="quick-actions">
-                      <button type="button">Começar bloco de estudo</button>
-                      <button type="button">Ver mãos marcadas</button>
-                      <button type="button">Ajustar plano</button>
-                    </div>
-                  ) : null}
-                </article>
-              ))}
-            </div>
-
-            <form className="reply-box" onSubmit={handleReply}>
-              <input
-                type="text"
-                placeholder="Responder ao Coach..."
-                value={reply}
-                onChange={(event) => setReply(event.target.value)}
-              />
-              <button className="primary-button" type="submit">
-                Responder
-              </button>
-            </form>
-          </section>
-
-          <div className="right-column">
-            <section className="panel session-card">
-              <div className="panel-heading">
-                <h2>Próxima sessão</h2>
-                <button className="link-button" type="button">
-                  Calendário
+                  Preparar o dia
                 </button>
-              </div>
-              <div className="session-header">
-                <span className="time-pill">Hoje, 19:30</span>
-                <span className="status-pill">Confirmada</span>
-              </div>
-              <h3>Online High Roller Series</h3>
-              <p>$2.100 · Dia 2 · lobby online</p>
-              <dl className="details-list">
-                <div>
-                  <dt>Plataforma</dt>
-                  <dd>GGPoker</dd>
-                </div>
-                <div>
-                  <dt>Mesas máx.</dt>
-                  <dd>6</dd>
-                </div>
-                <div>
-                  <dt>Late reg</dt>
-                  <dd>Fechado</dd>
-                </div>
-                <div>
-                  <dt>Foco</dt>
-                  <dd>ICM calmo</dd>
-                </div>
-              </dl>
-              <Link className="primary-button full button-link" href="/session/prepare">
-                Preparar sessão
-              </Link>
+              )}
             </section>
 
-            <section className="panel readiness-card">
-              <div className="panel-heading">
-                <h2>Prontidão para sessão</h2>
-                <span className="count-pill">Resumo</span>
-              </div>
-              <div className="readiness-summary">
-                <div>
-                  <strong>{readiness}</strong>
-                  <span>{readinessLabel}</span>
+            {dayPrepared ? (
+              <section className="planner-panel">
+                <div className="planner-section-heading">
+                  <div>
+                    <span className="planner-kicker">Modo execução</span>
+                    <h2>Compromissos de hoje</h2>
+                  </div>
+                  <span className="planner-count-pill">
+                    {doneCount}/{commitments.length} feito
+                  </span>
                 </div>
-                <p>O check-in completo fica no fluxo de preparação.</p>
+
+                <div className="planner-commitment-list">
+                  {commitments.map((commitment) => (
+                    <article className="planner-commitment" key={commitment.id}>
+                      <div>
+                        <span className="planner-source">{commitment.source}</span>
+                        <h3>{commitment.title}</h3>
+                        <p>{commitment.detail}</p>
+                      </div>
+                      <div className="planner-status-actions" aria-label="Atualizar estado">
+                        <button
+                          className={commitment.status === "done" ? "selected" : ""}
+                          type="button"
+                          onClick={() => updateCommitment(commitment.id, "done")}
+                        >
+                          Feito
+                        </button>
+                        <button
+                          className={commitment.status === "adjusted" ? "selected" : ""}
+                          type="button"
+                          onClick={() => updateCommitment(commitment.id, "adjusted")}
+                        >
+                          Ajustar
+                        </button>
+                        <button
+                          className={commitment.status === "missed" ? "selected risk" : ""}
+                          type="button"
+                          onClick={() => updateCommitment(commitment.id, "missed")}
+                        >
+                          Não fiz
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <section className="planner-panel">
+                <div className="planner-section-heading">
+                  <div>
+                    <span className="planner-kicker">Plano de hoje</span>
+                    <h2>Blocos planeados</h2>
+                  </div>
+                  <button className="planner-ghost-button" type="button">
+                    Editar plano semanal
+                  </button>
+                </div>
+
+                <div className="planner-block-list">
+                  {plannedBlocks.map((block) => (
+                    <article className="planner-block" key={block.id}>
+                      <span>{block.type}</span>
+                      <div>
+                        <h3>{block.title}</h3>
+                        <p>{block.target}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section className="planner-panel">
+              <div className="planner-section-heading">
+                <div>
+                  <span className="planner-kicker">Semana de planeamento</span>
+                  <h2>30 abr - 6 mai</h2>
+                </div>
+                <span className="planner-draft-link">Próxima semana em rascunho</span>
               </div>
-              <div className="readiness-factors" aria-label="Fatores de prontidão">
-                {readinessFactors.map(([label, value]) => (
-                  <div key={label}>
-                    <span>{label}</span>
-                    <strong>{value}/5</strong>
+
+              <div className="planner-week-strip">
+                {planningWeek.map((day) => (
+                  <article className={day.isToday ? "planner-day today" : "planner-day"} key={day.id}>
+                    <div className="planner-day-header">
+                      <strong>{day.label}</strong>
+                      <span>{day.date}</span>
+                    </div>
+                    <div className="planner-chip-stack">
+                      {day.chips.slice(0, 3).map((chip, index) => (
+                        <span
+                          className={`planner-chip ${chip.tone} ${chip.status ?? ""}`}
+                          key={`${day.id}-${chip.label}-${index}`}
+                        >
+                          {chip.label}
+                        </span>
+                      ))}
+                      {day.extra ? <span className="planner-chip muted">+{day.extra}</span> : null}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </div>
+
+          <aside className="planner-context">
+            <section className="planner-panel">
+              <div className="planner-section-heading">
+                <div>
+                  <span className="planner-kicker">Ritmo mensal</span>
+                  <h2>Maio</h2>
+                </div>
+              </div>
+              <div className="planner-pace-list">
+                {monthlyPace.map((item) => (
+                  <div className="planner-pace-row" key={item.category}>
+                    <div>
+                      <strong>{item.category}</strong>
+                      <span>{item.value}</span>
+                    </div>
+                    <span className={`planner-pace-status ${item.tone}`}>{item.status}</span>
                   </div>
                 ))}
               </div>
-              <Link className="secondary-button full button-link" href="/session/prepare">
-                Preparar sessão
-              </Link>
             </section>
 
-            <section className="panel weekly-card">
-              <div className="panel-heading">
-                <h2>Review semanal</h2>
-                <button className="link-button" type="button">
-                  Abrir
-                </button>
+            <section className="planner-panel">
+              <div className="planner-section-heading">
+                <div>
+                  <span className="planner-kicker">Atenção</span>
+                  <h2>O que pode fugir</h2>
+                </div>
               </div>
-              <p>
-                <strong>Padrão:</strong> foco cai depois de 3h de sessão. O melhor ajuste
-                é planear pausa obrigatória no segundo break.
-              </p>
-              <div className="progress-line">
-                <span style={{ width: "72%" }} />
+              <div className="planner-alert-list">
+                <p>Estudo está abaixo do ritmo mensal.</p>
+                <p>Domingo tem volume alto. Protege energia antes.</p>
               </div>
-              <small className="progress-label">72% alinhado com o plano</small>
             </section>
-          </div>
+
+            <section className="planner-panel planner-coach-card">
+              <span className="planner-kicker">Coach AI</span>
+              <h2>Rever plano semanal</h2>
+              <p>
+                O Coach deve rever o plano quando há dados suficientes, não substituir a tua decisão.
+              </p>
+              <button
+                className="planner-secondary-button full"
+                type="button"
+                onClick={() => setCoachOpen(true)}
+              >
+                Rever com Coach
+              </button>
+            </section>
+          </aside>
         </section>
       </main>
+
+      {coachOpen ? (
+        <div className="planner-drawer-backdrop" role="presentation">
+          <aside className="planner-drawer" aria-label="Revisão do Coach AI">
+            <div className="planner-drawer-header">
+              <div>
+                <span className="planner-kicker">Coach AI</span>
+                <h2>Revisão do plano</h2>
+              </div>
+              <button
+                className="planner-icon-button"
+                type="button"
+                aria-label="Fechar revisão do Coach"
+                onClick={() => setCoachOpen(false)}
+              >
+                X
+              </button>
+            </div>
+
+            <section>
+              <h3>Riscos encontrados</h3>
+              <ul className="planner-finding-list">
+                {coachFindings.map((finding) => (
+                  <li key={finding}>{finding}</li>
+                ))}
+              </ul>
+            </section>
+
+            <section>
+              <h3>Sugestões editáveis</h3>
+              <div className="planner-suggestion-list">
+                {coachSuggestions.map((suggestion) => (
+                  <article className="planner-suggestion" key={suggestion.title}>
+                    <h4>{suggestion.title}</h4>
+                    <p>{suggestion.detail}</p>
+                    <div>
+                      <button className="planner-secondary-button" type="button">
+                        Rever proposta
+                      </button>
+                      <button className="planner-ghost-button" type="button">
+                        Ignorar
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </aside>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function DailyPlanSync({
-  dailyPlan,
-  setScores,
-  setTasks,
-}: {
-  dailyPlan:
-    | {
-        checkIn:
-          | {
-              sleep: number;
-              energy: number;
-              focus: number;
-              stress: number;
-            }
-          | null;
-        commitments: Doc<"commitments">[];
-      }
-    | undefined;
-  setScores: Dispatch<
-    SetStateAction<{
-      sleep: number;
-      energy: number;
-      focus: number;
-      stress: number;
-    }>
-  >;
-  setTasks: Dispatch<SetStateAction<DashboardTask[]>>;
-}) {
-  useEffect(() => {
-    if (!dailyPlan?.checkIn) return;
-
-    setScores({
-      sleep: dailyPlan.checkIn.sleep,
-      energy: dailyPlan.checkIn.energy,
-      focus: dailyPlan.checkIn.focus,
-      stress: dailyPlan.checkIn.stress,
-    });
-  }, [dailyPlan?.checkIn, setScores]);
-
-  useEffect(() => {
-    if (!dailyPlan || dailyPlan.commitments.length === 0) return;
-
-    setTasks(
-      dailyPlan.commitments.map((commitment) => ({
-        id: commitment._id,
-        convexId: commitment._id,
-        title: commitment.title,
-        detail: commitment.detail,
-        phase: commitment.phase,
-        tone: commitment.tone,
-        done: commitment.done,
-      })),
-    );
-  }, [dailyPlan, setTasks]);
-
-  return null;
-}
-
 function AuthControls() {
   if (!isAuthConfigured) {
-    return <span className="auth-status">Modo demo</span>;
+    return <span className="planner-auth-status">Modo demo</span>;
   }
 
   return <ClerkAuthControls />;
@@ -689,21 +507,17 @@ function ClerkAuthControls() {
 
   if (isLoaded && isSignedIn) {
     return (
-      <div className="auth-controls">
-        <div className="signed-in-menu" aria-label="Conta">
-          <UserButton />
-        </div>
+      <div className="planner-account-menu" aria-label="Conta">
+        <UserButton />
       </div>
     );
   }
 
   return (
-    <div className="auth-controls">
-      <SignInButton mode="modal">
-        <button className="secondary-button auth-button" type="button">
-          Entrar
-        </button>
-      </SignInButton>
-    </div>
+    <SignInButton mode="modal">
+      <button className="planner-secondary-button" type="button">
+        Entrar
+      </button>
+    </SignInButton>
   );
 }

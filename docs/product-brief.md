@@ -4,7 +4,7 @@
 
 An application for professional online poker tournament players, focused on productivity, organization, accountability, and sustainable performance.
 
-The app should not become a complex financial tracker or a heavy Notion-style workspace. It should work as a weekly operating system for poker performance: helping the player define monthly targets, build a realistic weekly plan, execute daily commitments, review what happened, and improve consistency over time.
+The app should not become a complex financial tracker or a heavy Notion-style workspace. It should work as a performance operating system for professional online poker players: helping the player define monthly targets, build a realistic weekly plan, execute daily commitments, log study, capture session signals, review what happened, and use Coach AI to move closer to professional and personal goals.
 
 ## Product Principles
 
@@ -13,9 +13,11 @@ The app should not become a complex financial tracker or a heavy Notion-style wo
 - The dashboard is action-oriented: "what matters now?" and "what is the next best action?".
 - The week is the operational center of the app.
 - Monthly targets provide the main pacing context.
+- Poker sessions are the core grind execution surface and should feed Coach AI with performance context.
 - Annual and quarterly planning provide direction, not heavy MVP workflows.
 - The AI Coach is adaptive: calm when there is stress/tilt, more direct when there is repeated procrastination.
-- The AI Coach reviews and improves the player's plan; it should not become the author of the player's life.
+- The AI Coach is present and interactive, but the player remains the author of the plan.
+- Tracking exists mainly to feed better AI guidance, planning, study, session performance, and accountability.
 - Evidence-informed by default: product decisions should be grounded in relevant research, proven performance methods, and real-world usage patterns when available.
 - Privacy by default.
 - Build phase by phase.
@@ -42,30 +44,35 @@ The app should not become a complex financial tracker or a heavy Notion-style wo
 
 Balanced responsive product:
 
-- Desktop: dashboard, weekly planning, reviews, study logging, and future session support.
-- Mobile: quick check-in, daily commitments, short review, AI Coach.
+- Desktop: dashboard, weekly planning, poker sessions, reviews, study logging, and Coach AI.
+- Mobile: quick check-in, daily commitments, short review, quick session check-ups, and Coach AI.
 
 ## MVP
 
 Main focus:
 
-1. Monthly targets
-2. Weekly planning
-3. Daily execution
-4. Weekly review
-5. AI Coach as a planning reviewer and accountability assistant
+1. Annual direction
+2. Monthly targets
+3. Weekly planning
+4. Daily execution
+5. Poker sessions
+6. Study logging
+7. Reviews
+8. AI Coach as an interactive performance assistant
 
 First product spine:
 
 - Demo mode without account
 - Clerk login
 - Real dashboard
+- Annual direction as the strategic layer for the year
 - Monthly targets for grind, study, review, and sport
 - Weekly plan with editable daily blocks
 - Daily execution from the weekly plan
+- Poker session start, active capture, and short post-session review
 - Study session log
 - Weekly review
-- AI Coach plan review mock using real app data
+- AI Coach chat and plan/session review mock using real app data
 - Data persisted in Convex
 
 ## AI Coach
@@ -79,31 +86,36 @@ Product model:
 The Coach may use:
 
 - Check-ins
+- Annual direction
 - Monthly targets
 - Weekly plans
 - Daily block completion
 - Daily commitments
+- Poker sessions
+- Session events
+- Marked hands backlog
 - Study sessions
 - Weekly reviews
-- Future online sessions
-- Future notes and marked hands
 - Calculated patterns
 
 Important rule: the player must control which data is included in the Coach memory.
 
-MVP planning behavior:
+MVP Coach behavior:
 
-- The player creates the plan.
-- The Coach reviews the plan only when requested.
-- Suggestions are individual and accepted one by one.
+- The player creates the plan; the Coach can review, challenge, and improve it.
+- The Coach should have a free chat surface plus contextual entry points.
+- The Coach should show simple context used, such as weekly plan, last sessions, study log, or reviews.
+- Suggestions are individual and accepted one by one, with confirmation before changes are applied.
 - The Coach should flag unrealistic volume, missing review/study, weak recovery, and mismatch between monthly targets and weekly plan.
+- The Coach should identify performance patterns across sessions, study, plans, reviews, and check-ins.
+- The Coach must not provide technical poker hand analysis.
 - The first version can be deterministic or mocked before real OpenAI integration.
 
 ## Poker Data
 
 The MVP should not compete with poker financial trackers.
 
-Poker data exists mainly as context to improve feedback. Online sessions remain important, but they are no longer the immediate center of the MVP. Session preparation, live capture, and post-session review should be revisited after the planning system exists.
+Poker data exists mainly as context to improve feedback and Coach AI guidance. Sessions are part of the MVP design direction because they provide the real grind signals that connect planning to performance.
 
 - Platform
 - Tournament/session
@@ -119,15 +131,21 @@ Poker data exists mainly as context to improve feedback. Online sessions remain 
 
 Advanced fields should appear only when they are useful.
 
+Poker data should not turn the app into a financial tracker or hand analysis tool. Financial result is optional private context. Marked hands feed review/study backlog and performance patterns, not AI technical hand advice.
+
 ## Planning System
 
 The core planning loop is:
 
-`Monthly targets -> Weekly plan -> Daily execution -> Weekly review -> Next weekly plan`
+`Annual direction -> Monthly targets -> Weekly plan -> Daily execution -> Sessions/Study -> Reviews -> Next weekly plan`
 
 ### Annual And Quarterly Direction
 
-Annual and quarterly planning should stay light in the MVP. They give strategic direction, but should not require detailed forecasting before the player has app data.
+Annual direction is the strategic layer of the app. It should answer: "What am I trying to build this year, and what should this month move forward?"
+
+The MVP should include a lightweight annual direction flow before monthly targets. It should capture one primary direction, a small number of priorities, and important constraints. It should not become detailed forecasting, a heavy OKR system, or a full annual calendar.
+
+Quarterly planning can remain later. Monthly targets should be the first operational pacing layer under the annual direction.
 
 ### Monthly Targets
 
@@ -148,7 +166,7 @@ The weekly plan is the center of execution.
 
 It should include:
 
-- Weekly focus
+- Required weekly focus/intention
 - Editable balanced template
 - Daily blocks without fixed schedules
 - Multiple blocks per day
@@ -163,6 +181,8 @@ Block types:
 - Sport
 - Rest
 - Admin/Other
+
+The weekly focus/intention should appear in the weekly plan, dashboard, Today, and active poker session.
 
 ### Daily Execution
 
@@ -248,28 +268,33 @@ Base fields:
 
 ## During Online Session
 
-Online sessions are a later product area. When revisited, input must be ultra fast:
+Online sessions are an active design-system surface. The session flow should connect to the weekly plan and keep input ultra fast:
 
-- Mark hand
+- Quick setup with required session focus
+- Optional link to a planned Grind block
+- Optional initial energy/focus/tilt
+- Optional micro-intention
+- Check-up rapido with energy, focus, tilt, table count, and micro-intention
+- Mark hand to review
 - Quick note
-- Tilt +1
-- Break done
-- Low energy
+- Finish session and short review
 
-Details belong in the post-session review.
+Breaks should remain rest time. The app should not force notifications or mandatory check-ins.
 
 ## Post-Session Review
 
-Post-session review is a later product area. When revisited, it should stay short:
+Post-session review should stay short:
 
-- Simple result
-- Focus
-- Energy
-- Tilt
-- 1 good decision
-- 1 mistake to review
-- Marked hands
-- Next action
+- Number of tournaments played
+- Decision quality
+- Focus, energy, and tilt summary
+- Optional financial result as private Coach context
+- Optional good decision
+- Optional main leak/problem
+- Priority hands to review
+- Optional next action
+
+Session reviews feed weekly review, study/review backlog, monthly Grind progress, and Coach AI pattern detection.
 
 ## Future Coach/Team Support
 
@@ -326,5 +351,5 @@ Out of scope:
 Next product slice after foundation:
 
 - Define `docs/features/planning-system.md`.
-- Redesign dashboard and navigation around monthly targets, weekly plan, daily execution, weekly review, and Coach AI plan review.
-- Do not continue session preparation until the planning system exists.
+- Use `docs/features/poker-session-flow.md` for the active poker-session direction.
+- Redesign dashboard and navigation around monthly targets, weekly plan, daily execution, poker sessions, study, reviews, and Coach AI.

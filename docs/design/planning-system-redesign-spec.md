@@ -2,21 +2,22 @@
 
 ## Purpose
 
-Redesign the Coach AI Poker Planner app around the MVP planning system before implementing more product behavior.
+Redesign the Coach AI Poker Planner app around the MVP planning system, poker-session flow, and Coach AI before implementing more product behavior.
 
-The app should not feel like a generic poker dashboard, a calendar, or an AI chat product. The MVP should feel like a weekly operating system for professional online poker players:
+The app should not feel like a generic poker dashboard, a calendar, a financial tracker, or an AI chat wrapper. The MVP should feel like a performance operating system for professional online poker players:
 
-`Monthly targets -> Weekly plan -> Daily execution -> Day close -> Weekly review -> Next weekly plan`
+`Annual direction -> Monthly targets -> Weekly plan -> Daily execution -> Sessions/Study -> Reviews -> Coach patterns -> Next weekly plan`
 
 ## Source Of Truth
 
 - `docs/features/planning-system.md`
+- `docs/features/poker-session-flow.md`
 - `docs/design/product-design-brief.md`
 - `docs/product-brief.md`
 - `README.md`
 - Current Linear MVP issues, especially `DIA-15` through `DIA-21`
 
-Archived session-flow specs are historical reference only. Session preparation, live session capture, and post-session review should not drive the active MVP redesign.
+Archived session-flow specs are historical inputs only. The active session direction lives in `docs/features/poker-session-flow.md`.
 
 ## Product Positioning
 
@@ -25,10 +26,13 @@ The MVP should help the player answer:
 - What should I do today?
 - Is this week still realistic?
 - Am I on pace for this month's targets?
+- Is there an active or pending poker session?
 - What have I missed, adjusted, or avoided?
+- What patterns should Coach AI help me notice?
 - What should I improve before the next week?
+- Is this month still aligned with my annual direction?
 
-The app should optimize for execution and adjustment, not passive tracking.
+The app should optimize for execution, context capture, adjustment, and AI-assisted performance improvement, not passive tracking.
 
 ## Evidence-Informed Design Principles
 
@@ -38,6 +42,8 @@ The app should optimize for execution and adjustment, not passive tracking.
 - Review should diagnose patterns without creating guilt.
 - Feedback should produce a next action, not just a score.
 - The Coach should challenge the plan when useful, but the player remains the author.
+- Session capture should be optional during play but valuable when used.
+- Coach AI should use data to improve performance and organization, not to give technical hand advice.
 
 ## Primary Navigation
 
@@ -45,25 +51,34 @@ Recommended main navigation:
 
 - Today
 - Weekly plan
+- Annual direction
 - Monthly targets
+- Sessions
 - Study
 - Review
+- Coach AI
 
-Do not include Coach AI as a fixed primary navigation item in the MVP.
+Also include a visually highlighted `Start session` CTA below the logo in the sidebar.
 
-Coach AI should appear contextually:
+The highlighted session CTA states:
+
+- `Start session`
+- `Active session`
+- `Finish and review`
+
+Coach AI should appear both as a primary surface and contextually:
 
 - In the weekly plan as `Review with Coach`
 - In the weekly review as a short next-week suggestion
-- On Today only when there is a concrete plan risk or useful action
+- On Today as a compact insight plus `Ask Coach`
+- In Sessions as contextual performance insight
+- As a free chat page/drawer with suggested prompts
 
 Remove or defer from primary navigation:
 
-- Sessions
 - Analytics
 - Notes
-- Session preparation
-- Generic AI chat
+- Technical hand analysis
 
 ## Today Screen
 
@@ -74,9 +89,11 @@ Before the day is prepared, Today should show:
 - Primary CTA: `Prepare day`
 - Today's planned blocks from the active weekly plan
 - Weekly focus as a short line
+- Highlighted session CTA/state when relevant
 - Compact planning-week preview
 - Compact monthly pace summary
 - Useful attention items
+- Coach AI compact insight plus `Ask Coach`
 - A discreet signal if the next week has a draft
 
 If there is no active weekly plan, Today should not allow the main execution flow to drift into a disconnected habit tracker. The primary empty state should point the player to create a weekly plan:
@@ -102,12 +119,13 @@ Secondary compact content:
 - Today's original planned blocks
 - Compact planning-week preview
 - Compact monthly pace summary
+- Session state/CTA when relevant
 - Attention items only when actionable
 
 Execution mode should avoid:
 
 - Dense analytics
-- Coach chat as the main surface
+- Coach chat as the main surface, while still keeping a compact Coach entry point available
 - Full weekly planning controls
 - Prominent re-planning loops
 
@@ -198,7 +216,9 @@ Initial block types:
 - Rest
 - Admin/Other
 
-The weekly plan should have one short weekly focus.
+The weekly plan should have one required short weekly focus/intention.
+
+This weekly focus should appear in the weekly plan, Today, dashboard, and active session.
 
 Good examples:
 
@@ -223,6 +243,7 @@ Recommended states:
 - Previous week exists and no current draft exists: `Copy previous week`
 - Secondary action: `Review with Coach`
 - End of planning week: `Do weekly review`
+- Many marked hands pending: `Plan review block`
 
 The primary action should reinforce that the player owns the plan.
 
@@ -323,16 +344,41 @@ Recommended representation:
 
 Avoid a full calendar layout on Today.
 
+## Annual Direction
+
+Annual direction should be a lightweight primary surface in the MVP.
+
+Purpose:
+
+- Define the strategic direction for the year.
+- Help monthly targets answer "what should this month move forward?"
+- Give Coach AI context for plan and review feedback.
+
+MVP fields:
+
+- Primary direction for the year.
+- 2 to 4 priorities.
+- Optional constraints or non-negotiables.
+- Optional note on what the player does not want to repeat this year.
+
+Avoid:
+
+- Detailed annual forecasting.
+- Quarterly planning as a required setup step.
+- Heavy OKR/project management language.
+- Financial target dashboards.
+
 ## Monthly Targets
 
 Monthly targets should be a dedicated page in the primary navigation.
 
 Purpose:
 
-- Define monthly pacing
+- Define monthly pacing under the annual direction
 - Inform weekly planning
 - Inform Today context
 - Inform Coach plan review
+- Inform session and study recommendations
 
 Initial categories:
 
@@ -351,6 +397,84 @@ Example:
 - Sport: below pace · 1/4 sessions
 
 Show status plus one short progress number. Avoid dense charts, percentages, forecasts, or detailed analytics in the MVP. Monthly pace should trigger decisions, not become an analytics page.
+
+## Sessions
+
+Sessions should be a dedicated primary page and a core execution flow.
+
+Reference spec:
+
+- `docs/features/poker-session-flow.md`
+
+Main purposes:
+
+- Start or return to the active session.
+- Finish/review a pending session.
+- Show compact session history.
+- Feed Coach AI with performance context.
+
+Primary global CTA:
+
+- `Start session`, highlighted below the logo.
+
+Session start:
+
+- Short drawer/modal.
+- Required session focus.
+- Optional link to planned Grind block.
+- Optional initial energy/focus/tilt.
+- Optional micro-intention.
+- Optional max tables and quality rule, suggested from plan/block when available.
+
+Active session:
+
+- Dedicated focused page on desktop.
+- Quick check-up.
+- Mark hand to review.
+- Quick note.
+- Micro-intention.
+- Compact latest timeline.
+- Finish session CTA.
+
+Check-up:
+
+- Energy 1-5.
+- Focus 1-5.
+- Tilt 0-5.
+- Optional micro-intention.
+- Optional table count.
+
+End session:
+
+- Opens short review immediately.
+- If check-ups exist, show summary and let the player confirm/edit.
+- If no check-ups exist, ask final energy/focus/tilt/decision quality.
+- Required: number of tournaments played and final decision quality.
+- Optional: financial result with explicit permission for Coach AI.
+- Optional: good decision, main leak, next action, 1-3 priority hands.
+
+Session page filters:
+
+- Date/period.
+- Session state.
+- Review pending.
+
+History row:
+
+- Date.
+- Focus.
+- Number of tournaments.
+- Decision quality.
+- Tilt peak.
+- Hands to review.
+- State/review status.
+
+Avoid:
+
+- Calendar-first layout.
+- Financial summaries.
+- Technical hand analysis.
+- Detailed tournament-by-tournament tracking.
 
 ## Study
 
@@ -387,9 +511,7 @@ Out of scope:
 
 ## Review
 
-Review should mean weekly review in the MVP.
-
-Do not include session reviews in the active MVP review page.
+Review should include weekly review and pending session reviews as separate review types.
 
 Weekly review should be recommended, not mandatory. The player should be allowed to create or continue the next weekly plan even if the prior review was skipped.
 
@@ -415,19 +537,21 @@ MVP fields:
 
 Any Coach suggestion for the next week should appear after the player completes the review fields. This keeps the review reflective first and lets the Coach use the player's actual weekly context.
 
-The review should act like a mirror, not a tribunal.
+Session review should be short and should feed the weekly review. The review should act like a mirror, not a tribunal.
 
 ## Coach AI
 
-Coach AI should be contextual and plan-focused in the MVP.
+Coach AI should be contextual, interactive, and performance-focused in the MVP.
 
-The player creates the plan. The Coach reviews it only when requested.
+The player creates the plan. The Coach can review it when requested, answer free-form questions, and propose changes that require confirmation.
 
 Recommended UI:
 
-- Side drawer inside Weekly plan
+- Primary Coach AI page with free chat.
+- Contextual drawer/action on Today, Weekly plan, Sessions, Study, and Review.
+- Compact dashboard insight card with `Ask Coach`.
 
-The drawer should keep the plan visible while showing Coach findings and suggestions.
+The contextual drawer should keep the current screen visible while showing Coach findings and suggestions.
 
 The Coach should look for:
 
@@ -435,7 +559,8 @@ The Coach should look for:
 - Missing study or review
 - Weak recovery, sport, or rest balance
 - Mismatch between monthly targets and weekly plan
-- Repeated patterns once review data exists
+- Repeated patterns from plans, sessions, study logs, check-ins, and reviews
+- Session patterns such as energy drops, tilt spikes, many marked hands, table creep, or early session endings
 
 Suggestion behavior:
 
@@ -444,16 +569,18 @@ Suggestion behavior:
 - No suggestion is auto-applied
 - Copy should be direct and practical
 - Avoid theatrical AI personality in the MVP
+- Show simple context used, such as `weekly plan + last 3 sessions`
+- Do not provide technical poker hand analysis
 
 When the player accepts a Coach suggestion, create an editable proposal before applying the change. The Coach should not silently mutate the player's plan.
 
-For the MVP, do not build a full history center for Coach suggestions. Store the plan-level `coachReviewSummary` and persist accepted changes through the normal plan data. Ignored suggestions do not need detailed persistent history yet.
+For the MVP, do not build a full history center for Coach suggestions. Store useful summaries and persist accepted changes through normal plan/session/study data. Ignored suggestions do not need detailed persistent history yet.
 
 Avoid:
 
-- Coach as a fixed nav item
-- Coach chat as the main app surface
 - Coach-generated plans as the default
+- Coach as the only interaction model
+- Coach as technical hand analyst
 
 ## First Screen Information Hierarchy
 
@@ -463,18 +590,21 @@ Before day preparation:
 
 1. Prepare day CTA
 2. Planned blocks for today
-3. Weekly focus
-4. Compact planning-week preview
-5. Compact monthly pace
-6. Attention items
+3. Session CTA/state when relevant
+4. Weekly focus
+5. Compact planning-week preview
+6. Compact monthly pace
+7. Attention items
+8. Coach insight
 
 After day preparation:
 
 1. Daily commitments
 2. Quick status actions
 3. Adjust day as a secondary action
-4. Weekly focus
-5. Compact context
+4. Session CTA/state when relevant
+5. Weekly focus
+6. Compact context
 
 The player should feel: "I know what to do now."
 
@@ -490,25 +620,26 @@ Mitigation:
 - Keep weekly and monthly context compact
 - Only show alerts when they are actionable
 
-### The Product Drifts Back To Session Preparation
+### Sessions Overpower Planning
 
-The previous session-first direction was intentionally canceled.
+Sessions are now an active surface, but the macro planning system remains the product spine.
 
 Mitigation:
 
-- Avoid primary CTAs such as `Prepare session`, `Start grind`, or `Start session`
-- Keep sessions out of primary navigation
-- Revisit session flows only after planning context exists
+- Keep the weekly focus and monthly targets visible around session flows.
+- Keep session setup short.
+- Avoid making session preparation the whole dashboard.
 
 ### Coach AI Becomes The Product
 
-Coach AI is valuable, but the MVP should not be a chat wrapper.
+Coach AI is valuable and should be present, but the MVP should not become only a chat wrapper.
 
 Mitigation:
 
 - Keep Coach contextual
 - Keep plan ownership with the player
 - Use suggestions that can be accepted one by one
+- Add free chat without replacing structured flows
 
 ### Study Becomes A Knowledge Workspace
 
@@ -519,16 +650,68 @@ Mitigation:
 - Keep Study as a fast log
 - Defer content library and advanced tagging
 
+## Visual And Brand Direction
+
+Brand/name note:
+
+- Keep EdgePlan as the working name for now.
+- The logo symbol direction is accepted.
+- The product name may change later without changing the core identity.
+
+Design rhythm:
+
+- Operational screens should be compact and fast: Today, Weekly plan, Sessions, Monthly targets, Study.
+- Reflective screens can breathe more: Weekly review, session review, Coach AI.
+
+Dark mode:
+
+- Use dark slate/charcoal, not pure black.
+- Use the all-white logo on dark mode.
+- Provide dark mode rules for sidebar, cards/surfaces, text hierarchy, borders, badges, progress, and session capture.
+
+Logo variations:
+
+- Primary logo.
+- Stacked logo.
+- Horizontal logo.
+- Monochromatic logo.
+- Mark only.
+- App icon.
+- Usage on light, dark, blue, and teal/cyan backgrounds.
+
+Prefer:
+
+- Clear hierarchy.
+- Compact summaries.
+- Direct CTAs.
+- Editable blocks.
+- Quick status controls.
+- Compact professional rows for blocks, with category chips or left accents.
+- Navy plus teal/cyan accents with restrained category colors.
+
+Avoid:
+
+- Hero-style dashboard.
+- AI chat-first-only layout.
+- Full calendar scheduling.
+- Motivational filler.
+- Dense analytics.
+- Pure black dark mode.
+- Casino/gambling visual language.
+- Generic SaaS card soup.
+
 ## Recommended Implementation Order
 
-This design supports the existing implementation order:
+This design updates the implementation order:
 
-1. Monthly targets MVP
-2. Weekly plan MVP
-3. Daily execution from weekly blocks
-4. Study session log MVP
-5. Weekly review MVP
-6. Coach AI plan review mock
+1. Annual direction MVP
+2. Monthly targets MVP
+3. Weekly plan MVP
+4. Daily execution from weekly blocks
+5. Study session log MVP
+6. Poker session flow MVP
+7. Weekly and session review MVP
+8. Coach AI contextual chat and review mock
 
 Before implementation, `DIA-15` should use this spec to redesign the active dashboard/navigation around the planning system.
 
