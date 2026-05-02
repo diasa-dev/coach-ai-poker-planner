@@ -25,7 +25,7 @@ This screen must stay lightweight. It must not become annual forecasting, quarte
 Use the standard app shell from the design handoff:
 
 - Left sidebar navigation.
-- Official EdgePlan logo in the sidebar.
+- Official Uplinea logo in the sidebar.
 - Highlighted global session CTA below the logo.
 - Main content area with compact operational density.
 - `Direção anual` active in navigation.

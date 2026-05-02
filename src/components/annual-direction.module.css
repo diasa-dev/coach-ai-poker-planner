@@ -63,7 +63,7 @@
   display: grid;
   gap: 16px;
   background:
-    linear-gradient(135deg, rgba(34, 197, 213, 0.14), transparent 46%),
+    linear-gradient(135deg, rgba(6, 182, 196, 0.14), transparent 46%),
     var(--ep-bg-surface);
   padding: 18px;
 }
@@ -198,7 +198,7 @@
 
 .row button:hover,
 .addButton:hover {
-  border-color: rgba(34, 197, 213, 0.54);
+  border-color: rgba(6, 182, 196, 0.54);
   color: var(--ep-navy-800);
 }
 
@@ -212,7 +212,7 @@
 
 .nextPanel {
   background:
-    linear-gradient(135deg, rgba(34, 197, 213, 0.12), transparent 42%),
+    linear-gradient(135deg, rgba(6, 182, 196, 0.12), transparent 42%),
     var(--ep-bg-surface);
 }
 

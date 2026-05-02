@@ -10,7 +10,7 @@ The detailed approved redesign decisions live in `docs/design/planning-system-re
 
 The implementation-ready text wireframes live in `docs/design/planning-system-wireframes.md`.
 
-Brand note: the current name remains EdgePlan for now. The symbol/logo direction is accepted, but the product name may change later without changing the core identity.
+Brand note: the product name is now Uplinea. The logo direction, line/bar mark, spade detail, color palette, and typography are defined by the Uplinea brand guide.
 
 ## Primary User Questions
 

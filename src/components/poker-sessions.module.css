@@ -133,7 +133,7 @@
 }
 
 .active {
-  background: var(--pill-active-bg, rgba(34, 197, 213, 0.12));
+  background: var(--pill-active-bg, rgba(6, 182, 196, 0.12));
   color: var(--pill-active-fg, #126b77);
 }
 
@@ -208,7 +208,7 @@
   grid-template-columns: 22px minmax(0, 1fr);
   gap: 10px;
   background:
-    linear-gradient(135deg, rgba(34, 197, 213, 0.1), transparent 44%),
+    linear-gradient(135deg, rgba(6, 182, 196, 0.1), transparent 44%),
     var(--ep-bg-surface);
 }
 
@@ -374,7 +374,7 @@
   height: 34px;
   place-items: center;
   border-radius: var(--ep-radius-sm);
-  background: rgba(34, 197, 213, 0.14);
+  background: rgba(6, 182, 196, 0.14);
   color: var(--ep-accent-primary-hover);
 }
 
@@ -611,8 +611,8 @@
 
 .selectedTemplate,
 .selectedRating {
-  border-color: rgba(34, 197, 213, 0.5) !important;
-  background: rgba(34, 197, 213, 0.14) !important;
+  border-color: rgba(6, 182, 196, 0.5) !important;
+  background: rgba(6, 182, 196, 0.14) !important;
   color: var(--ep-navy-800) !important;
 }
 

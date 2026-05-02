@@ -3,15 +3,15 @@
 Use this prompt in Claude Design System mode.
 
 ```txt
-Create a complete design system for EdgePlan.
+Create a complete design system for Uplinea.
 
 Important brand note:
-EdgePlan is the current working name. The symbol/logo direction is accepted, but the product name may change later. Design the system so the wordmark can be replaced without changing the core identity.
+Uplinea is the approved product name. The logo direction, line/bar mark, spade detail, color palette, and typography are defined by the Uplinea brand guide.
 
 I will attach the logo and brand guide. Use the logo system as a visual foundation, but improve the UI creatively where needed.
 
 Product context:
-EdgePlan is a professional performance app for online poker tournament players. It helps the player plan, execute, capture real session/study data, review patterns, and use Coach AI to move closer to professional and personal goals.
+Uplinea is a professional performance app for online poker tournament players. It helps the player plan, execute, capture real session/study data, review patterns, and use Coach AI to move closer to professional and personal goals.
 
 The app is not:
 - a casino app

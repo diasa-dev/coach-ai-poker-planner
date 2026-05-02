@@ -49,7 +49,7 @@ body.dark-mode {
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 }
 
@@ -62,7 +62,7 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Poppins", ui-sans-serif, system-ui, sans-serif;
 }
 
 body.dark-mode {
@@ -2614,17 +2614,17 @@ dd {
   }
 }
 
-/* EdgePlan shell foundation */
+/* Uplinea shell foundation */
 :root {
   --ep-navy-950: #060d17;
   --ep-navy-900: #0a1320;
-  --ep-navy-800: #0d1b2a;
+  --ep-navy-800: #0b1d3d;
   --ep-navy-700: #142539;
-  --ep-blue-700: #1e3a8a;
+  --ep-blue-700: #1d4edb;
   --ep-teal-600: #1aa8b8;
-  --ep-teal-500: #22c5d5;
+  --ep-teal-500: #06b6c4;
   --ep-grey-50: #f7f8fa;
-  --ep-grey-100: #eef2f7;
+  --ep-grey-100: #f5f7fa;
   --ep-grey-150: #e4e9f0;
   --ep-grey-200: #d7dee7;
   --ep-grey-400: #8a95a4;
@@ -2669,7 +2669,7 @@ dd {
   --radius-pill: 999px;
   --sidebar-w: 232px;
   --topbar-h: 56px;
-  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Poppins", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
   --t-h1: 600 30px/1.2 var(--font-display);
   --t-h2: 600 22px/1.25 var(--font-display);
@@ -2679,8 +2679,8 @@ dd {
   --t-small: 400 13px/1.45 var(--font-sans);
   --t-mono-sm: 400 12px/1.4 var(--font-mono);
   --t-eyebrow: 600 11px/1.2 var(--font-sans);
-  --ep-cat-grind: #1e3a8a;
-  --ep-cat-study: #22c5d5;
+  --ep-cat-grind: #1d4edb;
+  --ep-cat-study: #06b6c4;
   --ep-cat-review: #7a6ce8;
   --ep-cat-sport: #2bad7e;
   --ep-cat-rest: #93a2b5;
@@ -2743,7 +2743,7 @@ dd {
   margin: 0;
   border: 0;
   background: var(--ep-accent-primary);
-  color: #0d1b2a;
+  color: #0b1d3d;
   padding: 0 14px;
   box-shadow: none;
 }
@@ -2753,8 +2753,8 @@ dd {
 }
 
 .ep-session-cta.active-session {
-  border: 1px solid rgba(34, 197, 213, 0.42);
-  background: rgba(34, 197, 213, 0.13);
+  border: 1px solid rgba(6, 182, 196, 0.42);
+  background: rgba(6, 182, 196, 0.13);
   color: var(--ep-accent-primary);
 }
 
@@ -2785,7 +2785,7 @@ dd {
 }
 
 .ep-nav-item.active {
-  background: rgba(34, 197, 213, 0.1);
+  background: rgba(6, 182, 196, 0.1);
   color: #ffffff;
 }
 
@@ -2815,7 +2815,7 @@ dd {
   place-items: center;
   border-radius: 50%;
   background: var(--ep-teal-500);
-  color: #0d1b2a;
+  color: #0b1d3d;
   font-size: 12px;
   font-weight: 600;
 }
@@ -2955,7 +2955,7 @@ dd {
 
 .ep-button.primary {
   background: var(--ep-accent-primary);
-  color: #0d1b2a;
+  color: #0b1d3d;
 }
 
 .ep-button.secondary {
@@ -2997,7 +2997,7 @@ dd {
 .ep-panel.large {
   min-height: 360px;
   background:
-    linear-gradient(135deg, rgba(34, 197, 213, 0.08), transparent 34%),
+    linear-gradient(135deg, rgba(6, 182, 196, 0.08), transparent 34%),
     var(--ep-bg-surface);
 }
 
@@ -3064,9 +3064,9 @@ dd {
   align-items: center;
   gap: 8px;
   min-height: 30px;
-  border: 1px solid rgba(34, 197, 213, 0.32);
+  border: 1px solid rgba(6, 182, 196, 0.32);
   border-radius: var(--ep-radius-md);
-  background: rgba(34, 197, 213, 0.1);
+  background: rgba(6, 182, 196, 0.1);
   color: #126b77;
   padding: 0 10px;
   font-size: 12px;
@@ -3175,7 +3175,7 @@ dd {
   align-items: center;
   min-height: 22px;
   border-radius: 999px;
-  background: rgba(34, 197, 213, 0.16);
+  background: rgba(6, 182, 196, 0.16);
   color: #126b77;
   padding: 0 9px;
   font-size: 11px;
@@ -3290,7 +3290,7 @@ dd {
 .ep-coach-send {
   border-color: var(--ep-teal-500);
   background: var(--ep-teal-500);
-  color: #0d1b2a;
+  color: #0b1d3d;
 }
 
 .ep-coach-button.ghost {
@@ -3458,10 +3458,10 @@ dd {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 0.45fr);
   gap: 16px;
-  border: 1px solid rgba(34, 197, 213, 0.36);
+  border: 1px solid rgba(6, 182, 196, 0.36);
   border-radius: var(--ep-radius-md);
   background:
-    linear-gradient(135deg, rgba(34, 197, 213, 0.12), transparent 42%),
+    linear-gradient(135deg, rgba(6, 182, 196, 0.12), transparent 42%),
     var(--ep-bg-surface);
   box-shadow: var(--ep-shadow-sm);
   padding: 15px 16px;
@@ -3529,8 +3529,8 @@ dd {
 }
 
 .ep-weekly-presets button.active {
-  border-color: rgba(34, 197, 213, 0.5);
-  background: rgba(34, 197, 213, 0.13);
+  border-color: rgba(6, 182, 196, 0.5);
+  background: rgba(6, 182, 196, 0.13);
   color: var(--ep-navy-800);
 }
 
@@ -3559,9 +3559,9 @@ dd {
 }
 
 .ep-week-row.today {
-  border-color: rgba(34, 197, 213, 0.66);
+  border-color: rgba(6, 182, 196, 0.66);
   background:
-    linear-gradient(90deg, rgba(34, 197, 213, 0.13), transparent 46%),
+    linear-gradient(90deg, rgba(6, 182, 196, 0.13), transparent 46%),
     var(--ep-bg-surface);
 }
 
@@ -3649,9 +3649,9 @@ dd {
 }
 
 .ep-day-column.today {
-  border-color: rgba(34, 197, 213, 0.66);
+  border-color: rgba(6, 182, 196, 0.66);
   background:
-    linear-gradient(180deg, rgba(34, 197, 213, 0.13), transparent 38%),
+    linear-gradient(180deg, rgba(6, 182, 196, 0.13), transparent 38%),
     var(--ep-bg-surface);
 }
 
@@ -3846,7 +3846,7 @@ dd {
 }
 
 .ep-add-day-block:hover {
-  border-color: rgba(34, 197, 213, 0.62);
+  border-color: rgba(6, 182, 196, 0.62);
   color: var(--ep-navy-800);
 }
 
@@ -3964,8 +3964,8 @@ dd {
 }
 
 .wp-demo-banner.is-real {
-  border-color: rgba(34, 197, 213, 0.34);
-  background: rgba(34, 197, 213, 0.08);
+  border-color: rgba(6, 182, 196, 0.34);
+  background: rgba(6, 182, 196, 0.08);
 }
 
 .wp-demo-banner strong,
@@ -4147,7 +4147,7 @@ dd {
 
 .ep-week-row.today {
   border-left: 3px solid var(--ep-teal-500);
-  background: linear-gradient(90deg, rgba(34, 197, 213, 0.06) 0%, rgba(34, 197, 213, 0) 50%),
+  background: linear-gradient(90deg, rgba(6, 182, 196, 0.06) 0%, rgba(6, 182, 196, 0) 50%),
     var(--bg-surface);
 }
 
@@ -4200,7 +4200,7 @@ dd {
 .ep-week-row header em {
   border-radius: 4px;
   background: var(--ep-teal-500);
-  color: #0d1b2a;
+  color: #0b1d3d;
   padding: 4px 8px;
   font: 600 10px/1 var(--font-sans);
   font-style: normal;
@@ -4237,7 +4237,7 @@ dd {
 
 .ep-week-row.today header strong {
   background: var(--ep-teal-500);
-  color: #0d1b2a;
+  color: #0b1d3d;
   font: 600 10px/1 var(--font-sans);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -4484,7 +4484,7 @@ dd {
 .wpp-presets button.active {
   border-color: var(--ep-teal-500);
   background: var(--ep-teal-500);
-  color: #0d1b2a;
+  color: #0b1d3d;
   font-weight: 600;
 }
 
@@ -4506,7 +4506,7 @@ dd {
 .wpp-col.today {
   border-color: var(--ep-teal-500);
   box-shadow: 0 0 0 1px var(--ep-teal-500) inset;
-  background: linear-gradient(180deg, rgba(34, 197, 213, 0.04) 0%, rgba(34, 197, 213, 0) 80px),
+  background: linear-gradient(180deg, rgba(6, 182, 196, 0.04) 0%, rgba(6, 182, 196, 0) 80px),
     var(--bg-surface);
 }
 
@@ -5274,7 +5274,7 @@ dd {
   flex-direction: column;
   justify-content: center;
   background:
-    linear-gradient(135deg, rgba(34, 197, 213, 0.12), transparent 42%),
+    linear-gradient(135deg, rgba(6, 182, 196, 0.12), transparent 42%),
     var(--ep-bg-surface);
 }
 
@@ -5292,9 +5292,9 @@ dd {
 }
 
 .today-prepare-band {
-  border-color: rgba(34, 197, 213, 0.42);
+  border-color: rgba(6, 182, 196, 0.42);
   background:
-    linear-gradient(135deg, rgba(34, 197, 213, 0.12), transparent 52%),
+    linear-gradient(135deg, rgba(6, 182, 196, 0.12), transparent 52%),
     var(--ep-bg-surface);
 }
 
@@ -5303,9 +5303,9 @@ dd {
 }
 
 .today-commitments {
-  border-color: rgba(34, 197, 213, 0.38);
+  border-color: rgba(6, 182, 196, 0.38);
   background:
-    linear-gradient(135deg, rgba(34, 197, 213, 0.1), transparent 42%),
+    linear-gradient(135deg, rgba(6, 182, 196, 0.1), transparent 42%),
     var(--ep-bg-surface);
 }
 
@@ -5462,7 +5462,7 @@ dd {
 }
 
 .today-chip.foco {
-  background: rgba(34, 197, 213, 0.14);
+  background: rgba(6, 182, 196, 0.14);
   color: var(--ep-teal-600);
 }
 
@@ -5511,9 +5511,9 @@ dd {
   align-items: center;
   gap: 5px;
   min-height: 28px;
-  border: 1px solid rgba(34, 197, 213, 0.4);
+  border: 1px solid rgba(6, 182, 196, 0.4);
   border-radius: var(--ep-radius-sm);
-  background: rgba(34, 197, 213, 0.12);
+  background: rgba(6, 182, 196, 0.12);
   color: var(--ep-navy-800);
   padding: 0 9px;
   font-size: 12px;
@@ -5553,7 +5553,7 @@ dd {
 }
 
 .today-session.active {
-  border-color: rgba(34, 197, 213, 0.5);
+  border-color: rgba(6, 182, 196, 0.5);
 }
 
 .today-session.active svg {
@@ -5589,8 +5589,8 @@ dd {
 }
 
 .today-day.active {
-  border-color: rgba(34, 197, 213, 0.64);
-  background: rgba(34, 197, 213, 0.1);
+  border-color: rgba(6, 182, 196, 0.64);
+  background: rgba(6, 182, 196, 0.1);
 }
 
 .today-day strong,
@@ -5696,9 +5696,9 @@ dd {
 .today-coach {
   display: grid;
   gap: 10px;
-  border-color: rgba(34, 197, 213, 0.36);
+  border-color: rgba(6, 182, 196, 0.36);
   background:
-    linear-gradient(135deg, rgba(34, 197, 213, 0.11), transparent 44%),
+    linear-gradient(135deg, rgba(6, 182, 196, 0.11), transparent 44%),
     var(--ep-bg-surface);
 }
 
@@ -5842,15 +5842,15 @@ dd {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
   min-height: 88px;
-  border-color: #22c5d5;
+  border-color: #06b6c4;
   border-radius: 8px;
-  background: rgba(34, 197, 213, 0.08);
+  background: rgba(6, 182, 196, 0.08);
   padding: 16px 18px;
 }
 
 .today-pick-list label.selected {
-  border-color: #22c5d5;
-  background: rgba(34, 197, 213, 0.11);
+  border-color: #06b6c4;
+  background: rgba(6, 182, 196, 0.11);
 }
 
 .today-pick-list input {
@@ -6283,7 +6283,7 @@ dd {
 
 .today-print-match .today-commitment::before {
   width: 4px;
-  background: #22c5d5;
+  background: #06b6c4;
 }
 
 .today-print-match .today-commitment-kind {
@@ -6392,8 +6392,8 @@ dd {
 }
 
 .today-print-match .today-commitment-actions button.active {
-  border-color: #0d1b2a;
-  background: #0d1b2a;
+  border-color: #0b1d3d;
+  background: #0b1d3d;
   color: #ffffff;
 }
 
@@ -6472,7 +6472,7 @@ dd {
 
 .today-print-match .today-block-row::before {
   width: 4px;
-  background: #22c5d5;
+  background: #06b6c4;
 }
 
 .today-print-match .today-block-row.grind::before {
@@ -6682,12 +6682,12 @@ dd {
 
 .today-print-match progress::-webkit-progress-value {
   border-radius: 999px;
-  background: #22c5d5;
+  background: #06b6c4;
 }
 
 .today-print-match progress::-moz-progress-bar {
   border-radius: 999px;
-  background: #22c5d5;
+  background: #06b6c4;
 }
 
 .today-print-match .today-coach-card {
@@ -6700,7 +6700,7 @@ dd {
 }
 
 .today-print-match .today-coach-card .today-card-head svg {
-  color: #22c5d5;
+  color: #06b6c4;
 }
 
 .today-print-match .today-coach-body {

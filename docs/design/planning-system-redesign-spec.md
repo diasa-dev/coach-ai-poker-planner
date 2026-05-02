@@ -654,9 +654,9 @@ Mitigation:
 
 Brand/name note:
 
-- Keep EdgePlan as the working name for now.
-- The logo symbol direction is accepted.
-- The product name may change later without changing the core identity.
+- Use Uplinea as the approved product name.
+- Preserve the approved logo direction: rising line/bar mark with spade detail.
+- Follow the Uplinea brand guide for colors, typography, and logo usage.
 
 Design rhythm:
 

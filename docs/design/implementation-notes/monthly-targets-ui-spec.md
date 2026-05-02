@@ -29,7 +29,7 @@ This screen must stay focused on planning decisions. It must not become a financ
 Use the standard app shell from the design handoff:
 
 - Left sidebar navigation.
-- Official EdgePlan logo in the sidebar.
+- Official Uplinea logo in the sidebar.
 - Highlighted global session CTA below the logo.
 - Main content area with compact operational density.
 - `Objetivos mensais` active in navigation.

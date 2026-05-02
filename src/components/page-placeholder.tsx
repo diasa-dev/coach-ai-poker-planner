@@ -46,7 +46,7 @@ export function PagePlaceholder({
             <h2>{title}</h2>
             <p>
               Esta área fica reservada para a próxima slice aprovada. A estrutura, navegação e
-              hierarquia visual já estão alinhadas com o handoff EdgePlan.
+              hierarquia visual já estão alinhadas com o handoff Uplinea.
             </p>
           </div>
         </article>
