@@ -19,7 +19,6 @@ import {
 
 type CommitmentStatus = "planned" | "done" | "adjusted" | "not-done";
 type CommitmentKind = PlanBlockType | "Foco" | "Revisão";
-type PlanChoice = "follow" | "adjust" | "reduce";
 type TodaySource = "demo" | "active" | "no-active-plan";
 
 type Commitment = {
@@ -31,6 +30,13 @@ type Commitment = {
   estimate: string;
   status: CommitmentStatus;
   reason?: string;
+};
+
+const statusLabels: Record<CommitmentStatus, string> = {
+  planned: "Planeado",
+  done: "Feito",
+  adjusted: "Ajustado",
+  "not-done": "Não feito",
 };
 
 const initialCommitmentsFallback: Commitment[] = [
@@ -258,7 +264,6 @@ function TodayWorkspace({
   const [commitments, setCommitments] = useState(defaultCommitments);
   const [prepareOpen, setPrepareOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
-  const [planChoice, setPlanChoice] = useState<PlanChoice>("follow");
   const [selectedCommitments, setSelectedCommitments] = useState(() =>
     getCommitmentOptions(source, todayBlocks).map((commitment) => commitment.id),
   );
@@ -303,9 +308,21 @@ function TodayWorkspace({
     }
   }
 
-  async function confirmPrepareDay() {
+  async function confirmPrepareDay(extraTitle?: string) {
     const selected = commitmentOptions.filter((commitment) => selectedCommitments.includes(commitment.id));
-    const nextCommitments = selected.length ? selected.slice(0, 3) : commitmentOptions.slice(0, 1);
+    const customCommitment = extraTitle?.trim()
+      ? {
+          id: `custom-${Date.now()}`,
+          kind: "Foco" as const,
+          text: extraTitle.trim(),
+          estimate: "opcional",
+          status: "planned" as const,
+        }
+      : null;
+    const nextCommitments = [
+      ...(selected.length ? selected : commitmentOptions.slice(0, 1)),
+      ...(customCommitment ? [customCommitment] : []),
+    ].slice(0, 3);
     const savedCommitments = onPrepareDay ? await onPrepareDay(nextCommitments) : nextCommitments;
 
     setCommitments(savedCommitments.length ? savedCommitments : nextCommitments);
@@ -330,7 +347,7 @@ function TodayWorkspace({
           </Link>
           <button className="ep-button primary" type="button" onClick={() => setPrepareOpen(true)}>
             <Check size={14} aria-hidden="true" />
-            Preparar dia
+            {dailyPlanStatus === "closed" ? "Editar dia" : "Preparar dia"}
           </button>
         </div>
       </div>
@@ -354,7 +371,7 @@ function TodayWorkspace({
           <CoachCard />
           <button className="today-close-button" type="button" onClick={() => setCloseOpen(true)}>
             <Check size={14} aria-hidden="true" />
-            Fechar dia
+            {dailyPlanStatus === "closed" ? "Dia fechado" : "Fechar dia"}
           </button>
         </aside>
       </div>
@@ -364,9 +381,7 @@ function TodayWorkspace({
           onClose={() => setPrepareOpen(false)}
           onConfirm={confirmPrepareDay}
           options={commitmentOptions}
-          planChoice={planChoice}
           selectedCommitments={selectedCommitments}
-          setPlanChoice={setPlanChoice}
           setSelectedCommitments={setSelectedCommitments}
         />
       ) : null}
@@ -706,19 +721,17 @@ function PrepareDayDialog({
   onClose,
   onConfirm,
   options,
-  planChoice,
   selectedCommitments,
-  setPlanChoice,
   setSelectedCommitments,
 }: {
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (extraTitle?: string) => void;
   options: Commitment[];
-  planChoice: PlanChoice;
   selectedCommitments: string[];
-  setPlanChoice: (choice: PlanChoice) => void;
   setSelectedCommitments: (items: string[]) => void;
 }) {
+  const [extraCommitment, setExtraCommitment] = useState("");
+
   function toggleCommitment(id: string) {
     setSelectedCommitments(
       selectedCommitments.includes(id)
@@ -730,25 +743,10 @@ function PrepareDayDialog({
   return (
     <DialogFrame title="Preparar dia" onClose={onClose}>
       <div className="today-dialog-body">
-        <div className="today-state-grid">
-          {["Sono 7h", "Energia 3/5", "Foco 4/5", "Stress 2/5"].map((item) => (
-            <span key={item}>{item}</span>
-          ))}
-        </div>
-        <div className="today-choice-group" aria-label="Escolha do plano">
-          <button className={planChoice === "follow" ? "active" : undefined} type="button" onClick={() => setPlanChoice("follow")}>
-            Seguir plano
-          </button>
-          <button className={planChoice === "adjust" ? "active" : undefined} type="button" onClick={() => setPlanChoice("adjust")}>
-            Ajustar plano
-          </button>
-          <button className={planChoice === "reduce" ? "active" : undefined} type="button" onClick={() => setPlanChoice("reduce")}>
-            Reduzir plano
-          </button>
-        </div>
-        {planChoice === "reduce" ? <div className="today-reduce-prompt">Qual é o mínimo que ainda torna o dia útil?</div> : null}
+        <p className="today-dialog-copy">
+          Escolhe 1 a 3 ações que tornam este dia bem executado. Não é a tua agenda — é o que importa.
+        </p>
         <div className="today-pick-list">
-          <span>Escolhe 1 a 3 compromissos</span>
           {options.length ? (
             options.map((commitment) => (
               <label className={selectedCommitments.includes(commitment.id) ? "selected" : undefined} key={commitment.id}>
@@ -771,14 +769,23 @@ function PrepareDayDialog({
             </div>
           )}
         </div>
+        <label className="today-extra-commitment">
+          Adicionar compromisso (opcional)
+          <input
+            maxLength={90}
+            onChange={(event) => setExtraCommitment(event.target.value)}
+            placeholder="Texto curto, observável..."
+            value={extraCommitment}
+          />
+        </label>
       </div>
       <div className="today-dialog-foot">
         <button className="ep-button secondary" type="button" onClick={onClose}>
           Cancelar
         </button>
-        <button className="ep-button primary" type="button" onClick={onConfirm}>
+        <button className="ep-button primary" type="button" onClick={() => onConfirm(extraCommitment)}>
           <Check size={14} aria-hidden="true" />
-          Começar dia
+          Confirmar dia
         </button>
       </div>
     </DialogFrame>
@@ -807,16 +814,31 @@ function CloseDayDialog({
             <div key={commitment.id}>
               <strong>{commitment.text}</strong>
               <div className="today-close-actions">
-                <button type="button" onClick={() => onStatusChange(commitment.id, "done")}>
+                <button
+                  className={commitment.status === "done" ? "active" : undefined}
+                  type="button"
+                  onClick={() => onStatusChange(commitment.id, "done")}
+                >
                   Feito
                 </button>
-                <button type="button" onClick={() => onStatusChange(commitment.id, "adjusted")}>
+                <button
+                  className={commitment.status === "adjusted" ? "active" : undefined}
+                  type="button"
+                  onClick={() => onStatusChange(commitment.id, "adjusted")}
+                >
                   Ajustado
                 </button>
-                <button type="button" onClick={() => onStatusChange(commitment.id, "not-done")}>
+                <button
+                  className={commitment.status === "not-done" ? "active" : undefined}
+                  type="button"
+                  onClick={() => onStatusChange(commitment.id, "not-done")}
+                >
                   Não feito
                 </button>
               </div>
+              <small className={`today-close-status ${statusClass(commitment.status)}`}>
+                {statusLabels[commitment.status]}
+              </small>
               {commitment.status === "adjusted" || commitment.status === "not-done" ? (
                 <label className="today-reason">
                   Motivo opcional

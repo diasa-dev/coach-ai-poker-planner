@@ -217,6 +217,17 @@ export const updateDailyCommitment = mutation({
       updatedAt: Date.now(),
     });
 
+    if (commitment.sourceWeeklyPlanBlockId) {
+      await ctx.db.patch(commitment.sourceWeeklyPlanBlockId, {
+        status: args.status,
+        statusReason:
+          args.status === "adjusted" || args.status === "notDone"
+            ? args.reason
+            : undefined,
+        updatedAt: Date.now(),
+      });
+    }
+
     return null;
   },
 });
@@ -231,6 +242,29 @@ export const closePreparedDay = mutation({
 
     if (!dailyPlan || dailyPlan.userId !== userId) {
       throw new Error("Daily plan not found");
+    }
+
+    const commitments = await ctx.db
+      .query("dailyCommitments")
+      .withIndex("by_daily_plan", (q) => q.eq("dailyPlanId", dailyPlan._id))
+      .collect();
+
+    for (const commitment of commitments) {
+      if (commitment.status !== "planned") continue;
+
+      await ctx.db.patch(commitment._id, {
+        status: "notDone",
+        reason: commitment.reason ?? "Sem motivo claro",
+        updatedAt: Date.now(),
+      });
+
+      if (commitment.sourceWeeklyPlanBlockId) {
+        await ctx.db.patch(commitment.sourceWeeklyPlanBlockId, {
+          status: "notDone",
+          statusReason: commitment.reason ?? "Sem motivo claro",
+          updatedAt: Date.now(),
+        });
+      }
     }
 
     await ctx.db.patch(args.id, {
