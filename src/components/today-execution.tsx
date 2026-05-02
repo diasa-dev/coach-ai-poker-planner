@@ -88,6 +88,13 @@ function statusClass(status: CommitmentStatus | PlanBlockStatus) {
   return "planned";
 }
 
+function commitmentStatusToPlanBlockStatus(status: CommitmentStatus): PlanBlockStatus {
+  if (status === "done") return "Feito";
+  if (status === "adjusted") return "Ajustado";
+  if (status === "not-done") return "Não feito";
+  return "Planeado";
+}
+
 function kindClass(kind: CommitmentKind | PlanBlockType) {
   return kind.toLowerCase().replace("ã", "a").replace("ç", "c");
 }
@@ -264,6 +271,7 @@ function TodayWorkspace({
   const [commitments, setCommitments] = useState(defaultCommitments);
   const [prepareOpen, setPrepareOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
+  const [updatingCommitmentIds, setUpdatingCommitmentIds] = useState<string[]>([]);
   const [selectedCommitments, setSelectedCommitments] = useState(() =>
     getCommitmentOptions(source, todayBlocks).map((commitment) => commitment.id),
   );
@@ -272,8 +280,21 @@ function TodayWorkspace({
     () => getCommitmentOptions(source, todayBlocks),
     [source, todayBlocks],
   );
+  const displayedTodayBlocks = useMemo(
+    () =>
+      todayBlocks.map((block) => {
+        const linkedCommitment = commitments.find(
+          (commitment) => commitment.sourceWeeklyPlanBlockId === block.id,
+        );
+
+        return linkedCommitment
+          ? { ...block, status: commitmentStatusToPlanBlockStatus(linkedCommitment.status) }
+          : block;
+      }),
+    [commitments, todayBlocks],
+  );
   const completedCommitments = commitments.filter((commitment) => commitment.status === "done").length;
-  const doneBlocks = todayBlocks.filter((block) => block.status === "Feito").length;
+  const doneBlocks = displayedTodayBlocks.filter((block) => block.status === "Feito").length;
 
   async function updateCommitment(id: string, status: CommitmentStatus) {
     const currentCommitment = commitments.find((item) => item.id === id);
@@ -281,6 +302,8 @@ function TodayWorkspace({
       status === "adjusted" || status === "not-done"
         ? currentCommitment?.reason ?? "Energia baixa"
         : undefined;
+
+    const previousCommitments = commitments;
 
     setCommitments((items) =>
       items.map((item) =>
@@ -295,7 +318,16 @@ function TodayWorkspace({
     );
 
     if (currentCommitment && onUpdateCommitment) {
-      await onUpdateCommitment(currentCommitment, status, reason);
+      setUpdatingCommitmentIds((items) => [...items.filter((item) => item !== id), id]);
+
+      try {
+        await onUpdateCommitment(currentCommitment, status, reason);
+      } catch (error) {
+        console.error(error);
+        setCommitments(previousCommitments);
+      } finally {
+        setUpdatingCommitmentIds((items) => items.filter((item) => item !== id));
+      }
     }
   }
 
@@ -361,8 +393,9 @@ function TodayWorkspace({
             onPrepare={() => setPrepareOpen(true)}
             onReasonChange={updateReason}
             onStatusChange={updateCommitment}
+            updatingCommitmentIds={updatingCommitmentIds}
           />
-          <PlannedBlocksCard blocks={todayBlocks} doneBlocks={doneBlocks} source={source} />
+          <PlannedBlocksCard blocks={displayedTodayBlocks} doneBlocks={doneBlocks} source={source} />
           <AttentionCard source={source} />
         </main>
 
@@ -464,6 +497,7 @@ function CommitmentsCard({
   onPrepare,
   onReasonChange,
   onStatusChange,
+  updatingCommitmentIds,
 }: {
   commitments: Commitment[];
   completed: number;
@@ -471,6 +505,7 @@ function CommitmentsCard({
   onPrepare: () => void;
   onReasonChange: (id: string, reason: string) => void;
   onStatusChange: (id: string, status: CommitmentStatus) => void;
+  updatingCommitmentIds: string[];
 }) {
   const isPrepared = commitments.length > 0;
 
@@ -500,43 +535,50 @@ function CommitmentsCard({
                   <small>{commitment.estimate}</small>
                 </div>
                 <div className="today-commitment-body">
-                  <strong>{commitment.text}</strong>
-                  <div className="today-commitment-actions">
-                    <button
-                      className={commitment.status === "done" ? "active" : undefined}
-                      type="button"
-                      onClick={() => onStatusChange(commitment.id, "done")}
-                    >
-                      <Check size={13} aria-hidden="true" />
-                      Feito
-                    </button>
-                    <button
-                      className={commitment.status === "adjusted" ? "active" : undefined}
-                      type="button"
-                      onClick={() => onStatusChange(commitment.id, "adjusted")}
-                    >
-                      <Edit3 size={12} aria-hidden="true" />
-                      Ajustar
-                    </button>
-                    <button
-                      className={commitment.status === "not-done" ? "active" : undefined}
-                      type="button"
-                      onClick={() => onStatusChange(commitment.id, "not-done")}
-                    >
-                      <X size={13} aria-hidden="true" />
-                      Não feito
-                    </button>
+                  <div className="today-commitment-title-row">
+                    <strong>{commitment.text}</strong>
+                    <span className={`today-status-pill ${statusClass(commitment.status)}`}>
+                      {updatingCommitmentIds.includes(commitment.id) ? "A guardar..." : statusLabels[commitment.status]}
+                    </span>
                   </div>
-                  {commitment.status === "adjusted" || commitment.status === "not-done" ? (
-                    <label className="today-reason">
-                      Motivo opcional
-                      <select value={commitment.reason} onChange={(event) => onReasonChange(commitment.id, event.target.value)}>
-                        {reasonOptions.map((reason) => (
-                          <option key={reason}>{reason}</option>
-                        ))}
-                      </select>
-                    </label>
-                  ) : null}
+                  <div className="today-commitment-control-row">
+                    <div className="today-commitment-actions">
+                      <button
+                        className={commitment.status === "done" ? "active" : undefined}
+                        type="button"
+                        onClick={() => onStatusChange(commitment.id, "done")}
+                      >
+                        <Check size={13} aria-hidden="true" />
+                        Feito
+                      </button>
+                      <button
+                        className={commitment.status === "adjusted" ? "active" : undefined}
+                        type="button"
+                        onClick={() => onStatusChange(commitment.id, "adjusted")}
+                      >
+                        <Edit3 size={12} aria-hidden="true" />
+                        Ajustar
+                      </button>
+                      <button
+                        className={commitment.status === "not-done" ? "active" : undefined}
+                        type="button"
+                        onClick={() => onStatusChange(commitment.id, "not-done")}
+                      >
+                        <X size={13} aria-hidden="true" />
+                        Não feito
+                      </button>
+                    </div>
+                    {commitment.status === "adjusted" || commitment.status === "not-done" ? (
+                      <label className="today-reason">
+                        Motivo opcional
+                        <select value={commitment.reason} onChange={(event) => onReasonChange(commitment.id, event.target.value)}>
+                          {reasonOptions.map((reason) => (
+                            <option key={reason}>{reason}</option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             ))}
@@ -755,11 +797,12 @@ function PrepareDayDialog({
                   onChange={() => toggleCommitment(commitment.id)}
                   type="checkbox"
                 />
-                <div>
+                <div className="today-pick-body">
+                  <span>
+                    <em className={`today-chip ${kindClass(commitment.kind)}`}>{commitment.kind}</em>
+                    <small>{commitment.estimate}</small>
+                  </span>
                   <strong>{commitment.text}</strong>
-                  <small>
-                    {commitment.kind} · {commitment.estimate}
-                  </small>
                 </div>
               </label>
             ))

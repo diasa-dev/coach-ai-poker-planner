@@ -5715,7 +5715,7 @@ dd {
   top: 50%;
   left: 50%;
   display: grid;
-  width: min(680px, calc(100vw - 28px));
+  width: min(820px, calc(100vw - 28px));
   max-height: calc(100vh - 28px);
   overflow: auto;
   transform: translate(-50%, -50%);
@@ -5731,7 +5731,7 @@ dd {
   justify-content: space-between;
   gap: 12px;
   border-bottom: 1px solid var(--ep-border-1);
-  padding: 16px 18px;
+  padding: 22px 24px;
 }
 
 .today-dialog > header button {
@@ -5752,14 +5752,14 @@ dd {
 
 .today-dialog-body {
   display: grid;
-  gap: 14px;
-  padding: 18px;
+  gap: 18px;
+  padding: 24px;
 }
 
 .today-dialog-foot {
   justify-content: flex-end;
   border-top: 1px solid var(--ep-border-1);
-  padding: 14px 18px;
+  padding: 16px 24px;
 }
 
 .today-state-grid {
@@ -5831,30 +5831,48 @@ dd {
 .today-pick-list label {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
+  min-height: 88px;
+  border-color: #22c5d5;
+  border-radius: 8px;
+  background: rgba(34, 197, 213, 0.08);
+  padding: 16px 18px;
 }
 
 .today-pick-list label.selected {
-  border-color: rgba(34, 197, 213, 0.54);
-  background: rgba(34, 197, 213, 0.1);
+  border-color: #22c5d5;
+  background: rgba(34, 197, 213, 0.11);
 }
 
 .today-pick-list input {
-  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  margin-top: 4px;
   accent-color: var(--ep-accent-primary);
 }
 
 .today-pick-list strong,
 .today-close-list strong {
   color: var(--ep-fg-1);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.35;
 }
 
+.today-pick-body {
+  display: grid;
+  gap: 10px;
+}
+
+.today-pick-body > span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .today-pick-list small {
-  display: block;
-  margin-top: 3px;
+  display: inline-flex;
   color: var(--ep-fg-3);
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -6269,11 +6287,53 @@ dd {
   gap: 11px;
 }
 
-.today-print-match .today-commitment-body > strong {
+.today-print-match .today-commitment-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.today-print-match .today-commitment-title-row > strong {
   color: #111827;
   font-size: 16px;
   font-weight: 700;
   line-height: 1.35;
+}
+
+.today-print-match .today-commitment-control-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.today-print-match .today-status-pill {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #edf1f6;
+  color: #4b5565;
+  padding: 6px 11px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.today-print-match .today-status-pill.done {
+  background: #d7f3e7;
+  color: #257a58;
+}
+
+.today-print-match .today-status-pill.adjusted {
+  background: #fff2d9;
+  color: #b76b08;
+}
+
+.today-print-match .today-status-pill.not-done {
+  background: #fde2e2;
+  color: #b42318;
 }
 
 .today-print-match .today-chip {
@@ -6325,6 +6385,35 @@ dd {
   border-color: #0d1b2a;
   background: #0d1b2a;
   color: #ffffff;
+}
+
+.today-print-match .today-commitment.done {
+  background: linear-gradient(90deg, rgba(215, 243, 231, 0.45), #ffffff 42%);
+}
+
+.today-print-match .today-commitment.done .today-commitment-title-row > strong,
+.today-print-match .today-block-row.st-done strong {
+  color: #475569;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.today-print-match .today-commitment.adjusted {
+  background: linear-gradient(90deg, rgba(255, 242, 217, 0.52), #ffffff 44%);
+}
+
+.today-print-match .today-commitment.not-done {
+  background: linear-gradient(90deg, rgba(253, 226, 226, 0.52), #ffffff 44%);
+}
+
+.today-print-match .today-commitment .today-reason {
+  flex: 0 1 210px;
+  min-width: 180px;
+}
+
+.today-print-match .today-commitment .today-reason select {
+  min-height: 34px;
+  background: #edf1f6;
 }
 
 .today-print-match .today-blocks-card {
