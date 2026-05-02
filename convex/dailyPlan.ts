@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 
 const defaultCommitments = [
   {
@@ -46,6 +47,13 @@ const defaultCommitments = [
   },
 ] as const;
 
+const dailyCommitmentStatus = v.union(
+  v.literal("planned"),
+  v.literal("done"),
+  v.literal("adjusted"),
+  v.literal("notDone"),
+);
+
 async function requireUserId(ctx: { auth: { getUserIdentity: () => Promise<{ subject: string } | null> } }) {
   const identity = await ctx.auth.getUserIdentity();
 
@@ -55,6 +63,184 @@ async function requireUserId(ctx: { auth: { getUserIdentity: () => Promise<{ sub
 
   return identity.subject;
 }
+
+async function getDailyPlanByDate(
+  ctx: QueryCtx | MutationCtx,
+  userId: string,
+  date: string,
+) {
+  return await ctx.db
+    .query("dailyPlans")
+    .withIndex("by_user_date", (q) => q.eq("userId", userId).eq("date", date))
+    .unique();
+}
+
+export const getPreparedDay = query({
+  args: {
+    date: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const dailyPlan = await getDailyPlanByDate(ctx, userId, args.date);
+
+    if (!dailyPlan) {
+      return {
+        dailyPlan: null,
+        commitments: [],
+      };
+    }
+
+    const commitments = await ctx.db
+      .query("dailyCommitments")
+      .withIndex("by_daily_plan", (q) => q.eq("dailyPlanId", dailyPlan._id))
+      .collect();
+
+    return {
+      dailyPlan,
+      commitments: commitments.sort((a, b) => a.order - b.order),
+    };
+  },
+});
+
+export const prepareDay = mutation({
+  args: {
+    date: v.string(),
+    weeklyPlanId: v.optional(v.id("weeklyPlans")),
+    commitments: v.array(
+      v.object({
+        sourceWeeklyPlanBlockId: v.optional(v.id("weeklyPlanBlocks")),
+        kind: v.string(),
+        title: v.string(),
+        estimate: v.string(),
+        order: v.number(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const now = Date.now();
+
+    if (args.weeklyPlanId) {
+      const weeklyPlan = await ctx.db.get(args.weeklyPlanId);
+
+      if (!weeklyPlan || weeklyPlan.userId !== userId) {
+        throw new Error("Weekly plan not found");
+      }
+    }
+
+    for (const commitment of args.commitments) {
+      if (commitment.sourceWeeklyPlanBlockId) {
+        const block = await ctx.db.get(commitment.sourceWeeklyPlanBlockId);
+
+        if (!block || block.userId !== userId || block.weeklyPlanId !== args.weeklyPlanId) {
+          throw new Error("Weekly plan block not found");
+        }
+      }
+    }
+
+    const existingDailyPlan = await getDailyPlanByDate(ctx, userId, args.date);
+    const dailyPlanId =
+      existingDailyPlan?._id ??
+      (await ctx.db.insert("dailyPlans", {
+        userId,
+        date: args.date,
+        weeklyPlanId: args.weeklyPlanId,
+        status: "prepared",
+        createdAt: now,
+        updatedAt: now,
+      }));
+
+    if (existingDailyPlan) {
+      await ctx.db.patch(existingDailyPlan._id, {
+        weeklyPlanId: args.weeklyPlanId,
+        status: "prepared",
+        updatedAt: now,
+      });
+
+      const existingCommitments = await ctx.db
+        .query("dailyCommitments")
+        .withIndex("by_daily_plan", (q) => q.eq("dailyPlanId", existingDailyPlan._id))
+        .collect();
+
+      for (const commitment of existingCommitments) {
+        await ctx.db.delete(commitment._id);
+      }
+    }
+
+    for (const commitment of args.commitments.slice(0, 3)) {
+      await ctx.db.insert("dailyCommitments", {
+        userId,
+        dailyPlanId,
+        sourceWeeklyPlanBlockId: commitment.sourceWeeklyPlanBlockId,
+        kind: commitment.kind,
+        title: commitment.title,
+        estimate: commitment.estimate,
+        status: "planned",
+        order: commitment.order,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    const savedCommitments = await ctx.db
+      .query("dailyCommitments")
+      .withIndex("by_daily_plan", (q) => q.eq("dailyPlanId", dailyPlanId))
+      .collect();
+
+    return {
+      dailyPlanId,
+      commitments: savedCommitments.sort((a, b) => a.order - b.order),
+    };
+  },
+});
+
+export const updateDailyCommitment = mutation({
+  args: {
+    id: v.id("dailyCommitments"),
+    status: dailyCommitmentStatus,
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const commitment = await ctx.db.get(args.id);
+
+    if (!commitment || commitment.userId !== userId) {
+      throw new Error("Daily commitment not found");
+    }
+
+    await ctx.db.patch(args.id, {
+      status: args.status,
+      reason:
+        args.status === "adjusted" || args.status === "notDone"
+          ? args.reason
+          : undefined,
+      updatedAt: Date.now(),
+    });
+
+    return null;
+  },
+});
+
+export const closePreparedDay = mutation({
+  args: {
+    id: v.id("dailyPlans"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const dailyPlan = await ctx.db.get(args.id);
+
+    if (!dailyPlan || dailyPlan.userId !== userId) {
+      throw new Error("Daily plan not found");
+    }
+
+    await ctx.db.patch(args.id, {
+      status: "closed",
+      updatedAt: Date.now(),
+    });
+
+    return null;
+  },
+});
 
 export const getToday = query({
   args: {

@@ -55,6 +55,36 @@ export default defineSchema({
     .index("by_plan", ["weeklyPlanId"])
     .index("by_user_plan", ["userId", "weeklyPlanId"]),
 
+  dailyPlans: defineTable({
+    userId: v.string(),
+    date: v.string(),
+    weeklyPlanId: v.optional(v.id("weeklyPlans")),
+    status: v.union(v.literal("prepared"), v.literal("closed")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user_date", ["userId", "date"]),
+
+  dailyCommitments: defineTable({
+    userId: v.string(),
+    dailyPlanId: v.id("dailyPlans"),
+    sourceWeeklyPlanBlockId: v.optional(v.id("weeklyPlanBlocks")),
+    kind: v.string(),
+    title: v.string(),
+    estimate: v.string(),
+    status: v.union(
+      v.literal("planned"),
+      v.literal("done"),
+      v.literal("adjusted"),
+      v.literal("notDone"),
+    ),
+    reason: v.optional(v.string()),
+    order: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_daily_plan", ["dailyPlanId"])
+    .index("by_user_daily_plan", ["userId", "dailyPlanId"]),
+
   dailyCheckIns: defineTable({
     userId: v.string(),
     date: v.string(),

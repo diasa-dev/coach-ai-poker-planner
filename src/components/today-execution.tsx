@@ -1,10 +1,11 @@
 "use client";
 
 import { Check, Edit3, MoreHorizontal, Sparkles, X } from "lucide-react";
-import { useConvexAuth, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { type ReactNode, useMemo, useState } from "react";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import {
   buildPlanDaysFromStoredBlocks,
   formatWeekRange,
@@ -23,6 +24,8 @@ type TodaySource = "demo" | "active" | "no-active-plan";
 
 type Commitment = {
   id: string;
+  persistedId?: Id<"dailyCommitments">;
+  sourceWeeklyPlanBlockId?: Id<"weeklyPlanBlocks">;
   kind: CommitmentKind;
   text: string;
   estimate: string;
@@ -30,7 +33,7 @@ type Commitment = {
   reason?: string;
 };
 
-const initialCommitments: Commitment[] = [
+const initialCommitmentsFallback: Commitment[] = [
   {
     id: "review-hands",
     kind: "Revisão",
@@ -109,8 +112,18 @@ function PersistedTodayExecution() {
     api.weeklyPlan.getCurrent,
     isAuthenticated ? { today: todayIsoDate } : "skip",
   );
+  const preparedDay = useQuery(
+    api.dailyPlan.getPreparedDay,
+    isAuthenticated ? { date: todayIsoDate } : "skip",
+  );
+  const prepareDay = useMutation(api.dailyPlan.prepareDay);
+  const updateDailyCommitment = useMutation(api.dailyPlan.updateDailyCommitment);
+  const closePreparedDay = useMutation(api.dailyPlan.closePreparedDay);
 
-  if (isLoading || (isAuthenticated && weeklyPlan === undefined)) {
+  if (
+    isLoading ||
+    (isAuthenticated && (weeklyPlan === undefined || preparedDay === undefined))
+  ) {
     return (
       <section className="ep-page today-page today-print-match">
         <div className="wp-demo-banner">A carregar plano de hoje...</div>
@@ -130,6 +143,10 @@ function PersistedTodayExecution() {
     );
   }
 
+  if (!preparedDay) {
+    return null;
+  }
+
   const activePlan = weeklyPlan.currentPlan?.status === "active" ? weeklyPlan.currentPlan : null;
   const activeDays = activePlan
     ? buildPlanDaysFromStoredBlocks({
@@ -139,10 +156,64 @@ function PersistedTodayExecution() {
       })
     : [];
   const todayBlocks = activeDays.find((day) => day.isToday)?.blocks ?? [];
+  const preparedCommitments = preparedDay.commitments.map((commitment) => ({
+    id: commitment._id,
+    persistedId: commitment._id,
+    sourceWeeklyPlanBlockId: commitment.sourceWeeklyPlanBlockId,
+    kind: commitment.kind as CommitmentKind,
+    text: commitment.title,
+    estimate: commitment.estimate,
+    status: fromStoredCommitmentStatus(commitment.status),
+    reason: commitment.reason,
+  }));
 
   return (
     <TodayWorkspace
-      key={`${weeklyPlan.weekStartDate}:${activePlan?._id ?? "no-active"}:${activePlan?.updatedAt ?? 0}:${todayBlocks.length}`}
+      key={`${weeklyPlan.weekStartDate}:${activePlan?._id ?? "no-active"}:${activePlan?.updatedAt ?? 0}:${todayBlocks.length}:${preparedDay.dailyPlan?._id ?? "unprepared"}:${preparedDay.dailyPlan?.updatedAt ?? 0}:${preparedCommitments.length}`}
+      dailyPlanStatus={preparedDay.dailyPlan?.status}
+      initialCommitments={preparedCommitments}
+      onCloseDay={
+        preparedDay.dailyPlan
+          ? async () => {
+              await closePreparedDay({ id: preparedDay.dailyPlan._id });
+            }
+          : undefined
+      }
+      onPrepareDay={async (commitments) => {
+        if (!activePlan) return [];
+
+        const result = await prepareDay({
+          date: todayIsoDate,
+          weeklyPlanId: activePlan._id,
+          commitments: commitments.map((commitment, order) => ({
+            sourceWeeklyPlanBlockId: commitment.sourceWeeklyPlanBlockId,
+            kind: commitment.kind,
+            title: commitment.text,
+            estimate: commitment.estimate,
+            order,
+          })),
+        });
+
+        return result.commitments.map((commitment) => ({
+          id: commitment._id,
+          persistedId: commitment._id,
+          sourceWeeklyPlanBlockId: commitment.sourceWeeklyPlanBlockId,
+          kind: commitment.kind as CommitmentKind,
+          text: commitment.title,
+          estimate: commitment.estimate,
+          status: fromStoredCommitmentStatus(commitment.status),
+          reason: commitment.reason,
+        }));
+      }}
+      onUpdateCommitment={async (commitment, status, reason) => {
+        if (!commitment.persistedId) return;
+
+        await updateDailyCommitment({
+          id: commitment.persistedId,
+          status: toStoredCommitmentStatus(status),
+          reason,
+        });
+      }}
       source={activePlan ? "active" : "no-active-plan"}
       sourceMessage={
         activePlan
@@ -157,19 +228,33 @@ function PersistedTodayExecution() {
 }
 
 function TodayWorkspace({
+  dailyPlanStatus,
+  initialCommitments,
+  onCloseDay,
+  onPrepareDay,
+  onUpdateCommitment,
   source,
   sourceMessage,
   todayBlocks,
   weeklyFocus,
   weekLabel,
 }: {
+  dailyPlanStatus?: "prepared" | "closed";
+  initialCommitments?: Commitment[];
+  onCloseDay?: () => Promise<void>;
+  onPrepareDay?: (commitments: Commitment[]) => Promise<Commitment[]>;
+  onUpdateCommitment?: (
+    commitment: Commitment,
+    status: CommitmentStatus,
+    reason?: string,
+  ) => Promise<void>;
   source: TodaySource;
   sourceMessage: string;
   todayBlocks: PlanBlock[];
   weeklyFocus: string;
   weekLabel: string;
 }) {
-  const defaultCommitments = source === "demo" ? initialCommitments : [];
+  const defaultCommitments = initialCommitments ?? (source === "demo" ? initialCommitmentsFallback : []);
   const [commitments, setCommitments] = useState(defaultCommitments);
   const [prepareOpen, setPrepareOpen] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
@@ -185,7 +270,13 @@ function TodayWorkspace({
   const completedCommitments = commitments.filter((commitment) => commitment.status === "done").length;
   const doneBlocks = todayBlocks.filter((block) => block.status === "Feito").length;
 
-  function updateCommitment(id: string, status: CommitmentStatus) {
+  async function updateCommitment(id: string, status: CommitmentStatus) {
+    const currentCommitment = commitments.find((item) => item.id === id);
+    const reason =
+      status === "adjusted" || status === "not-done"
+        ? currentCommitment?.reason ?? "Energia baixa"
+        : undefined;
+
     setCommitments((items) =>
       items.map((item) =>
         item.id === id
@@ -197,15 +288,27 @@ function TodayWorkspace({
           : item,
       ),
     );
+
+    if (currentCommitment && onUpdateCommitment) {
+      await onUpdateCommitment(currentCommitment, status, reason);
+    }
   }
 
-  function updateReason(id: string, reason: string) {
+  async function updateReason(id: string, reason: string) {
     setCommitments((items) => items.map((item) => (item.id === id ? { ...item, reason } : item)));
+    const currentCommitment = commitments.find((item) => item.id === id);
+
+    if (currentCommitment && onUpdateCommitment) {
+      await onUpdateCommitment(currentCommitment, currentCommitment.status, reason);
+    }
   }
 
-  function confirmPrepareDay() {
+  async function confirmPrepareDay() {
     const selected = commitmentOptions.filter((commitment) => selectedCommitments.includes(commitment.id));
-    setCommitments(selected.length ? selected.slice(0, 3) : commitmentOptions.slice(0, 1));
+    const nextCommitments = selected.length ? selected.slice(0, 3) : commitmentOptions.slice(0, 1);
+    const savedCommitments = onPrepareDay ? await onPrepareDay(nextCommitments) : nextCommitments;
+
+    setCommitments(savedCommitments.length ? savedCommitments : nextCommitments);
     setPrepareOpen(false);
   }
 
@@ -237,6 +340,7 @@ function TodayWorkspace({
           <CommitmentsCard
             commitments={commitments}
             completed={completedCommitments}
+            dailyPlanStatus={dailyPlanStatus}
             onPrepare={() => setPrepareOpen(true)}
             onReasonChange={updateReason}
             onStatusChange={updateCommitment}
@@ -271,6 +375,10 @@ function TodayWorkspace({
         <CloseDayDialog
           commitments={commitments}
           onClose={() => setCloseOpen(false)}
+          onSave={async () => {
+            if (onCloseDay) await onCloseDay();
+            setCloseOpen(false);
+          }}
           onReasonChange={updateReason}
           onStatusChange={updateCommitment}
         />
@@ -302,15 +410,24 @@ function TodayModeBanner({ message, source }: { message: string; source: TodaySo
 }
 
 function getCommitmentOptions(source: TodaySource, todayBlocks: PlanBlock[]) {
-  if (source === "demo") return initialCommitments;
+  if (source === "demo") return initialCommitmentsFallback;
 
   return todayBlocks.map<Commitment>((block) => ({
     id: `block-${block.id}`,
+    sourceWeeklyPlanBlockId: block.id as Id<"weeklyPlanBlocks">,
     kind: block.type,
     text: block.title,
     estimate: block.target ?? "sem alvo",
     status: "planned",
   }));
+}
+
+function fromStoredCommitmentStatus(status: "planned" | "done" | "adjusted" | "notDone"): CommitmentStatus {
+  return status === "notDone" ? "not-done" : status;
+}
+
+function toStoredCommitmentStatus(status: CommitmentStatus) {
+  return status === "not-done" ? "notDone" : status;
 }
 
 function getTodayHeaderLabel(weekLabel: string) {
@@ -328,12 +445,14 @@ function getTodayHeaderLabel(weekLabel: string) {
 function CommitmentsCard({
   commitments,
   completed,
+  dailyPlanStatus,
   onPrepare,
   onReasonChange,
   onStatusChange,
 }: {
   commitments: Commitment[];
   completed: number;
+  dailyPlanStatus?: "prepared" | "closed";
   onPrepare: () => void;
   onReasonChange: (id: string, reason: string) => void;
   onStatusChange: (id: string, status: CommitmentStatus) => void;
@@ -347,7 +466,13 @@ function CommitmentsCard({
           <span className="today-card-icon">⊙</span>
           <h2>Compromissos de hoje</h2>
         </div>
-        {isPrepared ? <small>{completed} / {commitments.length} feitos</small> : <em>Por preparar</em>}
+        {isPrepared ? (
+          <small>
+            {dailyPlanStatus === "closed" ? "Fechado" : `${completed} / ${commitments.length} feitos`}
+          </small>
+        ) : (
+          <em>Por preparar</em>
+        )}
       </header>
       {isPrepared ? (
         <>
@@ -663,11 +788,13 @@ function PrepareDayDialog({
 function CloseDayDialog({
   commitments,
   onClose,
+  onSave,
   onReasonChange,
   onStatusChange,
 }: {
   commitments: Commitment[];
   onClose: () => void;
+  onSave: () => void;
   onReasonChange: (id: string, reason: string) => void;
   onStatusChange: (id: string, status: CommitmentStatus) => void;
 }) {
@@ -712,7 +839,7 @@ function CloseDayDialog({
         <button className="ep-button secondary" type="button" onClick={onClose}>
           Cancelar
         </button>
-        <button className="ep-button primary" type="button" onClick={onClose}>
+        <button className="ep-button primary" type="button" onClick={onSave}>
           <Check size={14} aria-hidden="true" />
           Guardar e fechar dia
         </button>
