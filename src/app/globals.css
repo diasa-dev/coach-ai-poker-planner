@@ -6103,6 +6103,19 @@ dd {
   white-space: nowrap;
 }
 
+.today-print-match .today-commitments-card .today-card-head em {
+  border-radius: 999px;
+  background: #edf1f6;
+  color: #4b5565;
+  padding: 7px 13px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
 .today-print-match .today-card-icon {
   display: inline-flex;
   color: #12243a;
@@ -6120,6 +6133,63 @@ dd {
 
 .today-print-match .today-commitment-list {
   gap: 10px;
+}
+
+.today-print-match .today-prepare-empty {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  padding: 22px 24px 14px;
+  text-align: center;
+}
+
+.today-print-match .today-prepare-visual {
+  display: flex;
+  width: min(390px, 100%);
+  min-height: 86px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #dce4ee;
+  border-radius: 8px;
+  background: #eef3f8;
+}
+
+.today-print-match .today-prepare-visual span {
+  width: 10px;
+  border-radius: 999px;
+  background: #d8e0ea;
+}
+
+.today-print-match .today-prepare-visual span:nth-child(1),
+.today-print-match .today-prepare-visual span:nth-child(8) {
+  height: 24px;
+}
+
+.today-print-match .today-prepare-visual span:nth-child(2),
+.today-print-match .today-prepare-visual span:nth-child(7) {
+  height: 36px;
+}
+
+.today-print-match .today-prepare-visual span:nth-child(3),
+.today-print-match .today-prepare-visual span:nth-child(6) {
+  height: 46px;
+}
+
+.today-print-match .today-prepare-visual span:nth-child(4),
+.today-print-match .today-prepare-visual span:nth-child(5) {
+  height: 58px;
+}
+
+.today-print-match .today-prepare-empty p {
+  max-width: 440px;
+  color: #4b5565;
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+.today-print-match .today-prepare-empty .ep-button {
+  min-width: 168px;
 }
 
 .today-print-match .today-commitment {
@@ -6315,6 +6385,60 @@ dd {
   border: 0;
   background: transparent;
   color: #4b5565;
+}
+
+.today-print-match .today-attention-card {
+  padding-bottom: 18px;
+}
+
+.today-print-match .today-attention-list {
+  display: grid;
+  gap: 10px;
+}
+
+.today-print-match .today-attention-item {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #dce4ee;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px 14px;
+}
+
+.today-print-match .today-attention-item > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  background: #fff2d9;
+  color: #b76b08;
+  font-weight: 800;
+}
+
+.today-print-match .today-attention-item strong {
+  display: block;
+  color: #111827;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.today-print-match .today-attention-item p {
+  margin: 3px 0 0;
+  color: #4b5565;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.today-print-match .today-attention-item button {
+  border: 0;
+  background: transparent;
+  color: #0097aa;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .today-print-match .today-progress-card {
