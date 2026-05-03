@@ -21,6 +21,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
 import { api } from "../../convex/_generated/api";
+import { hasPersistenceConfig } from "@/lib/runtime-config";
 
 const navItems = [
   { href: "/", label: "Hoje", icon: Sun },
@@ -40,14 +41,6 @@ function isActivePath(pathname: string, href: string) {
 
 export function UplineaShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const hasPersistenceConfig = Boolean(
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_CONVEX_URL,
-  );
-  const { isAuthenticated } = useConvexAuth();
-  const activeSession = useQuery(
-    api.pokerSession.getActive,
-    hasPersistenceConfig && isAuthenticated ? {} : "skip",
-  );
   const currentItem =
     navItems.find((item) => isActivePath(pathname, item.href)) ??
     (pathname.startsWith("/settings")
@@ -67,10 +60,7 @@ export function UplineaShell({ children }: { children: ReactNode }) {
           />
         </Link>
 
-        <Link className={activeSession ? "ep-session-cta active-session" : "ep-session-cta"} href="/sessions">
-          <Play size={16} aria-hidden="true" />
-          <span>{activeSession ? `Sessão ativa · ${formatSessionDuration(activeSession.startedAt)}` : "Iniciar sessão"}</span>
-        </Link>
+        {hasPersistenceConfig ? <PersistedSessionCta /> : <SessionCta activeSession={null} />}
 
         <nav className="ep-nav" aria-label="Navegação principal">
           {navItems.map((item) => {
@@ -135,6 +125,22 @@ export function UplineaShell({ children }: { children: ReactNode }) {
         <main className="ep-main">{children}</main>
       </div>
     </div>
+  );
+}
+
+function PersistedSessionCta() {
+  const { isAuthenticated } = useConvexAuth();
+  const activeSession = useQuery(api.pokerSession.getActive, isAuthenticated ? {} : "skip");
+
+  return <SessionCta activeSession={activeSession ?? null} />;
+}
+
+function SessionCta({ activeSession }: { activeSession: { startedAt: number } | null }) {
+  return (
+    <Link className={activeSession ? "ep-session-cta active-session" : "ep-session-cta"} href="/sessions">
+      <Play size={16} aria-hidden="true" />
+      <span>{activeSession ? `Sessão ativa · ${formatSessionDuration(activeSession.startedAt)}` : "Iniciar sessão"}</span>
+    </Link>
   );
 }
 

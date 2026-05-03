@@ -9,6 +9,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Build in small implementation slices. Do not expand into adjacent product areas unless the user explicitly approves that slice.
 - At the end of every implementation slice, stop and ask the user whether to run validation now. The user may want to add more work before validation.
 - If the user approves validation, run the relevant checks for the slice, such as typecheck, lint, build, tests, and local smoke checks when available.
+- For every implemented feature, run an extensive smoke test that covers the feature itself, the app surfaces it interacts with, and any adjacent flows likely to be affected.
+- When changing Convex schema or functions, run `npx convex dev --once --typecheck enable` before browser smoke so the linked dev deployment has the same functions as the frontend.
 - After validation has no blocking errors, provide a short slice summary with:
   - what changed
   - key files touched

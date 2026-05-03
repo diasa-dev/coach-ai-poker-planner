@@ -16,6 +16,7 @@ import {
   type PlanBlockStatus,
   type PlanBlockType,
 } from "@/lib/planning/weekly-plan";
+import { hasPersistenceConfig } from "@/lib/runtime-config";
 
 type CommitmentStatus = "planned" | "done" | "adjusted" | "not-done";
 type CommitmentKind = PlanBlockType | "Foco" | "Revisão";
@@ -72,9 +73,6 @@ const reasonOptions = [
   "Prioridade mudou",
   "Sem motivo claro",
 ];
-const hasPersistenceConfig = Boolean(
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_CONVEX_URL,
-);
 const todayIsoDate = getTodayIsoDate();
 
 function getDemoTodayBlocks() {

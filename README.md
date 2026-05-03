@@ -97,6 +97,16 @@ Copy `.env.example` to `.env.local` and fill in the Clerk and Convex values when
 those projects exist. Without those values, the dashboard remains available in
 mock mode.
 
+For local UI smoke that should not depend on Clerk sessions, use:
+
+```bash
+npm run dev:smoke
+SMOKE_BASE_URL=http://127.0.0.1:3103 npm run smoke:coach
+```
+
+This disables Clerk/Convex providers for that server process only and runs the
+Coach proposal flow plus adjacent route checks against demo data.
+
 ## Notes
 
 User-facing UI should be Portuguese from Portugal.

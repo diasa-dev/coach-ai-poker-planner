@@ -14,6 +14,7 @@ export type PlanBlock = {
   title: string;
   target?: string;
   status: PlanBlockStatus;
+  reason?: string;
 };
 
 export type PlanDay = {
@@ -65,6 +66,7 @@ export type StoredWeeklyPlanBlock = {
   title: string;
   targetLabel?: string;
   status: StoredBlockStatus;
+  statusReason?: string;
   order: number;
 };
 
@@ -337,6 +339,7 @@ export function buildPlanDaysFromStoredBlocks({
         title: block.title,
         target: block.targetLabel,
         status: storedToUiStatus[block.status],
+        reason: block.statusReason,
       }));
 
     return {

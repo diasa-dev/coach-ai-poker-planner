@@ -2,6 +2,7 @@
 
 import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
 import { useState } from "react";
+import { hasClerkConfig } from "@/lib/runtime-config";
 
 type CommitmentStatus = "pending" | "done" | "adjusted" | "missed";
 
@@ -32,10 +33,6 @@ type PlanningDay = {
   }>;
   extra?: number;
 };
-
-const isAuthConfigured = Boolean(
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-);
 
 const navItems = ["Hoje", "Plano semanal", "Objetivos mensais", "Estudo", "Review"];
 
@@ -495,7 +492,7 @@ export function DashboardPrototype() {
 }
 
 function AuthControls() {
-  if (!isAuthConfigured) {
+  if (!hasClerkConfig) {
     return <span className="planner-auth-status">Modo demo</span>;
   }
 

@@ -15,14 +15,28 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
+import {
+  buildPlanDaysFromStoredBlocks,
+  formatPlanMinutes,
+  getTodayIsoDate,
+  initialPlanDays,
+  parsePlanTarget,
+  type PlanBlock,
+  type PlanBlockType,
+  type PlanDay,
+} from "@/lib/planning/weekly-plan";
+import { hasPersistenceConfig } from "@/lib/runtime-config";
 import styles from "./review-section.module.css";
 
 type ReviewStatus = "available" | "draft" | "completed" | "skipped";
 type CategoryId = "grind" | "study" | "review" | "sport";
-type BlockStatus = "done" | "adjusted" | "notDone";
+type BlockStatus = "planned" | "done" | "adjusted" | "notDone";
 
 type CategorySummary = {
   id: CategoryId;
@@ -34,6 +48,7 @@ type CategorySummary = {
   completion: number;
   icon: LucideIcon;
   details: {
+    id: string;
     status: BlockStatus;
     title: string;
     meta: string;
@@ -48,6 +63,35 @@ type PendingSessionReview = {
   meta: string;
   hands: number;
 };
+
+type SessionReviewContext = {
+  pendingReviews: PendingSessionReview[];
+  reviewedSessions: number;
+  averageDecisionQuality: number;
+  averageFinalTilt: number;
+  averageFinalEnergy: number;
+  averageFinalFocus: number;
+  handsToReview: number;
+  nextActions: string[];
+};
+
+type WeeklyReviewForm = {
+  status: ReviewStatus;
+  ratings: {
+    execution: number;
+    energy: number;
+    focus: number;
+    quality: number;
+  };
+  reflection: {
+    wins: string;
+    leaks: string;
+    reasons: string[];
+    next: string;
+  };
+};
+
+const todayIsoDate = getTodayIsoDate();
 
 const reasonOptions = [
   "Pouca energia",
@@ -76,121 +120,197 @@ const pendingSessionReviews: PendingSessionReview[] = [
   },
 ];
 
-const categorySummary: CategorySummary[] = [
-  {
-    id: "grind",
-    label: "Grind",
-    planned: "5 sessões",
-    done: "4 sessões",
-    adjusted: 1,
-    missed: 0,
-    completion: 82,
-    icon: Spade,
-    details: [
-      { status: "done", title: "Sessão MTT — manhã", meta: "Qua · 2h" },
-      { status: "done", title: "Sessão MTT — noite", meta: "Seg · Ter · Qui" },
-      {
-        status: "adjusted",
-        title: "Sessão MTT — sábado",
-        meta: "4h → 2h 30m",
-        reason: "Energia caiu depois da sessão anterior.",
-      },
-    ],
+const demoSessionReviewContext: SessionReviewContext = {
+  pendingReviews: pendingSessionReviews,
+  reviewedSessions: 3,
+  averageDecisionQuality: 4,
+  averageFinalTilt: 2,
+  averageFinalEnergy: 3,
+  averageFinalFocus: 4,
+  handsToReview: 5,
+  nextActions: ["Fazer review antes da sessão de domingo.", "Reduzir mesas se energia ficar em 2/5."],
+};
+
+const demoWeeklyReviewForm: WeeklyReviewForm = {
+  status: "available",
+  ratings: {
+    execution: 4,
+    energy: 3,
+    focus: 4,
+    quality: 4,
   },
-  {
-    id: "study",
-    label: "Estudo",
-    planned: "5h",
-    done: "3h 15m",
-    adjusted: 1,
-    missed: 1,
-    completion: 65,
-    icon: Target,
-    details: [
-      { status: "done", title: "ICM até bolha", meta: "2 blocos · 1h 30m" },
-      {
-        status: "adjusted",
-        title: "Open ranges",
-        meta: "45m → 25m",
-        reason: "Manhã atrasou e a sessão começou mais cedo.",
-      },
-      {
-        status: "notDone",
-        title: "Bluff catch",
-        meta: "45m",
-        reason: "Fui direto para a sessão.",
-      },
-    ],
+  reflection: {
+    wins: "Mantive tilt baixo nas sessões longas e cumpri o foco de ICM na maioria das decisões difíceis.",
+    leaks: "Estudo caiu sempre que a manhã atrasou. Review ficou comprimida antes das sessões da noite.",
+    reasons: ["Pouca energia", "Falta de tempo", "Plano irrealista"],
+    next: "Fazer review antes da sessão de domingo.",
   },
-  {
-    id: "review",
-    label: "Review",
-    planned: "2 blocos",
-    done: "1 bloco",
-    adjusted: 1,
-    missed: 0,
-    completion: 58,
-    icon: BookCheck,
-    details: [
-      { status: "done", title: "Revisão das mãos de terça", meta: "40m" },
-      {
-        status: "adjusted",
-        title: "Revisão semanal de tendências",
-        meta: "1h 15m → 30m",
-        reason: "Reduzida para chegar a tempo da sessão da noite.",
-      },
-    ],
-  },
-  {
-    id: "sport",
-    label: "Sport",
-    planned: "3 blocos",
-    done: "2 blocos",
-    adjusted: 0,
-    missed: 1,
-    completion: 67,
-    icon: RotateCcw,
-    details: [
-      { status: "done", title: "Corrida — base", meta: "2 blocos · 1h 20m" },
-      {
-        status: "notDone",
-        title: "Corrida — recovery",
-        meta: "40m",
-        reason: "Adiada três vezes.",
-      },
-    ],
-  },
-];
+};
+
+const demoCategorySummary = buildCategorySummary(initialPlanDays);
 
 const statusCopy: Record<BlockStatus, string> = {
+  planned: "Planeado",
   done: "Feito",
   adjusted: "Ajustado",
   notDone: "Não feito",
 };
 
 export function ReviewSection() {
-  const [status, setStatus] = useState<ReviewStatus>("available");
+  if (!hasPersistenceConfig) {
+    return (
+      <ReviewWorkspace
+      initialReview={demoWeeklyReviewForm}
+      planSummary={demoCategorySummary}
+      sessionReviewContext={demoSessionReviewContext}
+    />
+    );
+  }
+
+  return <PersistedReviewSection />;
+}
+
+function PersistedReviewSection() {
+  const { isAuthenticated, isLoading } = useConvexAuth();
+  const weeklyPlan = useQuery(api.weeklyPlan.getCurrent, isAuthenticated ? { today: todayIsoDate } : "skip");
+  const sessions = useQuery(api.pokerSession.list, isAuthenticated ? {} : "skip");
+  const weeklyReview = useQuery(
+    api.weeklyReview.getByWeek,
+    isAuthenticated && weeklyPlan ? { weekStartDate: weeklyPlan.weekStartDate } : "skip",
+  );
+  const saveWeeklyReview = useMutation(api.weeklyReview.save);
+  const planSummary = useMemo(() => {
+    if (!isAuthenticated || !weeklyPlan?.currentPlan) return demoCategorySummary;
+
+    return buildCategorySummary(
+      buildPlanDaysFromStoredBlocks({
+        blocks: weeklyPlan.currentBlocks,
+        today: todayIsoDate,
+        weekStartDate: weeklyPlan.weekStartDate,
+      }),
+    );
+  }, [isAuthenticated, weeklyPlan]);
+
+  const sessionReviewContext = useMemo(() => {
+    if (!isAuthenticated || !sessions) return demoSessionReviewContext;
+
+    const reviewed = sessions.filter((session) => session.status === "reviewed");
+    const pending = sessions.filter((session) => session.status === "reviewPending");
+
+    return {
+      pendingReviews: pending.map((session) => ({
+        id: session._id,
+        date: session.date,
+        focus: session.sessionFocus,
+        meta: `${session.tournamentsPlayed ?? 0} torneios · ${formatElapsed(session.startedAt, session.endedAt)}`,
+        hands: session.handsToReview,
+      })),
+      reviewedSessions: reviewed.length,
+      averageDecisionQuality: average(reviewed.map((session) => session.decisionQuality)),
+      averageFinalTilt: average(reviewed.map((session) => session.finalTilt)),
+      averageFinalEnergy: average(reviewed.map((session) => session.finalEnergy)),
+      averageFinalFocus: average(reviewed.map((session) => session.finalFocus)),
+      handsToReview: sessions.reduce((total, session) => total + session.handsToReview, 0),
+      nextActions: reviewed
+        .map((session) => session.nextAction?.trim())
+        .filter((value): value is string => Boolean(value))
+        .slice(0, 2),
+    };
+  }, [isAuthenticated, sessions]);
+
+  if (
+    isLoading ||
+    (isAuthenticated && (weeklyPlan === undefined || sessions === undefined || weeklyReview === undefined))
+  ) {
+    return (
+      <section className="ep-page">
+        <div className="wp-demo-banner">A carregar contexto da revisão...</div>
+      </section>
+    );
+  }
+
+  const initialReview: WeeklyReviewForm = weeklyReview
+    ? {
+        status: weeklyReview.status === "draft" ? "draft" : weeklyReview.status,
+        ratings: {
+          execution: weeklyReview.executionRating,
+          energy: weeklyReview.energyRating,
+          focus: weeklyReview.focusRating,
+          quality: weeklyReview.qualityRating,
+        },
+        reflection: {
+          wins: weeklyReview.wins,
+          leaks: weeklyReview.leaks,
+          reasons: weeklyReview.reasons,
+          next: weeklyReview.adjustmentNextWeek,
+        },
+      }
+    : {
+        ...demoWeeklyReviewForm,
+        reflection: {
+          ...demoWeeklyReviewForm.reflection,
+          reasons: getPlanReasons(planSummary) || demoWeeklyReviewForm.reflection.reasons,
+        },
+      };
+
+  return (
+    <ReviewWorkspace
+      key={`${weeklyPlan?.weekStartDate ?? "demo"}:${weeklyReview?.updatedAt ?? 0}`}
+      initialReview={initialReview}
+      onSaveReview={
+        isAuthenticated && weeklyPlan
+          ? async (review) => {
+              await saveWeeklyReview({
+                weekStartDate: weeklyPlan.weekStartDate,
+                weeklyPlanId: weeklyPlan.currentPlan?._id as Id<"weeklyPlans"> | undefined,
+                status: toStoredReviewStatus(review.status),
+                executionRating: review.ratings.execution,
+                energyRating: review.ratings.energy,
+                focusRating: review.ratings.focus,
+                qualityRating: review.ratings.quality,
+                wins: review.reflection.wins,
+                leaks: review.reflection.leaks,
+                reasons: review.reflection.reasons,
+                adjustmentNextWeek: review.reflection.next,
+                reviewedSessionCount: sessionReviewContext.reviewedSessions,
+                pendingSessionReviewCount: sessionReviewContext.pendingReviews.length,
+                handsToReviewCount: sessionReviewContext.handsToReview,
+              });
+            }
+          : undefined
+      }
+      planSummary={planSummary}
+      sessionReviewContext={sessionReviewContext}
+    />
+  );
+}
+
+function ReviewWorkspace({
+  initialReview,
+  onSaveReview,
+  planSummary,
+  sessionReviewContext,
+}: {
+  initialReview: WeeklyReviewForm;
+  onSaveReview?: (review: WeeklyReviewForm) => Promise<void>;
+  planSummary: CategorySummary[];
+  sessionReviewContext: SessionReviewContext;
+}) {
+  const [status, setStatus] = useState<ReviewStatus>(initialReview.status);
   const [expanded, setExpanded] = useState<CategoryId | null>("study");
   const [sessionContextOpen, setSessionContextOpen] = useState(true);
-  const [ratings, setRatings] = useState({
-    execution: 4,
-    energy: 3,
-    focus: 4,
-    quality: 4,
-  });
-  const [reflection, setReflection] = useState({
-    wins: "Mantive tilt baixo nas sessões longas e cumpri o foco de ICM na maioria das decisões difíceis.",
-    leaks:
-      "Estudo caiu sempre que a manhã atrasou. Review ficou comprimida antes das sessões da noite.",
-    reasons: ["Pouca energia", "Falta de tempo", "Plano irrealista"],
-    next:
-      "Mover estudo para antes da primeira sessão e reduzir Sport para dois blocos curtos nesta semana.",
-  });
+  const [ratings, setRatings] = useState(initialReview.ratings);
+  const [reflection, setReflection] = useState(initialReview.reflection);
 
   const coachUnlocked = status === "completed";
 
-  const adjustedCount = categorySummary.reduce((total, item) => total + item.adjusted, 0);
-  const missedCount = categorySummary.reduce((total, item) => total + item.missed, 0);
+  const adjustedCount = planSummary.reduce((total, item) => total + item.adjusted, 0);
+  const missedCount = planSummary.reduce((total, item) => total + item.missed, 0);
+  const availableReasonOptions = mergeUnique([
+    ...reasonOptions,
+    ...getPlanReasonList(planSummary),
+    ...reflection.reasons,
+  ]);
 
   function updateRating(key: keyof typeof ratings, value: number) {
     setRatings((current) => ({ ...current, [key]: value }));
@@ -212,8 +332,15 @@ export function ReviewSection() {
     if (status === "available") setStatus("draft");
   }
 
-  function saveReview() {
-    setStatus("completed");
+  async function persistReview(nextStatus: ReviewStatus) {
+    const nextReview = {
+      status: nextStatus,
+      ratings,
+      reflection,
+    };
+
+    await onSaveReview?.(nextReview);
+    setStatus(nextStatus);
   }
 
   return (
@@ -226,7 +353,7 @@ export function ReviewSection() {
         </div>
         <div className="ep-page-actions">
           {status !== "completed" ? (
-            <button className="ep-button secondary" type="button" onClick={() => setStatus("skipped")}>
+            <button className="ep-button secondary" type="button" onClick={() => void persistReview("skipped")}>
               <X size={14} aria-hidden="true" />
               Saltar por agora
             </button>
@@ -253,14 +380,14 @@ export function ReviewSection() {
                 <Clock3 size={16} aria-hidden="true" />
                 Reviews de sessão pendentes
               </span>
-              <strong>{pendingSessionReviews.length}</strong>
+              <strong>{sessionReviewContext.pendingReviews.length}</strong>
               <ChevronDown size={16} aria-hidden="true" />
             </button>
 
             {sessionContextOpen ? (
               <div className={styles.pendingList}>
                 <p>Podem melhorar o contexto da revisão semanal, mas não são obrigatórias agora.</p>
-                {pendingSessionReviews.map((session) => (
+                {sessionReviewContext.pendingReviews.map((session) => (
                   <article className={styles.pendingRow} key={session.id}>
                     <div>
                       <span>{session.date}</span>
@@ -280,13 +407,54 @@ export function ReviewSection() {
 
           <section className={styles.panel}>
             <PanelHead
+              eyebrow="Sessões revistas"
+              icon={<Spade size={17} aria-hidden="true" />}
+              title="Sinais das sessões"
+            />
+
+            <div className={styles.sessionSignalsGrid}>
+              <Metric label="Sessões revistas" value={String(sessionReviewContext.reviewedSessions)} />
+              <Metric
+                label="Qualidade média"
+                value={sessionReviewContext.averageDecisionQuality ? `${sessionReviewContext.averageDecisionQuality}/5` : "-"}
+              />
+              <Metric
+                label="Tilt final médio"
+                value={sessionReviewContext.averageFinalTilt ? `${sessionReviewContext.averageFinalTilt}/5` : "-"}
+              />
+              <Metric
+                label="Energia final média"
+                value={sessionReviewContext.averageFinalEnergy ? `${sessionReviewContext.averageFinalEnergy}/5` : "-"}
+              />
+              <Metric
+                label="Foco final médio"
+                value={sessionReviewContext.averageFinalFocus ? `${sessionReviewContext.averageFinalFocus}/5` : "-"}
+              />
+              <Metric label="Mãos a rever" value={String(sessionReviewContext.handsToReview)} />
+            </div>
+
+            <article className={styles.sessionAdjustmentCard}>
+              <strong>{getSessionSignalCopy(sessionReviewContext)}</strong>
+              <p>Usa estes sinais só para escolher um ajuste concreto. Não substituem a tua reflexão.</p>
+              {sessionReviewContext.nextActions.length ? (
+                <ul>
+                  {sessionReviewContext.nextActions.map((action) => (
+                    <li key={action}>{action}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </article>
+          </section>
+
+          <section className={styles.panel}>
+            <PanelHead
               eyebrow="Espelho da semana"
               icon={<FileText size={17} aria-hidden="true" />}
               title="Plano vs execução"
             />
 
             <div className={styles.summaryGrid}>
-              {categorySummary.map((category) => (
+              {planSummary.map((category) => (
                 <CategoryRow
                   category={category}
                   expanded={expanded === category.id}
@@ -343,7 +511,7 @@ export function ReviewSection() {
             <div className={styles.reasonBox}>
               <span>Motivos para blocos falhados ou ajustados</span>
               <div>
-                {reasonOptions.map((reason) => (
+                {availableReasonOptions.map((reason) => (
                   <button
                     className={reflection.reasons.includes(reason) ? styles.reasonSelected : undefined}
                     key={reason}
@@ -363,10 +531,10 @@ export function ReviewSection() {
             </label>
 
             <div className={styles.reviewActions}>
-              <button className="ep-button secondary" type="button" onClick={() => setStatus("draft")}>
+              <button className="ep-button secondary" type="button" onClick={() => void persistReview("draft")}>
                 Guardar rascunho
               </button>
-              <button className="ep-button primary" type="button" onClick={saveReview}>
+              <button className="ep-button primary" type="button" onClick={() => void persistReview("completed")}>
                 <Check size={14} aria-hidden="true" />
                 Guardar revisão
               </button>
@@ -534,7 +702,7 @@ function CategoryRow({
       {expanded ? (
         <div className={styles.categoryDetails}>
           {category.details.map((detail) => (
-            <div className={styles.detailRow} key={`${category.id}-${detail.title}`}>
+            <div className={styles.detailRow} key={detail.id}>
               <span className={`${styles.statusPill} ${styles[detail.status]}`}>{statusCopy[detail.status]}</span>
               <div>
                 <strong>{detail.title}</strong>
@@ -587,4 +755,144 @@ function Metric({ label, value }: { label: string; value: string }) {
       <dd>{value}</dd>
     </div>
   );
+}
+
+function buildCategorySummary(days: PlanDay[]): CategorySummary[] {
+  const categories: Array<{
+    id: CategoryId;
+    icon: LucideIcon;
+    label: string;
+    type: PlanBlockType;
+  }> = [
+    { id: "grind", icon: Spade, label: "Grind", type: "Grind" },
+    { id: "study", icon: Target, label: "Estudo", type: "Estudo" },
+    { id: "review", icon: BookCheck, label: "Review", type: "Review" },
+    { id: "sport", icon: RotateCcw, label: "Sport", type: "Desporto" },
+  ];
+
+  return categories.map((category) => {
+    const blocks = days.flatMap((day) =>
+      day.blocks
+        .filter((block) => block.type === category.type)
+        .map((block) => ({ block, day })),
+    );
+    const adjusted = blocks.filter(({ block }) => block.status === "Ajustado").length;
+    const missed = blocks.filter(({ block }) => block.status === "Não feito").length;
+    const doneBlocks = blocks.filter(({ block }) => block.status === "Feito");
+    const closedBlocks = blocks.filter(
+      ({ block }) => block.status === "Feito" || block.status === "Ajustado",
+    ).length;
+    const totalBlocks = blocks.length;
+
+    return {
+      id: category.id,
+      label: category.label,
+      planned: formatCategoryAmount(category.id, blocks.map(({ block }) => block)),
+      done: formatCategoryAmount(category.id, doneBlocks.map(({ block }) => block)),
+      adjusted,
+      missed,
+      completion: totalBlocks ? Math.round((closedBlocks / totalBlocks) * 100) : 0,
+      icon: category.icon,
+      details: blocks.map(({ block, day }) => ({
+        id: block.id,
+        status: toReviewBlockStatus(block.status),
+        title: block.title,
+        meta: `${day.label}${block.target ? ` · ${block.target}` : ""}`,
+        reason: normalizeBlockReason(block.reason),
+      })),
+    };
+  });
+}
+
+function getPlanReasons(planSummary: CategorySummary[]) {
+  const reasons = getPlanReasonList(planSummary);
+  return reasons.length ? reasons : null;
+}
+
+function getPlanReasonList(planSummary: CategorySummary[]) {
+  return mergeUnique(
+    planSummary.flatMap((category) =>
+      category.details
+        .filter((detail) => detail.status === "adjusted" || detail.status === "notDone")
+        .map((detail) => detail.reason)
+        .filter((reason): reason is string => Boolean(reason)),
+    ),
+  );
+}
+
+function normalizeBlockReason(reason?: string) {
+  if (!reason) return undefined;
+
+  const normalizedReason = reason.trim();
+  const reasonMap: Record<string, string> = {
+    "Energia baixa": "Pouca energia",
+    "Falta de tempo": "Falta de tempo",
+    "Tilt/stress": "Tilt/stress",
+    Imprevisto: "Imprevisto",
+    "Evento inesperado": "Imprevisto",
+    "Plano irrealista": "Plano irrealista",
+    "Prioridade mudou": "Prioridade mudou",
+    "Sem motivo claro": "Sem motivo claro",
+  };
+
+  return reasonMap[normalizedReason] ?? normalizedReason;
+}
+
+function mergeUnique(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function formatCategoryAmount(categoryId: CategoryId, blocks: PlanBlock[]) {
+  if (categoryId === "grind") {
+    return `${blocks.length} ${blocks.length === 1 ? "sessão" : "sessões"}`;
+  }
+
+  const minutes = blocks.reduce((total, block) => total + parsePlanTarget(block.target), 0);
+  if (minutes > 0) return formatPlanMinutes(minutes);
+
+  return `${blocks.length} ${blocks.length === 1 ? "bloco" : "blocos"}`;
+}
+
+function toReviewBlockStatus(status: PlanBlock["status"]): BlockStatus {
+  if (status === "Feito") return "done";
+  if (status === "Ajustado") return "adjusted";
+  if (status === "Não feito") return "notDone";
+  return "planned";
+}
+
+function average(values: Array<number | undefined>) {
+  const numericValues = values.filter((value): value is number => typeof value === "number");
+  if (!numericValues.length) return 0;
+  return Math.round((numericValues.reduce((total, value) => total + value, 0) / numericValues.length) * 10) / 10;
+}
+
+function formatElapsed(startedAt: number, endedAt = Date.now()) {
+  const minutes = Math.max(0, Math.floor((endedAt - startedAt) / 60000));
+  const hours = Math.floor(minutes / 60);
+  const remaining = minutes % 60;
+  return hours ? `${hours}h ${remaining}m` : `${remaining}m`;
+}
+
+function getSessionSignalCopy(context: SessionReviewContext) {
+  if (context.pendingReviews.length > 0) {
+    return "Há reviews de sessão pendentes. A revisão semanal pode avançar, mas o contexto fica mais fraco.";
+  }
+
+  if (context.handsToReview >= 5) {
+    return "Há várias mãos marcadas. O ajuste da próxima semana deve reservar tempo real para review.";
+  }
+
+  if (context.reviewedSessions > 0 && context.averageFinalTilt >= 3) {
+    return "O tilt final está alto nas sessões revistas. O ajuste deve proteger energia, mesas ou pausas.";
+  }
+
+  if (context.reviewedSessions > 0) {
+    return "As sessões revistas já dão sinais suficientes para escolher um ajuste simples para a próxima semana.";
+  }
+
+  return "Ainda há pouco contexto de sessões revistas. Mantém o ajuste baseado na tua reflexão principal.";
+}
+
+function toStoredReviewStatus(status: ReviewStatus) {
+  return status === "available" ? "draft" : status;
 }

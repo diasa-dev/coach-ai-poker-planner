@@ -36,11 +36,9 @@ import {
   type PlanBlockType,
   type PlanDay,
 } from "@/lib/planning/weekly-plan";
+import { hasPersistenceConfig } from "@/lib/runtime-config";
 
 const planOrder = ["Grind", "Estudo", "Review", "Desporto", "Descanso", "Admin"] as const;
-const hasPersistenceConfig = Boolean(
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_CONVEX_URL,
-);
 const todayIsoDate = getTodayIsoDate();
 
 type SaveState = "idle" | "saving" | "saved" | "error";

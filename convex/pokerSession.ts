@@ -296,3 +296,58 @@ export const finish = mutation({
     return null;
   },
 });
+
+export const confirmReview = mutation({
+  args: {
+    sessionId: v.id("pokerSessions"),
+    tournamentsPlayed: v.number(),
+    decisionQuality: v.number(),
+    finalFocus: v.number(),
+    finalEnergy: v.number(),
+    finalTilt: v.number(),
+    goodDecision: v.optional(v.string()),
+    mainLeak: v.optional(v.string()),
+    nextAction: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const session = await ctx.db.get(args.sessionId);
+
+    if (!session || session.userId !== userId) {
+      throw new Error("Session not found");
+    }
+
+    const now = Date.now();
+    const endedAt = session.endedAt ?? now;
+
+    await ctx.db.patch(session._id, {
+      status: "reviewed",
+      tournamentsPlayed: Math.max(0, args.tournamentsPlayed),
+      decisionQuality: args.decisionQuality,
+      finalFocus: args.finalFocus,
+      finalEnergy: args.finalEnergy,
+      finalTilt: args.finalTilt,
+      focusScore: args.finalFocus,
+      energy: args.finalEnergy,
+      tilt: args.finalTilt,
+      goodDecision: args.goodDecision?.trim() || undefined,
+      mainLeak: args.mainLeak?.trim() || undefined,
+      nextAction: args.nextAction?.trim() || undefined,
+      isPaused: false,
+      endedAt,
+      reviewedAt: now,
+      updatedAt: now,
+    });
+
+    await insertEvent(ctx, {
+      userId,
+      sessionId: session._id,
+      type: "finished",
+      title: "Review confirmada",
+      detail: `Qualidade ${args.decisionQuality}/5 · Tilt final ${args.finalTilt}/5`,
+      createdAt: now,
+    });
+
+    return null;
+  },
+});

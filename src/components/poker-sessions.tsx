@@ -23,6 +23,7 @@ import {
   getTodayIsoDate,
   type PlanBlock,
 } from "@/lib/planning/weekly-plan";
+import { hasPersistenceConfig } from "@/lib/runtime-config";
 import styles from "./poker-sessions.module.css";
 
 type SessionStatus = "active" | "reviewPending" | "reviewed";
@@ -44,7 +45,28 @@ type SessionView = {
   handsToReview: number;
   microIntention?: string;
   isPaused: boolean;
+  tournamentsPlayed?: number;
+  decisionQuality?: number;
+  finalFocus?: number;
+  finalEnergy?: number;
+  finalTilt?: number;
+  goodDecision?: string;
+  mainLeak?: string;
+  nextAction?: string;
   startedAt: number;
+  endedAt?: number;
+};
+
+type SessionRow = {
+  _id?: Id<"pokerSessions">;
+  date: string;
+  focus: string;
+  tournaments: number;
+  duration: string;
+  quality: number;
+  tiltPeak: number;
+  hands: number;
+  status: SessionStatus;
 };
 
 type SessionEventView = {
@@ -55,9 +77,6 @@ type SessionEventView = {
   createdAt: number;
 };
 
-const hasPersistenceConfig = Boolean(
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_CONVEX_URL,
-);
 const todayIsoDate = getTodayIsoDate();
 
 const demoStartedAt = Date.now() - 84 * 60 * 1000;
@@ -87,6 +106,12 @@ const demoSession: SessionView = {
   startedAt: demoStartedAt,
 };
 
+const demoPendingReviewSession: SessionView = {
+  ...demoSession,
+  status: "reviewPending",
+  endedAt: Date.now() - 12 * 60 * 1000,
+};
+
 const demoEvents: SessionEventView[] = [
   { type: "checkup", title: "Quick check-up", detail: "Energia 4 · Foco 4 · Tilt 1 · 6 mesas", createdAt: Date.now() - 52 * 60 * 1000 },
   { type: "hand", title: "Mão para rever — ICM", detail: "Stack 12bb · UTG · QQ · open shove", createdAt: Date.now() - 66 * 60 * 1000 },
@@ -111,6 +136,7 @@ function PersistedPokerSessions() {
   );
   const startSession = useMutation(api.pokerSession.start);
   const addEvent = useMutation(api.pokerSession.addEvent);
+  const confirmReview = useMutation(api.pokerSession.confirmReview);
   const togglePause = useMutation(api.pokerSession.togglePause);
   const finishSession = useMutation(api.pokerSession.finish);
 
@@ -139,13 +165,14 @@ function PersistedPokerSessions() {
     _id: session._id,
     date: session.date === todayIsoDate ? "Hoje" : formatShortDate(session.startedAt),
     focus: session.sessionFocus,
-    tournaments: session.currentTables,
+    tournaments: session.tournamentsPlayed ?? 0,
     duration: formatElapsed(session.startedAt, session.endedAt),
-    quality: session.status === "reviewed" ? 4 : 0,
-    tiltPeak: session.tilt,
+    quality: session.decisionQuality ?? 0,
+    tiltPeak: session.finalTilt ?? session.tilt,
     hands: session.handsToReview,
     status: session.status as SessionStatus,
   }));
+  const pendingReviewSession = sessions.find((session) => session.status === "reviewPending") ?? null;
 
   return (
     <SessionsWorkspace
@@ -154,6 +181,9 @@ function PersistedPokerSessions() {
       grindBlocks={grindBlocks}
       onAddEvent={async (sessionId, event) => {
         await addEvent({ sessionId, ...event });
+      }}
+      onConfirmReview={async (sessionId, review) => {
+        await confirmReview({ sessionId, ...review });
       }}
       onFinishSession={async (sessionId) => {
         await finishSession({ sessionId });
@@ -176,6 +206,7 @@ function PersistedPokerSessions() {
       onTogglePause={async (sessionId) => {
         await togglePause({ sessionId });
       }}
+      pendingReviewSession={pendingReviewSession as SessionView | null}
       rows={sessionRows}
     />
   );
@@ -190,14 +221,17 @@ function PokerSessionsDemo({ banner }: { banner?: string }) {
       banner={banner ?? "Modo demo/mock. Entra para guardar sessões e eventos no Convex."}
       demoMode
       onAddEvent={async () => undefined}
+      onConfirmReview={async () => undefined}
       onFinishSession={async () => undefined}
       onStartSession={async () => undefined}
       onTogglePause={async () => undefined}
+      pendingReviewSession={demoPendingReviewSession}
       rows={[
         {
+          _id: demoPendingReviewSession._id,
           date: "Hoje",
           focus: demoSession.sessionFocus,
-          tournaments: 6,
+          tournaments: 42,
           duration: "1h 24m",
           quality: 0,
           tiltPeak: 2,
@@ -216,9 +250,11 @@ function SessionsWorkspace({
   events,
   grindBlocks,
   onAddEvent,
+  onConfirmReview,
   onFinishSession,
   onStartSession,
   onTogglePause,
+  pendingReviewSession,
   rows,
 }: {
   activeSession: SessionView | null;
@@ -241,6 +277,19 @@ function SessionsWorkspace({
       microIntention?: string;
     },
   ) => Promise<void>;
+  onConfirmReview: (
+    sessionId: Id<"pokerSessions">,
+    review: {
+      tournamentsPlayed: number;
+      decisionQuality: number;
+      finalFocus: number;
+      finalEnergy: number;
+      finalTilt: number;
+      goodDecision?: string;
+      mainLeak?: string;
+      nextAction?: string;
+    },
+  ) => Promise<void>;
   onFinishSession: (sessionId: Id<"pokerSessions">) => Promise<void>;
   onStartSession: (payload: {
     weeklyPlanBlockId?: Id<"weeklyPlanBlocks">;
@@ -253,20 +302,14 @@ function SessionsWorkspace({
     microIntention?: string;
   }) => Promise<void>;
   onTogglePause: (sessionId: Id<"pokerSessions">) => Promise<void>;
-  rows: {
-    _id?: Id<"pokerSessions">;
-    date: string;
-    focus: string;
-    tournaments: number;
-    duration: string;
-    quality: number;
-    tiltPeak: number;
-    hands: number;
-    status: SessionStatus;
-  }[];
+  pendingReviewSession: SessionView | null;
+  rows: SessionRow[];
 }) {
   const [modal, setModal] = useState<Modal>(null);
   const [view, setView] = useState<"history" | "active">(activeSession ? "active" : "history");
+  const [demoActiveSession, setDemoActiveSession] = useState<SessionView | null>(null);
+  const [demoPendingReviewSession, setDemoPendingReviewSession] = useState<SessionView | null>(pendingReviewSession);
+  const [demoRows, setDemoRows] = useState<SessionRow[]>(rows);
   const [startFocus, setStartFocus] = useState("Disciplina em ICM até bolha");
   const [selectedBlockId, setSelectedBlockId] = useState(grindBlocks[0]?.id ?? "none");
   const [maxTables, setMaxTables] = useState(6);
@@ -274,31 +317,94 @@ function SessionsWorkspace({
   const [focusScore, setFocusScore] = useState(4);
   const [tilt, setTilt] = useState(1);
   const [microIntention, setMicroIntention] = useState("");
+  const [tournamentsPlayed, setTournamentsPlayed] = useState(0);
+  const [decisionQuality, setDecisionQuality] = useState(4);
+  const [finalFocus, setFinalFocus] = useState(4);
+  const [finalEnergy, setFinalEnergy] = useState(3);
+  const [finalTilt, setFinalTilt] = useState(1);
+  const [goodDecision, setGoodDecision] = useState("");
+  const [mainLeak, setMainLeak] = useState("");
+  const [nextAction, setNextAction] = useState("");
+  const [reviewSession, setReviewSession] = useState<SessionView | null>(null);
+  const [actionError, setActionError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const selectedBlock = grindBlocks.find((block) => block.id === selectedBlockId);
-  const visibleActiveSession = activeSession ?? (demoMode && view === "active" ? demoSession : null);
+  const effectivePendingReviewSession = demoMode ? demoPendingReviewSession : pendingReviewSession;
+  const effectiveRows = demoMode ? demoRows : rows;
+  const visibleActiveSession = activeSession ?? demoActiveSession;
   const summary = useMemo(
     () => ({
-      sessions: rows.length,
-      averageQuality: getAverageQuality(rows),
-      hands: rows.reduce((total, row) => total + row.hands, 0),
+      sessions: effectiveRows.length,
+      averageQuality: getAverageQuality(effectiveRows),
+      averageFinalTilt: getAverageFinalTilt(effectiveRows),
+      hands: effectiveRows.reduce((total, row) => total + row.hands, 0),
+      pendingReviews: effectiveRows.filter((row) => row.status === "reviewPending").length,
+      reviewedSessions: effectiveRows.filter((row) => row.status === "reviewed").length,
+      tournaments: effectiveRows.reduce((total, row) => total + row.tournaments, 0),
     }),
-    [rows],
+    [effectiveRows],
   );
+  const sessionInsight = getSessionInsight(summary);
 
   async function submitStartSession() {
-    await onStartSession({
-      weeklyPlanBlockId: selectedBlock?.id as Id<"weeklyPlanBlocks"> | undefined,
-      blockLabel: selectedBlock ? `Grind · ${selectedBlock.title}${selectedBlock.target ? ` (${selectedBlock.target})` : ""}` : undefined,
-      sessionFocus: startFocus,
-      maxTables,
-      energy,
-      focusScore,
-      tilt,
-      microIntention,
+    await runSessionAction(async () => {
+      await onStartSession({
+        weeklyPlanBlockId: selectedBlock?.id as Id<"weeklyPlanBlocks"> | undefined,
+        blockLabel: selectedBlock ? `Grind · ${selectedBlock.title}${selectedBlock.target ? ` (${selectedBlock.target})` : ""}` : undefined,
+        sessionFocus: startFocus,
+        maxTables,
+        energy,
+        focusScore,
+        tilt,
+        microIntention,
+      });
+      if (demoMode) {
+        setDemoActiveSession({
+          ...demoSession,
+          sessionFocus: startFocus,
+          blockLabel: selectedBlock ? `Grind · ${selectedBlock.title}${selectedBlock.target ? ` (${selectedBlock.target})` : ""}` : undefined,
+          maxTables,
+          currentTables: maxTables,
+          energy,
+          focusScore,
+          tilt,
+          microIntention: microIntention.trim() || undefined,
+          startedAt: Date.now(),
+          endedAt: undefined,
+          status: "active",
+        });
+      }
+      setModal(null);
+      setView("active");
     });
-    setModal(null);
-    setView("active");
+  }
+
+  function openReviewModal(session: SessionView) {
+    setActionError("");
+    setReviewSession(session);
+    setTournamentsPlayed(session.tournamentsPlayed ?? 0);
+    setDecisionQuality(session.decisionQuality ?? 4);
+    setFinalFocus(session.finalFocus ?? session.focusScore);
+    setFinalEnergy(session.finalEnergy ?? session.energy);
+    setFinalTilt(session.finalTilt ?? session.tilt);
+    setGoodDecision(session.goodDecision ?? "");
+    setMainLeak(session.mainLeak ?? "");
+    setNextAction(session.nextAction ?? "");
+    setModal("review");
+  }
+
+  async function runSessionAction(action: () => Promise<void>) {
+    setActionError("");
+    setIsSubmitting(true);
+
+    try {
+      await action();
+    } catch (error) {
+      setActionError(getActionErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -309,7 +415,7 @@ function SessionsWorkspace({
         <ActiveSession
           events={events}
           onCapture={setModal}
-          onFinish={() => setModal("review")}
+          onFinish={() => openReviewModal(visibleActiveSession)}
           onQuickNote={async (text) => {
             if (!visibleActiveSession._id || !text.trim()) return;
             await onAddEvent(visibleActiveSession._id, {
@@ -355,18 +461,37 @@ function SessionsWorkspace({
                 Voltar à sessão
               </button>
             </article>
+          ) : effectivePendingReviewSession ? (
+            <article className={styles.statusCard}>
+              <div>
+                <span>Review pendente</span>
+                <h2>{effectivePendingReviewSession.sessionFocus}</h2>
+                <p>{formatElapsed(effectivePendingReviewSession.startedAt, effectivePendingReviewSession.endedAt)} · {effectivePendingReviewSession.handsToReview} mãos marcadas</p>
+              </div>
+              <button className="ep-button primary" type="button" onClick={() => openReviewModal(effectivePendingReviewSession)}>
+                Terminar review
+              </button>
+            </article>
           ) : null}
 
           <div className={styles.sessionLayout}>
-            <SessionsTable rows={rows} onOpenActive={() => setView("active")} />
+            <SessionsTable
+              rows={effectiveRows}
+              onOpenActive={() => setView("active")}
+              onOpenReview={(sessionId) => {
+                if (effectivePendingReviewSession?._id === sessionId) {
+                  openReviewModal(effectivePendingReviewSession);
+                }
+              }}
+            />
             <aside className={styles.sideStack}>
               <SummaryPanel summary={summary} />
               <article className={styles.coachPanel}>
                 <Sparkles size={17} aria-hidden="true" />
                 <div>
                   <span>Coach AI</span>
-                  <p>Mãos marcadas, check-ups e notas rápidas entram como contexto para análise futura.</p>
-                  <small>contexto · sessões + eventos</small>
+                  <p>{sessionInsight}</p>
+                  <small>contexto · reviews + mãos marcadas</small>
                 </div>
               </article>
             </aside>
@@ -423,11 +548,12 @@ function SessionsWorkspace({
             <button className="ep-button secondary" type="button" onClick={() => setModal(null)}>
               Cancelar
             </button>
-            <button className="ep-button primary" type="button" onClick={submitStartSession}>
+            <button className="ep-button primary" type="button" disabled={isSubmitting} onClick={submitStartSession}>
               <Play size={15} aria-hidden="true" />
-              Iniciar sessão
+              {isSubmitting ? "A iniciar..." : "Iniciar sessão"}
             </button>
           </div>
+          {actionError ? <p className={styles.actionError}>{actionError}</p> : null}
         </ModalFrame>
       ) : null}
 
@@ -478,20 +604,71 @@ function SessionsWorkspace({
         />
       ) : null}
 
-      {visibleActiveSession?._id && modal === "review" ? (
+      {reviewSession?._id && modal === "review" ? (
         <ModalFrame title="Terminar sessão" onClose={() => setModal(null)}>
+          <p className={styles.modalCopy}>Fecha com os sinais mínimos que vão alimentar a review semanal e o Coach.</p>
           <div className={styles.formGrid}>
             <label>
               Duração
-              <input disabled value={formatElapsed(visibleActiveSession.startedAt)} />
+              <input disabled value={formatElapsed(reviewSession.startedAt, reviewSession.endedAt)} />
             </label>
             <label>
               Mãos marcadas
-              <input disabled value={visibleActiveSession.handsToReview} />
+              <input disabled value={reviewSession.handsToReview} />
+            </label>
+            <label>
+              Torneios jogados
+              <input
+                inputMode="numeric"
+                min={0}
+                value={tournamentsPlayed}
+                onChange={(event) => setTournamentsPlayed(Number(event.target.value) || 0)}
+              />
+            </label>
+            <label>
+              Qualidade decisão
+              <select value={decisionQuality} onChange={(event) => setDecisionQuality(Number(event.target.value))}>
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <option key={value} value={value}>{value}/5</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <section className={styles.initialStateBox}>
+            <header>
+              <span>Estado final</span>
+              <small>obrigatório</small>
+            </header>
+            <div className={styles.ratingGrid}>
+              <Rating label="Energia" min={1} value={finalEnergy} onChange={setFinalEnergy} />
+              <Rating label="Foco" min={1} value={finalFocus} onChange={setFinalFocus} />
+              <Rating label="Tilt" min={1} tone="tilt" value={finalTilt} onChange={setFinalTilt} />
+            </div>
+          </section>
+          <div className={styles.formGrid}>
+            <label className={styles.fullField}>
+              Boa decisão
+              <textarea
+                placeholder="Opcional: algo que queres repetir"
+                value={goodDecision}
+                onChange={(event) => setGoodDecision(event.target.value)}
+              />
             </label>
             <label className={styles.fullField}>
-              Resumo
-              <textarea defaultValue="Sessão terminada. Review completa fica para a próxima slice." />
+              Principal leak
+              <textarea
+                placeholder="Opcional: padrão ou erro principal"
+                value={mainLeak}
+                onChange={(event) => setMainLeak(event.target.value)}
+              />
+            </label>
+            <label className={styles.fullField}>
+              Próxima ação
+              <textarea
+                placeholder="Opcional: rever bloco, estudar spot, reduzir mesas..."
+                value={nextAction}
+                onChange={(event) => setNextAction(event.target.value)}
+              />
             </label>
           </div>
           <section className={styles.financialBox}>
@@ -506,22 +683,132 @@ function SessionsWorkspace({
               Cancelar
             </button>
             <button
-              className="ep-button primary"
+              className="ep-button secondary"
+              disabled={isSubmitting}
               type="button"
-              onClick={async () => {
-                await onFinishSession(visibleActiveSession._id!);
-                setModal(null);
-                setView("history");
+              onClick={() => {
+                void runSessionAction(async () => {
+                  if (reviewSession.status === "active") {
+                    await onFinishSession(reviewSession._id!);
+                  }
+                  if (demoMode) {
+                    const nextSession = {
+                      ...reviewSession,
+                      status: "reviewPending" as const,
+                      endedAt: reviewSession.endedAt ?? Date.now(),
+                    };
+                    setDemoActiveSession(null);
+                    setDemoPendingReviewSession(nextSession);
+                    setDemoRows((current) =>
+                      upsertSessionRow(
+                        current,
+                        buildSessionRow(nextSession, {
+                          tournaments: tournamentsPlayed,
+                          quality: 0,
+                          tiltPeak: finalTilt,
+                        }),
+                      ),
+                    );
+                  }
+                  setModal(null);
+                  setReviewSession(null);
+                  setView("history");
+                });
               }}
             >
-              <Square size={14} aria-hidden="true" />
-              Terminar sessão
+              {isSubmitting ? "A guardar..." : "Guardar rascunho"}
+            </button>
+            <button
+              className="ep-button primary"
+              disabled={isSubmitting}
+              type="button"
+              onClick={() => {
+                void runSessionAction(async () => {
+                  await onConfirmReview(reviewSession._id!, {
+                    tournamentsPlayed,
+                    decisionQuality,
+                    finalFocus,
+                    finalEnergy,
+                    finalTilt,
+                    goodDecision: goodDecision.trim() || undefined,
+                    mainLeak: mainLeak.trim() || undefined,
+                    nextAction: nextAction.trim() || undefined,
+                  });
+                  if (demoMode) {
+                    const reviewedSession = {
+                      ...reviewSession,
+                      status: "reviewed" as const,
+                      endedAt: reviewSession.endedAt ?? Date.now(),
+                      tournamentsPlayed,
+                      decisionQuality,
+                      finalFocus,
+                      finalEnergy,
+                      finalTilt,
+                      goodDecision: goodDecision.trim() || undefined,
+                      mainLeak: mainLeak.trim() || undefined,
+                      nextAction: nextAction.trim() || undefined,
+                    };
+                    setDemoActiveSession(null);
+                    setDemoPendingReviewSession((current) =>
+                      current?._id === reviewedSession._id ? null : current,
+                    );
+                    setDemoRows((current) =>
+                      upsertSessionRow(
+                        current,
+                        buildSessionRow(reviewedSession, {
+                          tournaments: tournamentsPlayed,
+                          quality: decisionQuality,
+                          tiltPeak: finalTilt,
+                        }),
+                      ),
+                    );
+                  }
+                  setModal(null);
+                  setReviewSession(null);
+                  setView("history");
+                });
+              }}
+            >
+              <Check size={14} aria-hidden="true" />
+              {isSubmitting ? "A confirmar..." : "Confirmar review"}
             </button>
           </div>
+          {actionError ? <p className={styles.actionError}>{actionError}</p> : null}
         </ModalFrame>
       ) : null}
     </section>
   );
+}
+
+function buildSessionRow(
+  session: SessionView,
+  overrides: {
+    tournaments: number;
+    quality: number;
+    tiltPeak: number;
+  },
+): SessionRow {
+  return {
+    _id: session._id,
+    date: session.date === todayIsoDate ? "Hoje" : formatShortDate(session.startedAt),
+    focus: session.sessionFocus,
+    tournaments: overrides.tournaments,
+    duration: formatElapsed(session.startedAt, session.endedAt),
+    quality: overrides.quality,
+    tiltPeak: overrides.tiltPeak,
+    hands: session.handsToReview,
+    status: session.status,
+  };
+}
+
+function upsertSessionRow(rows: SessionRow[], nextRow: SessionRow) {
+  const existingIndex = rows.findIndex((row) => row._id === nextRow._id);
+
+  if (existingIndex === -1) {
+    return [nextRow, ...rows];
+  }
+
+  return rows.map((row, index) => (index === existingIndex ? nextRow : row));
 }
 
 function ActiveSession({
@@ -654,26 +941,19 @@ function ActiveSession({
 
 function SessionsTable({
   onOpenActive,
+  onOpenReview,
   rows,
 }: {
   onOpenActive: () => void;
-  rows: {
-    date: string;
-    focus: string;
-    tournaments: number;
-    duration: string;
-    quality: number;
-    tiltPeak: number;
-    hands: number;
-    status: SessionStatus;
-  }[];
+  onOpenReview: (sessionId: Id<"pokerSessions">) => void;
+  rows: SessionRow[];
 }) {
   return (
     <article className={styles.historyPanel}>
       <header className={styles.tableHeader}>
         <span>Data</span>
         <span>Foco</span>
-        <span>Mesas</span>
+        <span>Torneios</span>
         <span>Duração</span>
         <span>Qual.</span>
         <span>Tilt</span>
@@ -694,7 +974,10 @@ function SessionsTable({
               aria-label={`Abrir sessão de ${row.date}`}
               className={styles.iconButton}
               type="button"
-              onClick={() => (row.status === "active" ? onOpenActive() : undefined)}
+              onClick={() => {
+                if (row.status === "active") onOpenActive();
+                if (row.status === "reviewPending" && row._id) onOpenReview(row._id);
+              }}
             >
               <ArrowRight size={15} aria-hidden="true" />
             </button>
@@ -707,7 +990,19 @@ function SessionsTable({
   );
 }
 
-function SummaryPanel({ summary }: { summary: { sessions: number; averageQuality: number; hands: number } }) {
+function SummaryPanel({
+  summary,
+}: {
+  summary: {
+    sessions: number;
+    averageQuality: number;
+    averageFinalTilt: number;
+    hands: number;
+    pendingReviews: number;
+    reviewedSessions: number;
+    tournaments: number;
+  };
+}) {
   return (
     <article className={styles.summaryPanel}>
       <span>Resumo leve</span>
@@ -717,8 +1012,24 @@ function SummaryPanel({ summary }: { summary: { sessions: number; averageQuality
           <dd>{summary.sessions}</dd>
         </div>
         <div>
+          <dt>Revistas</dt>
+          <dd>{summary.reviewedSessions}</dd>
+        </div>
+        <div>
+          <dt>Reviews pendentes</dt>
+          <dd>{summary.pendingReviews}</dd>
+        </div>
+        <div>
+          <dt>Torneios</dt>
+          <dd>{summary.tournaments || "-"}</dd>
+        </div>
+        <div>
           <dt>Qualidade média</dt>
-          <dd>{summary.averageQuality}/5</dd>
+          <dd>{summary.averageQuality ? `${summary.averageQuality}/5` : "-"}</dd>
+        </div>
+        <div>
+          <dt>Tilt final médio</dt>
+          <dd>{summary.averageFinalTilt ? `${summary.averageFinalTilt}/5` : "-"}</dd>
         </div>
         <div>
           <dt>Mãos a rever</dt>
@@ -925,6 +1236,37 @@ function getAverageQuality(rows: { quality: number }[]) {
   return Math.round((reviewedRows.reduce((total, row) => total + row.quality, 0) / reviewedRows.length) * 10) / 10;
 }
 
+function getAverageFinalTilt(rows: { status: SessionStatus; tiltPeak: number }[]) {
+  const reviewedRows = rows.filter((row) => row.status === "reviewed");
+  if (!reviewedRows.length) return 0;
+  return Math.round((reviewedRows.reduce((total, row) => total + row.tiltPeak, 0) / reviewedRows.length) * 10) / 10;
+}
+
+function getSessionInsight(summary: {
+  averageFinalTilt: number;
+  hands: number;
+  pendingReviews: number;
+  reviewedSessions: number;
+}) {
+  if (summary.pendingReviews > 0) {
+    return `${summary.pendingReviews} review${summary.pendingReviews > 1 ? "s" : ""} pendente${summary.pendingReviews > 1 ? "s" : ""}. Fecha antes de tirar conclusões da semana.`;
+  }
+
+  if (summary.hands >= 5) {
+    return "Há várias mãos marcadas. Faz sentido reservar um bloco curto de revisão antes da próxima sessão.";
+  }
+
+  if (summary.reviewedSessions > 0 && summary.averageFinalTilt >= 3) {
+    return "Tilt final médio elevado nas sessões revistas. Mantém atenção à energia e ao número de mesas.";
+  }
+
+  if (summary.reviewedSessions > 0) {
+    return "Reviews confirmadas já dão contexto útil para padrões de qualidade, tilt e próximas ações.";
+  }
+
+  return "Mãos marcadas, check-ups e notas rápidas entram como contexto para análise futura.";
+}
+
 function formatElapsed(startedAt: number, endedAt = Date.now()) {
   const minutes = Math.max(0, Math.floor((endedAt - startedAt) / 60000));
   const hours = Math.floor(minutes / 60);
@@ -949,4 +1291,12 @@ function getLastCheckupLabel(events: SessionEventView[]) {
   if (!checkup) return "sem check-up";
   const minutes = Math.max(0, Math.floor((Date.now() - checkup.createdAt) / 60000));
   return minutes < 1 ? "agora" : `há ${minutes} min`;
+}
+
+function getActionErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message.includes("Could not find public function")) {
+    return "As funções Convex ainda não estão atualizadas. Corre `npx convex dev --once` e tenta outra vez.";
+  }
+
+  return "Não foi possível guardar agora. Tenta novamente.";
 }

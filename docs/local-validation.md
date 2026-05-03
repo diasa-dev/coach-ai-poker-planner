@@ -45,6 +45,17 @@ Use `npm run convex:codegen` only when Convex generated bindings should be
 refreshed. Use `npm run convex:dev` when a linked Convex dev deployment is
 needed.
 
+When a slice changes Convex schema or public functions used by the frontend,
+push the functions to the linked dev deployment before browser smoke:
+
+```bash
+npx convex dev --once --typecheck enable
+```
+
+If this is skipped, the browser can load new frontend code while Convex still
+serves the old function set, causing errors such as `Could not find public
+function`.
+
 For shell helper changes:
 
 ```bash
@@ -55,6 +66,8 @@ For mock-mode safety when touching Clerk, Convex, providers, proxy, or env
 wiring:
 
 ```bash
+UPLINEA_DISABLE_AUTH=1 \
+NEXT_PUBLIC_UPLINEA_DISABLE_AUTH=1 \
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY= \
 CLERK_SECRET_KEY= \
 CLERK_JWT_ISSUER_DOMAIN= \
@@ -62,6 +75,18 @@ NEXT_PUBLIC_CONVEX_URL= \
 CONVEX_DEPLOYMENT= \
 npm run build
 ```
+
+For browser smoke that must not depend on Clerk sessions or matching Clerk keys,
+start the app with auth disabled:
+
+```bash
+npm run dev:smoke
+SMOKE_BASE_URL=http://127.0.0.1:3103 npm run smoke:coach
+```
+
+This mode intentionally uses demo data and skips Clerk/Convex providers. Use it
+for UI and route smoke. Use the normal authenticated dev server separately when
+the slice specifically changes persistence or auth behavior.
 
 ## Local Smoke
 
