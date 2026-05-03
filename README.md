@@ -101,11 +101,14 @@ For local UI smoke that should not depend on Clerk sessions, use:
 
 ```bash
 npm run dev:smoke
-SMOKE_BASE_URL=http://127.0.0.1:3103 npm run smoke:coach
+SMOKE_BASE_URL=http://localhost:3103 npm run smoke:coach
 ```
 
 This disables Clerk/Convex providers for that server process only and runs the
 Coach proposal flow plus adjacent route checks against demo data.
+
+When Clerk is enabled, open local dev through `http://localhost:<port>`, not
+`http://127.0.0.1:<port>`, to avoid Clerk development-session refresh loops.
 
 ## Notes
 

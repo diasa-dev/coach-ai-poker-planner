@@ -9,7 +9,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Build in small implementation slices. Do not expand into adjacent product areas unless the user explicitly approves that slice.
 - At the end of every implementation slice, stop and ask the user whether to run validation now. The user may want to add more work before validation.
 - If the user approves validation, run the relevant checks for the slice, such as typecheck, lint, build, tests, and local smoke checks when available.
-- For every implemented feature, run an extensive smoke test that covers the feature itself, the app surfaces it interacts with, and any adjacent flows likely to be affected.
+- Use layered validation. Every implementation slice gets the fast required checks plus a focused smoke for the changed behavior. Expand to broader smoke only when the slice risk justifies it.
+- For every implemented feature, run a smoke test that deeply covers the feature itself, the app surfaces it interacts with, and any adjacent flows likely to be affected. This does not mean testing the whole app every time; match the smoke breadth to the risk.
+- Run extended smoke when changing auth/providers/env, Convex schema or public functions, navigation/layout shell, persistence flows, or shared flows across Weekly Plan, Today, Sessions, Review, and Coach.
+- Prefer stable scripted smoke over ad hoc browser scripts. Use demo smoke for UI/flow validation when persistence is not the target, and authenticated smoke only when the feature depends on user/session/persistence behavior.
+- If smoke fails, classify the failure before trying variants: feature bug, infra/env issue, or test issue. Stop blind retry loops early and switch to the shortest reliable validation path.
 - When changing Convex schema or functions, run `npx convex dev --once --typecheck enable` before browser smoke so the linked dev deployment has the same functions as the frontend.
 - After validation has no blocking errors, provide a short slice summary with:
   - what changed

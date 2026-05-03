@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import { chromium } from "playwright";
 
-const baseUrl = process.env.SMOKE_BASE_URL || "http://127.0.0.1:3103";
+const baseUrl = process.env.SMOKE_BASE_URL || "http://localhost:3103";
 
 async function waitText(page, text) {
   await page.getByText(text, { exact: false }).first().waitFor({

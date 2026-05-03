@@ -26,6 +26,51 @@ nvm use
 The expected runtime is Node 22. Running Next.js with Node 18 fails before the
 build starts.
 
+## Layered Validation
+
+Validation should protect product quality without turning every slice into a
+full-app regression pass.
+
+Use this default stack for implementation slices:
+
+1. Run the fast required checks:
+
+   ```bash
+   npm run lint
+   npm run build
+   ```
+
+2. Run a focused smoke for the changed behavior.
+3. Add 2-4 adjacent routes or flows that directly interact with the changed
+   behavior.
+4. Expand to extended smoke only when the slice changes shared infrastructure
+   or persistence.
+
+Extended smoke is required for changes touching:
+
+- Clerk, Convex providers, proxy, or environment wiring
+- Convex schema, indexes, or public functions used by the frontend
+- Navigation, app shell, route layout, or cross-page state
+- Persistence flows such as Weekly Plan, Today commitments, Sessions, Review,
+  or Coach proposal application
+- Any flow where a saved record is later consumed by another page
+
+Use demo smoke when the goal is UI behavior, visual state, or local interaction.
+Use authenticated smoke when the goal depends on Clerk identity, Convex
+ownership, saved records, or session-specific behavior.
+
+If a smoke fails, classify it before retrying:
+
+- Feature bug: fix the implementation and rerun the focused smoke.
+- Infra/env issue: document the blocker and switch to the stable smoke path if
+  it still validates the slice.
+- Test issue: fix the smoke script or selector before drawing product
+  conclusions.
+
+Avoid repeated ad hoc browser attempts. Prefer adding or updating a reusable
+script such as `smoke:coach`, `smoke:sessions`, `smoke:review`, or
+`smoke:weekly-today` when the same flow will be tested again.
+
 ## Standard Checks
 
 For most technical slices:
@@ -81,12 +126,17 @@ start the app with auth disabled:
 
 ```bash
 npm run dev:smoke
-SMOKE_BASE_URL=http://127.0.0.1:3103 npm run smoke:coach
+SMOKE_BASE_URL=http://localhost:3103 npm run smoke:coach
 ```
 
 This mode intentionally uses demo data and skips Clerk/Convex providers. Use it
 for UI and route smoke. Use the normal authenticated dev server separately when
 the slice specifically changes persistence or auth behavior.
+
+When Clerk is enabled locally, use `http://localhost:<port>` in the browser and
+smoke scripts. Do not use `http://127.0.0.1:<port>` for authenticated smoke:
+Clerk development instances can treat that as a different origin and enter a
+session refresh loop.
 
 ## Local Smoke
 

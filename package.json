@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --webpack",
     "dev:coach": "next dev --webpack -H 0.0.0.0 -p 3100",
-    "dev:smoke": "UPLINEA_DISABLE_AUTH=1 NEXT_PUBLIC_UPLINEA_DISABLE_AUTH=1 next dev --webpack -H 127.0.0.1 -p ${SMOKE_PORT:-3103}",
+    "dev:smoke": "UPLINEA_DISABLE_AUTH=1 NEXT_PUBLIC_UPLINEA_DISABLE_AUTH=1 next dev --webpack -H localhost -p ${SMOKE_PORT:-3103}",
     "dev:coach:bg": "bash scripts/coach-dev.sh start",
     "dev:coach:restart": "bash scripts/coach-dev.sh restart",
     "dev:coach:status": "bash scripts/coach-dev.sh status",
