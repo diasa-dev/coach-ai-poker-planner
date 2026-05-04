@@ -1,18 +1,5 @@
-import { PagePlaceholder } from "@/components/page-placeholder";
+import { StudySection } from "@/components/study-section";
 
 export default function StudyPage() {
-  return (
-    <PagePlaceholder
-      eyebrow="Aprendizagem"
-      title="Estudo"
-      description="Regista sessões de estudo com duração, tipo e qualidade."
-      primaryAction="Registar estudo"
-      items={[
-        "Drills",
-        "Hand review",
-        "Solver",
-        "Aula individual",
-      ]}
-    />
-  );
+  return <StudySection />;
 }
