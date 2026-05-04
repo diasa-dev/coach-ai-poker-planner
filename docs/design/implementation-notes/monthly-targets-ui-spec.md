@@ -24,6 +24,8 @@ Product sequence:
 
 This screen must stay focused on planning decisions. It must not become a financial tracker, dense analytics dashboard, calendar, quarterly planning flow, or Coach-generated automation surface.
 
+Future dependency: Monthly targets may later use Annual Operating Targets as optional context. Those targets are concrete rhythm metrics under the annual direction, such as grind days per month, tournaments per month, study hours per week, review volume, sport sessions, or custom metrics. They must use `effectiveFrom` so mid-year starts and adjustments only affect future months. Monthly targets should not auto-apply those rhythms without player confirmation.
+
 ## 2. Desktop Layout
 
 Use the standard app shell from the design handoff:

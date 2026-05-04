@@ -412,6 +412,14 @@ Example:
 
 Show status plus one short progress number. Avoid dense charts, percentages, forecasts, or detailed analytics in the MVP. Monthly pace should trigger decisions, not become an analytics page.
 
+Future Annual Operating Targets layer:
+
+- May sit between Annual direction and Monthly targets.
+- Captures concrete rhythm metrics such as grind days per month, tournaments per month, study hours per week, review volume, sport sessions, or custom player metrics.
+- Each metric should have an `effectiveFrom` date so mid-year starts and mid-year adjustments apply from that point forward.
+- Monthly targets may use these metrics as operating context or suggestions, but must not auto-generate or auto-apply targets without player confirmation.
+- Keep this out of OKR, quarterly planning, annual forecasting, financial tracking, and dense analytics territory.
+
 ## Sessions
 
 Sessions should be a dedicated primary page and a core execution flow.
@@ -725,19 +733,23 @@ This design updates the implementation order:
    - Persist annual direction.
    - Add `decisionRule` and stronger `nonNegotiables` / `avoidRepeating`.
    - Keep Coach real integration and advanced analytics out of scope.
-2. Monthly Targets as Strategic Pace
+2. Annual Operating Targets
+   - Add optional concrete annual rhythm metrics with `effectiveFrom`.
+   - Support mid-year starts and later adjustments without rewriting the past.
+   - Keep it lightweight and player-editable.
+3. Monthly Targets as Strategic Pace
    - Persist monthly targets.
-   - Link Grind, Study, Review, and Sport targets to annual direction.
+   - Link Grind, Study, Review, and Sport targets to annual direction and optional operating rhythm.
    - Calculate simple pace: missing/none, behind, on, ahead, complete.
-3. Strategic Feedback Integration
+4. Strategic Feedback Integration
    - Use annual direction plus monthly targets in Weekly plan, Today, Sessions, Review, and Coach mock/rules-based feedback.
    - Keep feedback simple, actionable, and optional.
-4. Weekly plan MVP
-5. Daily execution from weekly blocks
-6. Study session log MVP
-7. Poker session flow MVP
-8. Weekly and session review MVP
-9. Coach AI contextual chat and review mock
+5. Weekly plan MVP
+6. Daily execution from weekly blocks
+7. Study session log MVP
+8. Poker session flow MVP
+9. Weekly and session review MVP
+10. Coach AI contextual chat and review mock
 
 Before implementation, `DIA-15` should use this spec to redesign the active dashboard/navigation around the planning system.
 

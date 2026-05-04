@@ -20,6 +20,8 @@ Product sequence:
 
 This screen must stay lightweight. It must not become annual forecasting, quarterly planning, an OKR system, a financial target dashboard, or a broad life-planning workspace.
 
+Future note: concrete yearly rhythm metrics should live in a separate Annual Operating Targets layer, not inside the core Annual direction fields. Examples include grind days per month, tournaments per month, study hours per week, review volume, sport sessions, or custom player-defined metrics. Each metric should support `effectiveFrom` so users who start mid-year, or adjust expectations later, only apply the new rhythm from that date forward.
+
 ## 2. Desktop Layout
 
 Use the standard app shell from the design handoff:
@@ -457,6 +459,7 @@ Coach behavior expectation:
 - Annual forecasting.
 - Quarterly planning.
 - OKR system.
+- Concrete annual rhythm metrics inside the core Annual direction form. Use a future Annual Operating Targets layer instead.
 - Annual calendar.
 - Year roadmap.
 - Financial target dashboard.

@@ -20,6 +20,14 @@ The planning loop is:
 
 Annual direction should exist in the MVP as the active strategic layer. Quarterly planning can come later, and the MVP should avoid asking the player to forecast too much too early.
 
+Future product layer:
+
+`Annual direction -> Annual operating targets -> Monthly targets -> Weekly plan -> Daily execution -> Sessions/Study -> Reviews -> Next weekly plan`
+
+Annual operating targets are optional concrete rhythm metrics that may be added after Annual direction is persisted. They should capture practical operating pace, not strategic identity. Examples include grind days per month, tournaments per month, study hours per week, review volume, sport sessions, or player-defined custom metrics.
+
+These targets should support `effectiveFrom` so a player can start mid-year or adjust expectations later without rewriting previous months or making the app judge past months as missed.
+
 ## Evidence-Informed Principles
 
 - Specific goals with progress feedback outperform vague intentions.
@@ -54,6 +62,7 @@ Rules:
 - Keep it lightweight but operational.
 - Do not require detailed annual forecasting.
 - Do not require quarterly planning before the player can use the app.
+- Keep concrete rhythm metrics in a future Annual Operating Targets layer rather than overloading Annual direction itself.
 - Monthly targets should show the annual direction as context.
 - Monthly targets should check whether the month's pace serves the annual direction.
 - Weekly plans should warn when the plan contradicts priorities, non-negotiables, or patterns to avoid.
@@ -64,7 +73,7 @@ Rules:
 
 ### Monthly Targets
 
-Monthly targets provide strategic pace for the weekly plan and should connect back to the annual direction.
+Monthly targets provide strategic pace for the weekly plan and should connect back to the annual direction. When Annual Operating Targets exist later, monthly targets may use that rhythm as optional context or suggestion input, but the player remains responsible for the monthly target decision.
 
 Initial categories:
 
@@ -257,6 +266,20 @@ The dashboard should not become session-first, but it should include session sta
 - createdAt
 - updatedAt
 
+### `annualOperatingTargets`
+
+- userId
+- year
+- label
+- category: grind | study | review | sport | recovery | custom
+- unit
+- cadence: weekly | monthly
+- targetValue
+- effectiveFrom
+- active
+- createdAt
+- updatedAt
+
 ### `monthlyTargets`
 
 - userId
@@ -358,16 +381,20 @@ See `docs/features/poker-session-flow.md`.
    - Persist annual direction.
    - Add `decisionRule` and stronger `nonNegotiables` / `avoidRepeating`.
    - Keep Coach real integration and advanced analytics out of scope.
-2. Monthly Targets as Strategic Pace.
+2. Annual Operating Targets.
+   - Add optional concrete rhythm metrics under the annual direction.
+   - Use `effectiveFrom` for mid-year starts and adjustments.
+   - Keep it lightweight and separate from OKRs, quarterly planning, annual forecasting, and financial targets.
+3. Monthly Targets as Strategic Pace.
    - Persist monthly targets.
-   - Link Grind, Study, Review, and Sport targets to annual direction.
+   - Link Grind, Study, Review, and Sport targets to annual direction and optional annual operating rhythm.
    - Calculate simple pace: missing/none, behind, on, ahead, complete.
-3. Strategic Feedback Integration.
+4. Strategic Feedback Integration.
    - Use annual direction plus monthly targets in Weekly plan, Today, Sessions, Review, and Coach mock/rules-based feedback.
    - Keep feedback simple, actionable, and optional.
-4. Weekly plan MVP.
-5. Daily execution from weekly blocks.
-6. Study session log MVP.
-7. Poker session flow MVP.
-8. Weekly review MVP.
-9. Coach AI contextual chat and plan/session review mock.
+5. Weekly plan MVP.
+6. Daily execution from weekly blocks.
+7. Study session log MVP.
+8. Poker session flow MVP.
+9. Weekly review MVP.
+10. Coach AI contextual chat and plan/session review mock.

@@ -165,6 +165,20 @@ Annual direction should stay simple and operational. It must not become detailed
 
 Quarterly planning can remain later. Monthly targets should be the first operational pacing layer under the annual direction.
 
+Future layer: Annual Operating Targets.
+
+Annual direction may later be supported by lightweight operating targets: concrete rhythm metrics such as grind days per month, tournaments per month, study hours per week, review volume, sport sessions, or other player-defined metrics.
+
+This should remain separate from Annual direction itself. Annual direction defines strategic context and trade-offs; Annual Operating Targets define the default operating rhythm that can inform monthly targets and weekly planning.
+
+Rules for a future implementation:
+
+- Keep targets editable during the year.
+- Store changes with `effectiveFrom` so new targets apply from the date they are set and do not rewrite past months.
+- Support users who start using the app mid-year without making the app judge earlier months as missed.
+- Allow player-defined custom metrics without turning the feature into OKRs, quarterly planning, annual forecasting, financial tracking, or dense analytics.
+- Treat these metrics as suggested operating context for Monthly targets, not as automatic target generation.
+
 How it influences the app:
 
 - Monthly targets: check whether the month's pace serves the annual direction.
@@ -367,12 +381,18 @@ Roadmap from the current planning-system direction:
    - Add `decisionRule` and stronger `nonNegotiables` / `avoidRepeating`.
    - Keep Coach real integration and advanced analytics out of scope.
 
-2. Monthly Targets as Strategic Pace
+2. Annual Operating Targets
+   - Add optional concrete rhythm metrics under the annual direction.
+   - Examples: grind days per month, tournaments per month, study hours per week, review volume, sport sessions.
+   - Use `effectiveFrom` so mid-year starts and mid-year adjustments apply only from the chosen date forward.
+   - Keep this separate from OKRs, quarterly planning, annual forecasting, and financial targets.
+
+3. Monthly Targets as Strategic Pace
    - Persist monthly targets.
-   - Link Grind, Study, Review, and Sport targets to the annual direction.
+   - Link Grind, Study, Review, and Sport targets to the annual direction and optional annual operating rhythm.
    - Calculate simple pace: missing/none, behind, on, ahead, complete.
 
-3. Strategic Feedback Integration
+4. Strategic Feedback Integration
    - Use annual direction plus monthly targets in Weekly plan, Today, Sessions, Review, and Coach mock/rules-based feedback.
    - Keep feedback simple, actionable, and optional.
 
