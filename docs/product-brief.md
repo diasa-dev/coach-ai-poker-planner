@@ -12,9 +12,10 @@ The app should not become a complex financial tracker or a heavy Notion-style wo
 - Few inputs, high value.
 - The dashboard is action-oriented: "what matters now?" and "what is the next best action?".
 - The week is the operational center of the app.
-- Monthly targets provide the main pacing context.
+- Annual direction is the active strategic operating context, not an inspirational page.
+- Monthly targets provide the main pacing context under the annual direction.
 - Poker sessions are the core grind execution surface and should feed Coach AI with performance context.
-- Annual and quarterly planning provide direction, not heavy MVP workflows.
+- Quarterly planning remains out of scope for now.
 - The AI Coach is adaptive: calm when there is stress/tilt, more direct when there is repeated procrastination.
 - The AI Coach is present and interactive, but the player remains the author of the plan.
 - Tracking exists mainly to feed better AI guidance, planning, study, session performance, and accountability.
@@ -65,7 +66,7 @@ First product spine:
 - Demo mode without account
 - Clerk login
 - Real dashboard
-- Annual direction as the strategic layer for the year
+- Annual direction as the strategic operating context for the year
 - Monthly targets for grind, study, review, and sport
 - Weekly plan with editable daily blocks
 - Daily execution from the weekly plan
@@ -139,17 +140,45 @@ The core planning loop is:
 
 `Annual direction -> Monthly targets -> Weekly plan -> Daily execution -> Sessions/Study -> Reviews -> Next weekly plan`
 
-### Annual And Quarterly Direction
+### Annual Direction As Strategic Operating Context
 
-Annual direction is the strategic layer of the app. It should answer: "What am I trying to build this year, and what should this month move forward?"
+Annual direction is the strategic operating context of the app. It is a persisted, operational source of truth that helps guide monthly targets, weekly planning, daily execution, poker sessions, weekly review, and Coach AI feedback.
 
-The MVP should include a lightweight annual direction flow before monthly targets. It should capture one primary direction, a small number of priorities, and important constraints. It should not become detailed forecasting, a heavy OKR system, or a full annual calendar.
+It should answer:
+
+- What kind of player/professional am I trying to build this year?
+- Which decisions should I repeat?
+- Which patterns should I stop?
+- Which trade-offs do I accept or refuse?
+
+Expected future fields:
+
+- `primaryDirection`
+- `priorities` with 2 to 4 items
+- `nonNegotiables` / `constraints`
+- `avoidRepeating`
+- `decisionRule`
+- `createdAt`
+- `updatedAt`
+
+Annual direction should stay simple and operational. It must not become detailed annual forecasting, a heavy OKR system, a quarterly planning workflow, a dense analytics dashboard, or a financial target dashboard.
 
 Quarterly planning can remain later. Monthly targets should be the first operational pacing layer under the annual direction.
+
+How it influences the app:
+
+- Monthly targets: check whether the month's pace serves the annual direction.
+- Weekly plan: warn when the plan contradicts priorities, non-negotiables, or patterns to avoid.
+- Today: show a relevant decision rule when it helps execution.
+- Sessions: suggest micro-intentions or limits based on non-negotiables.
+- Weekly review: ask whether the week moved the player closer to the annual direction.
+- Coach AI: use annual direction as a criterion to challenge plans, identify repeated patterns, and propose adjustments.
 
 ### Monthly Targets
 
 Monthly targets are the main pacing layer.
+
+Monthly targets should become strategic pace, not isolated metrics. They should connect Grind, Study, Review, and Sport targets back to the annual direction and use simple pace states: missing/none, behind, on, ahead, or complete.
 
 Initial target categories:
 
@@ -331,25 +360,26 @@ AI Coach:
 
 ## Next Recommended Slice
 
-Slice 1: Technical foundation.
+Roadmap from the current planning-system direction:
 
-Goal:
+1. Annual Direction as Operating Context
+   - Persist annual direction.
+   - Add `decisionRule` and stronger `nonNegotiables` / `avoidRepeating`.
+   - Keep Coach real integration and advanced analytics out of scope.
 
-- Create the Next.js + TypeScript app.
-- Configure Tailwind/shadcn.
-- Prepare Convex.
-- Prepare Clerk.
-- Preserve the current dashboard prototype only as historical reference until the planning-system redesign.
+2. Monthly Targets as Strategic Pace
+   - Persist monthly targets.
+   - Link Grind, Study, Review, and Sport targets to the annual direction.
+   - Calculate simple pace: missing/none, behind, on, ahead, complete.
 
-Out of scope:
+3. Strategic Feedback Integration
+   - Use annual direction plus monthly targets in Weekly plan, Today, Sessions, Review, and Coach mock/rules-based feedback.
+   - Keep feedback simple, actionable, and optional.
 
-- Real AI Coach.
-- Billing.
-- Complete goals/sessions/reviews pages.
-- Advanced analytics.
+Out of scope for these slices:
 
-Next product slice after foundation:
-
-- Define `docs/features/planning-system.md`.
-- Use `docs/features/poker-session-flow.md` for the active poker-session direction.
-- Redesign dashboard and navigation around monthly targets, weekly plan, daily execution, poker sessions, study, reviews, and Coach AI.
+- Quarterly planning.
+- Heavy OKR/project management flows.
+- Dense analytics dashboards.
+- Financial tracking.
+- Coach auto-applying changes.

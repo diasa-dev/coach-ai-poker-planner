@@ -31,6 +31,7 @@ The MVP should help the player answer:
 - What patterns should Coach AI help me notice?
 - What should I improve before the next week?
 - Is this month still aligned with my annual direction?
+- Which annual decision rule should guide this choice?
 
 The app should optimize for execution, context capture, adjustment, and AI-assisted performance improvement, not passive tracking.
 
@@ -44,6 +45,7 @@ The app should optimize for execution, context capture, adjustment, and AI-assis
 - The Coach should challenge the plan when useful, but the player remains the author.
 - Session capture should be optional during play but valuable when used.
 - Coach AI should use data to improve performance and organization, not to give technical hand advice.
+- Annual direction should act as strategic operating context across the app, not as a static inspirational page.
 
 ## Primary Navigation
 
@@ -346,26 +348,38 @@ Avoid a full calendar layout on Today.
 
 ## Annual Direction
 
-Annual direction should be a lightweight primary surface in the MVP.
+Annual direction should be the strategic operating context of the MVP.
 
 Purpose:
 
-- Define the strategic direction for the year.
-- Help monthly targets answer "what should this month move forward?"
-- Give Coach AI context for plan and review feedback.
+- Define what kind of player/professional the user is trying to build this year.
+- Clarify decisions to repeat, patterns to stop, and trade-offs the player accepts or refuses.
+- Help monthly targets answer whether the month's pace serves the annual direction.
+- Give Weekly plan, Today, Sessions, Review, and Coach AI a practical strategic criterion for feedback.
 
 MVP fields:
 
-- Primary direction for the year.
-- 2 to 4 priorities.
-- Optional constraints or non-negotiables.
-- Optional note on what the player does not want to repeat this year.
+- `primaryDirection`
+- `priorities` with 2 to 4 items
+- `nonNegotiables` / `constraints`
+- `avoidRepeating`
+- `decisionRule`
+
+Operating use:
+
+- Monthly targets check whether the rhythm of the month serves the annual direction.
+- Weekly plan warns when the plan contradicts priorities, non-negotiables, or patterns to avoid.
+- Today can show a relevant decision rule when it helps the player execute better.
+- Sessions can suggest micro-intentions or limits based on non-negotiables.
+- Weekly review asks whether the week moved the player closer to the annual direction.
+- Coach AI uses annual direction to challenge plans, identify repeated patterns, and propose adjustments.
 
 Avoid:
 
 - Detailed annual forecasting.
 - Quarterly planning as a required setup step.
 - Heavy OKR/project management language.
+- Dense strategic analytics.
 - Financial target dashboards.
 
 ## Monthly Targets
@@ -374,7 +388,7 @@ Monthly targets should be a dedicated page in the primary navigation.
 
 Purpose:
 
-- Define monthly pacing under the annual direction
+- Define monthly strategic pace under the annual direction
 - Inform weekly planning
 - Inform Today context
 - Inform Coach plan review
@@ -387,7 +401,7 @@ Initial categories:
 - Review
 - Sport
 
-Today should show a compact monthly pace summary by category.
+Today should show a compact monthly pace summary by category. Monthly targets should use simple pace states: missing/none, behind, on, ahead, complete.
 
 Example:
 
@@ -559,6 +573,8 @@ The Coach should look for:
 - Missing study or review
 - Weak recovery, sport, or rest balance
 - Mismatch between monthly targets and weekly plan
+- Mismatch between annual direction, monthly targets, and weekly plan
+- Repeated decisions or patterns the annual direction says to stop
 - Repeated patterns from plans, sessions, study logs, check-ins, and reviews
 - Session patterns such as energy drops, tilt spikes, many marked hands, table creep, or early session endings
 
@@ -570,6 +586,7 @@ Suggestion behavior:
 - Copy should be direct and practical
 - Avoid theatrical AI personality in the MVP
 - Show simple context used, such as `weekly plan + last 3 sessions`
+- Use annual direction as a criterion, not as automatic authority over the player's plan
 - Do not provide technical poker hand analysis
 
 When the player accepts a Coach suggestion, create an editable proposal before applying the change. The Coach should not silently mutate the player's plan.
@@ -704,14 +721,23 @@ Avoid:
 
 This design updates the implementation order:
 
-1. Annual direction MVP
-2. Monthly targets MVP
-3. Weekly plan MVP
-4. Daily execution from weekly blocks
-5. Study session log MVP
-6. Poker session flow MVP
-7. Weekly and session review MVP
-8. Coach AI contextual chat and review mock
+1. Annual Direction as Operating Context
+   - Persist annual direction.
+   - Add `decisionRule` and stronger `nonNegotiables` / `avoidRepeating`.
+   - Keep Coach real integration and advanced analytics out of scope.
+2. Monthly Targets as Strategic Pace
+   - Persist monthly targets.
+   - Link Grind, Study, Review, and Sport targets to annual direction.
+   - Calculate simple pace: missing/none, behind, on, ahead, complete.
+3. Strategic Feedback Integration
+   - Use annual direction plus monthly targets in Weekly plan, Today, Sessions, Review, and Coach mock/rules-based feedback.
+   - Keep feedback simple, actionable, and optional.
+4. Weekly plan MVP
+5. Daily execution from weekly blocks
+6. Study session log MVP
+7. Poker session flow MVP
+8. Weekly and session review MVP
+9. Coach AI contextual chat and review mock
 
 Before implementation, `DIA-15` should use this spec to redesign the active dashboard/navigation around the planning system.
 

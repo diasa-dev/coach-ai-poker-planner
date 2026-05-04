@@ -23,6 +23,7 @@ Planned next:
 - Create Clerk and Convex projects
 - Add local environment values
 - Define the Planning System MVP spec
+- Treat Annual Direction as Strategic Operating Context for monthly targets, weekly plans, Today, sessions, review, and Coach AI
 - Redesign dashboard/navigation around annual direction, monthly targets, weekly plans, and daily execution
 - Include poker sessions and Coach AI as active design-system surfaces
 - Persist weekly planning data before daily check-ins and commitments

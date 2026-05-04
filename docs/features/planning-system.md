@@ -6,6 +6,8 @@ Create the operational planning spine for Uplinea.
 
 The system should help a professional online poker player translate annual direction into monthly targets, a realistic weekly plan, daily execution, reviews, and a better next plan.
 
+Annual Direction = Strategic Operating Context. It is not only a light or inspirational page; it should become a persisted, operational source of context for the rest of the app.
+
 The MVP should be useful without becoming a heavy calendar, Notion workspace, or generic habit tracker.
 
 ## Product Direction
@@ -16,7 +18,7 @@ The planning loop is:
 
 `Annual direction -> Monthly targets -> Weekly plan -> Daily execution -> Sessions/Study -> Reviews -> Next weekly plan`
 
-Annual direction should exist in the MVP as a lightweight strategic layer. Quarterly planning can come later, and the MVP should avoid asking the player to forecast too much too early.
+Annual direction should exist in the MVP as the active strategic layer. Quarterly planning can come later, and the MVP should avoid asking the player to forecast too much too early.
 
 ## Evidence-Informed Principles
 
@@ -30,26 +32,39 @@ Annual direction should exist in the MVP as a lightweight strategic layer. Quart
 
 ### Annual Direction
 
-Annual direction provides the strategic context for monthly targets.
+Annual direction provides the strategic operating context for monthly targets, weekly plans, Today, poker sessions, weekly review, and Coach AI.
+
+It should answer:
+
+- What kind of player/professional am I trying to build this year?
+- Which decisions should I repeat?
+- Which patterns should I stop?
+- Which trade-offs do I accept or refuse?
 
 MVP fields:
 
-- Primary direction for the year.
-- 2 to 4 priorities.
-- Optional constraints or non-negotiables.
-- Optional note on what the player does not want to repeat this year.
+- `primaryDirection`
+- `priorities` with 2 to 4 items
+- `nonNegotiables` / `constraints`
+- `avoidRepeating`
+- `decisionRule`
 
 Rules:
 
-- Keep it lightweight.
+- Keep it lightweight but operational.
 - Do not require detailed annual forecasting.
 - Do not require quarterly planning before the player can use the app.
 - Monthly targets should show the annual direction as context.
-- Coach AI may use annual direction to flag mismatch between monthly targets, weekly plans, and the player's stated direction.
+- Monthly targets should check whether the month's pace serves the annual direction.
+- Weekly plans should warn when the plan contradicts priorities, non-negotiables, or patterns to avoid.
+- Today may show a relevant decision rule when it helps execution.
+- Sessions may suggest micro-intentions or limits based on non-negotiables.
+- Weekly review should ask whether the week moved the player closer to the annual direction.
+- Coach AI may use annual direction to challenge plans, identify repeated patterns, and propose adjustments.
 
 ### Monthly Targets
 
-Monthly targets provide pacing for the weekly plan and should connect back to the annual direction.
+Monthly targets provide strategic pace for the weekly plan and should connect back to the annual direction.
 
 Initial categories:
 
@@ -66,7 +81,7 @@ Target rules:
 - Review unit: hands or hours.
 - Sport unit: sessions/blocks or hours.
 
-The dashboard and weekly planner may show light pace feedback, such as "below monthly pace" or "on pace". Avoid complex analytics in the first version.
+The dashboard and weekly planner may show light pace feedback. Use simple pace states: missing/none, behind, on, ahead, complete. Avoid complex analytics in the first version.
 
 ### Weekly Plan
 
@@ -236,8 +251,9 @@ The dashboard should not become session-first, but it should include session sta
 - year
 - primaryDirection
 - priorities
-- constraints
+- nonNegotiables / constraints
 - avoidRepeating
+- decisionRule
 - createdAt
 - updatedAt
 
@@ -314,9 +330,11 @@ See `docs/features/poker-session-flow.md`.
 
 - No fixed-time calendar in the first MVP.
 - No drag-and-drop requirement in the first MVP.
-- No full annual planning flow in the first MVP.
+- No heavy annual planning flow in the first MVP.
 - No quarterly planning flow in the first MVP.
+- No heavy OKR system.
 - No automatic Coach-generated plan as the default.
+- No Coach auto-applying changes.
 - No heavy fitness tracking.
 - No poker financial tracker.
 - No technical poker hand analysis from Coach AI.
@@ -336,11 +354,20 @@ See `docs/features/poker-session-flow.md`.
 
 ## First Recommended Implementation Slices
 
-1. Annual direction MVP.
-2. Monthly targets MVP.
-3. Weekly plan MVP.
-4. Daily execution from weekly blocks.
-5. Study session log MVP.
-6. Poker session flow MVP.
-7. Weekly review MVP.
-8. Coach AI contextual chat and plan/session review mock.
+1. Annual Direction as Operating Context.
+   - Persist annual direction.
+   - Add `decisionRule` and stronger `nonNegotiables` / `avoidRepeating`.
+   - Keep Coach real integration and advanced analytics out of scope.
+2. Monthly Targets as Strategic Pace.
+   - Persist monthly targets.
+   - Link Grind, Study, Review, and Sport targets to annual direction.
+   - Calculate simple pace: missing/none, behind, on, ahead, complete.
+3. Strategic Feedback Integration.
+   - Use annual direction plus monthly targets in Weekly plan, Today, Sessions, Review, and Coach mock/rules-based feedback.
+   - Keep feedback simple, actionable, and optional.
+4. Weekly plan MVP.
+5. Daily execution from weekly blocks.
+6. Study session log MVP.
+7. Poker session flow MVP.
+8. Weekly review MVP.
+9. Coach AI contextual chat and plan/session review mock.
