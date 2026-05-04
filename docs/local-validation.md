@@ -133,6 +133,23 @@ This mode intentionally uses demo data and skips Clerk/Convex providers. Use it
 for UI and route smoke. Use the normal authenticated dev server separately when
 the slice specifically changes persistence or auth behavior.
 
+For authenticated Coach smoke, run a normal authenticated dev server on
+localhost, then store a Clerk session once in the persistent Playwright profile:
+
+```bash
+AUTH_SMOKE_HEADFUL=1 SMOKE_BASE_URL=http://localhost:3103 npm run smoke:coach:auth
+```
+
+After signing in and closing the browser, rerun headless:
+
+```bash
+SMOKE_BASE_URL=http://localhost:3103 npm run smoke:coach:auth
+```
+
+This smoke mutates local/dev data by applying the Coach proposal, verifies the
+Coach-origin badge in Weekly, checks that Today still loads, and uses undo before
+the countdown expires. Run it only against local or disposable dev data.
+
 When Clerk is enabled locally, use `http://localhost:<port>` in the browser and
 smoke scripts. Do not use `http://127.0.0.1:<port>` for authenticated smoke:
 Clerk development instances can treat that as a different origin and enter a

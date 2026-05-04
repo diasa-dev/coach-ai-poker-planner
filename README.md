@@ -107,6 +107,18 @@ SMOKE_BASE_URL=http://localhost:3103 npm run smoke:coach
 This disables Clerk/Convex providers for that server process only and runs the
 Coach proposal flow plus adjacent route checks against demo data.
 
+For authenticated Coach smoke against the real Clerk/Convex local session, use
+a normal authenticated dev server on localhost first. The first run can be
+headful so Clerk stores the session in `.coach-dev/auth-smoke-profile`:
+
+```bash
+AUTH_SMOKE_HEADFUL=1 SMOKE_BASE_URL=http://localhost:3103 npm run smoke:coach:auth
+SMOKE_BASE_URL=http://localhost:3103 npm run smoke:coach:auth
+```
+
+This applies the Coach proposal, verifies the Coach badge in Weekly, checks
+Today still loads, and then uses undo to clean up the applied proposal.
+
 When Clerk is enabled, open local dev through `http://localhost:<port>`, not
 `http://127.0.0.1:<port>`, to avoid Clerk development-session refresh loops.
 

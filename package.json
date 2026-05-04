@@ -17,7 +17,8 @@
     "start:coach": "next start -H 0.0.0.0 -p 3100",
     "start": "next start",
     "lint": "eslint",
-    "smoke:coach": "node scripts/smoke-coach-flow.mjs"
+    "smoke:coach": "node scripts/smoke-coach-flow.mjs",
+    "smoke:coach:auth": "node scripts/smoke-authenticated-coach-flow.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.2.9",
