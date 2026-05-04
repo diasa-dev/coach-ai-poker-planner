@@ -7110,6 +7110,97 @@ dd {
   font-size: 17px;
 }
 
+.today-print-match .today-monthly-pace-list {
+  display: grid;
+  gap: 9px;
+}
+
+.today-print-match .today-monthly-pace-row {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #dce4ee;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px 11px;
+}
+
+.today-print-match .today-monthly-pace-row span {
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.today-print-match .today-monthly-pace-row strong {
+  overflow: hidden;
+  color: #111827;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.today-print-match .today-monthly-pace-row small {
+  justify-self: end;
+  border-radius: 999px;
+  background: #edf1f6;
+  color: #4b5565;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.today-print-match .today-monthly-pace-row.none small,
+.today-print-match .today-monthly-pace-row.missing small {
+  background: #fff2d9;
+  color: #b76b08;
+}
+
+.today-print-match .today-monthly-pace-row.complete small,
+.today-print-match .today-monthly-pace-row.on small {
+  background: #d7f3e7;
+  color: #257a58;
+}
+
+.today-print-match .today-monthly-empty {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 10px 12px;
+  align-items: center;
+  border: 1px solid #dce4ee;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.today-print-match .today-monthly-empty svg {
+  color: #b76b08;
+}
+
+.today-print-match .today-monthly-empty strong {
+  display: block;
+  color: #111827;
+  font-size: 14px;
+}
+
+.today-print-match .today-monthly-empty p {
+  margin: 3px 0 0;
+  color: #4b5565;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.today-print-match .today-monthly-empty .ep-button {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
 .today-print-match .today-progress-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

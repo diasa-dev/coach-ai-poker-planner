@@ -22,12 +22,12 @@ Implemented:
 - Persisted Annual Operating Targets with `effectiveFrom` versioning
 - Persisted Monthly Targets for Grind, Study, Review, and Sport
 - Weekly Plan consumes Monthly Targets as compact strategic pace context
+- Today consumes Monthly Targets as compact read-only pace context
 - Functional slices for Weekly Plan, Today, Sessions, Review, and Coach proposal application
 - Demo UI slices for Study and Settings
 
 Planned next:
 
-- Bring Monthly Targets context into Today as a compact non-editing summary
 - Continue Strategic Feedback Integration across Today, Sessions, Review, and Coach mock/rules-based feedback
 - Connect Review context into Coach suggestions
 - Replace mocked Study and Settings data with persistence when their specs are approved

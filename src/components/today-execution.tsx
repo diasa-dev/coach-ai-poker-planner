@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Edit3, MoreHorizontal, Sparkles, X } from "lucide-react";
+import { Check, Edit3, Gauge, MoreHorizontal, Sparkles, Target, X } from "lucide-react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { type ReactNode, useMemo, useState } from "react";
@@ -21,6 +21,14 @@ import { hasPersistenceConfig } from "@/lib/runtime-config";
 type CommitmentStatus = "planned" | "done" | "adjusted" | "not-done";
 type CommitmentKind = PlanBlockType | "Foco" | "Revisão";
 type TodaySource = "demo" | "active" | "no-active-plan";
+type MonthlyTargetCategory = "grind" | "study" | "review" | "sport";
+type MonthlyTargetContext = {
+  category: MonthlyTargetCategory;
+  primaryUnit: string;
+  targetValue: number;
+  optionalSecondaryUnit?: string;
+  optionalSecondaryTargetValue?: number;
+};
 
 type Commitment = {
   id: string;
@@ -75,6 +83,10 @@ const reasonOptions = [
 ];
 const todayIsoDate = getTodayIsoDate();
 
+function getCurrentMonth() {
+  return new Date().toISOString().slice(0, 7);
+}
+
 function getDemoTodayBlocks() {
   return initialPlanDays.find((day) => day.isToday)?.blocks ?? [];
 }
@@ -119,6 +131,7 @@ export function TodayExecution() {
 
 function PersistedTodayExecution() {
   const { isAuthenticated, isLoading } = useConvexAuth();
+  const currentMonth = getCurrentMonth();
   const weeklyPlan = useQuery(
     api.weeklyPlan.getCurrent,
     isAuthenticated ? { today: todayIsoDate } : "skip",
@@ -127,13 +140,18 @@ function PersistedTodayExecution() {
     api.dailyPlan.getPreparedDay,
     isAuthenticated ? { date: todayIsoDate } : "skip",
   );
+  const monthlyTargets = useQuery(
+    api.monthlyTarget.listForMonth,
+    isAuthenticated ? { month: currentMonth } : "skip",
+  );
   const prepareDay = useMutation(api.dailyPlan.prepareDay);
   const updateDailyCommitment = useMutation(api.dailyPlan.updateDailyCommitment);
   const closePreparedDay = useMutation(api.dailyPlan.closePreparedDay);
 
   if (
     isLoading ||
-    (isAuthenticated && (weeklyPlan === undefined || preparedDay === undefined))
+    (isAuthenticated &&
+      (weeklyPlan === undefined || preparedDay === undefined || monthlyTargets === undefined))
   ) {
     return (
       <section className="ep-page today-page today-print-match">
@@ -177,12 +195,14 @@ function PersistedTodayExecution() {
     status: fromStoredCommitmentStatus(commitment.status),
     reason: commitment.reason,
   }));
+  const currentMonthlyTargets = monthlyTargets ?? [];
 
   return (
     <TodayWorkspace
-      key={`${weeklyPlan.weekStartDate}:${activePlan?._id ?? "no-active"}:${activePlan?.updatedAt ?? 0}:${todayBlocks.length}:${preparedDay.dailyPlan?._id ?? "unprepared"}:${preparedDay.dailyPlan?.updatedAt ?? 0}:${preparedCommitments.length}`}
+      key={`${weeklyPlan.weekStartDate}:${activePlan?._id ?? "no-active"}:${activePlan?.updatedAt ?? 0}:${todayBlocks.length}:${preparedDay.dailyPlan?._id ?? "unprepared"}:${preparedDay.dailyPlan?.updatedAt ?? 0}:${preparedCommitments.length}:${currentMonthlyTargets.map((target) => `${target.category}:${target.updatedAt}`).join("|")}`}
       dailyPlanStatus={preparedDay.dailyPlan?.status}
       initialCommitments={preparedCommitments}
+      monthlyTargets={currentMonthlyTargets}
       onCloseDay={
         preparedDay.dailyPlan
           ? async () => {
@@ -241,6 +261,7 @@ function PersistedTodayExecution() {
 function TodayWorkspace({
   dailyPlanStatus,
   initialCommitments,
+  monthlyTargets = [],
   onCloseDay,
   onPrepareDay,
   onUpdateCommitment,
@@ -252,6 +273,7 @@ function TodayWorkspace({
 }: {
   dailyPlanStatus?: "prepared" | "closed";
   initialCommitments?: Commitment[];
+  monthlyTargets?: MonthlyTargetContext[];
   onCloseDay?: () => Promise<void>;
   onPrepareDay?: (commitments: Commitment[]) => Promise<Commitment[]>;
   onUpdateCommitment?: (
@@ -398,7 +420,7 @@ function TodayWorkspace({
         </main>
 
         <aside className="today-side">
-          <WeeklyProgressCard />
+          <MonthlyPaceCard targets={monthlyTargets} />
           <CoachCard />
           <button className="today-close-button" type="button" onClick={() => setCloseOpen(true)}>
             <Check size={14} aria-hidden="true" />
@@ -663,7 +685,7 @@ function AttentionCard({ source }: { source: TodaySource }) {
       : [
           {
             title: "Atenção ligada a dados reais vem a seguir",
-            detail: "Nesta slice, Today já usa o plano ativo. Sessões, mãos pendentes e ritmo mensal ainda não estão persistidos.",
+            detail: "Nesta slice, Today já usa plano ativo e objetivos mensais. Sessões e mãos pendentes entram depois.",
             action: "Depois",
           },
         ];
@@ -690,49 +712,88 @@ function AttentionCard({ source }: { source: TodaySource }) {
   );
 }
 
-function WeeklyProgressCard() {
+function MonthlyPaceCard({ targets }: { targets: MonthlyTargetContext[] }) {
+  const rows = buildMonthlyPaceRows(targets);
+
   return (
     <article className="today-panel today-progress-card">
       <header className="today-card-head">
-        <h2>Progresso semanal</h2>
-        <small>semana 18</small>
-      </header>
-      <div className="today-progress-grid">
-        <ProgressMetric label="Grind" sub="64% · no ritmo" value="9h / 14h" />
-        <ProgressMetric label="Estudo" sub="-40m vs ritmo" value="3h 15m / 5h" warning />
-        <ProgressMetric label="Revisão" sub="-15m vs ritmo" value="1h 10m / 2h" />
-        <ProgressMetric label="Sport" sub="no ritmo" value="2h / 3h" />
-      </div>
-      <div className="today-month-progress">
-        <span>Mês · Maio</span>
         <div>
-          <strong>42h / 80h</strong>
-          <small>52% · projeção 78h</small>
+          <Gauge size={18} aria-hidden="true" />
+          <h2>Ritmo mensal</h2>
         </div>
-        <progress value={52} max={100} />
-      </div>
+        <small>{rows.length ? "mês atual" : "sem objetivos"}</small>
+      </header>
+
+      {rows.length ? (
+        <div className="today-monthly-pace-list">
+          {rows.map((row) => (
+            <div className={`today-monthly-pace-row ${row.status}`} key={row.category}>
+              <span>{row.label}</span>
+              <strong>{row.progressLabel}</strong>
+              <small>{row.statusLabel}</small>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="today-monthly-empty">
+          <Target size={17} aria-hidden="true" />
+          <div>
+            <strong>Sem objetivos mensais</strong>
+            <p>O Hoje funciona, mas tem menos contexto de ritmo.</p>
+          </div>
+          <Link className="ep-button secondary" href="/monthly">
+            Definir objetivos
+          </Link>
+        </div>
+      )}
     </article>
   );
 }
 
-function ProgressMetric({
-  label,
-  sub,
-  value,
-  warning,
-}: {
-  label: string;
-  sub: string;
-  value: string;
-  warning?: boolean;
-}) {
-  return (
-    <div className="today-progress-metric">
-      <span>{label}</span>
-      <strong className={warning ? "warning" : undefined}>{value}</strong>
-      <small>{sub}</small>
-    </div>
-  );
+function buildMonthlyPaceRows(targets: MonthlyTargetContext[]) {
+  const labels: Record<MonthlyTargetCategory, string> = {
+    grind: "Grind",
+    study: "Estudo",
+    review: "Review",
+    sport: "Sport",
+  };
+
+  return targets.map((target) => {
+    const currentValue = 0;
+    const status = getMonthlyPaceStatus(currentValue, target.targetValue);
+
+    return {
+      category: target.category,
+      label: labels[target.category],
+      progressLabel: `${formatMonthlyTargetValue(currentValue, target.primaryUnit)} / ${formatMonthlyTargetValue(target.targetValue, target.primaryUnit)}`,
+      status,
+      statusLabel: getMonthlyPaceLabel(status),
+    };
+  });
+}
+
+function getMonthlyPaceStatus(currentValue: number, targetValue: number) {
+  if (!targetValue) return "missing";
+  if (currentValue <= 0) return "none";
+  if (currentValue >= targetValue) return "complete";
+
+  return "on";
+}
+
+function getMonthlyPaceLabel(status: ReturnType<typeof getMonthlyPaceStatus>) {
+  return {
+    missing: "Sem objetivo definido",
+    none: "Sem progresso",
+    on: "No ritmo",
+    complete: "Completo",
+  }[status];
+}
+
+function formatMonthlyTargetValue(value: number, unit: string) {
+  if (unit === "horas") return `${value}h`;
+  if (unit === "minutos") return `${value}m`;
+  return `${value} ${unit}`;
 }
 
 function CoachCard() {
