@@ -7122,6 +7122,40 @@ dd {
   white-space: nowrap;
 }
 
+.today-print-match .today-annual-card {
+  padding-bottom: 14px;
+}
+
+.today-print-match .today-annual-context,
+.today-print-match .today-annual-empty {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #dce4ee;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.today-print-match .today-annual-context p,
+.today-print-match .today-annual-empty p {
+  margin: 0;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.today-print-match .today-annual-context small {
+  color: #4b5565;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.today-print-match .today-annual-empty .ep-button {
+  justify-self: start;
+}
+
 .today-print-match .today-progress-card {
   min-height: 307px;
 }

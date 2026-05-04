@@ -29,6 +29,10 @@ type MonthlyTargetContext = {
   optionalSecondaryUnit?: string;
   optionalSecondaryTargetValue?: number;
 };
+type AnnualPlanContext = {
+  primaryDirection: string;
+  decisionRule: string;
+};
 
 type Commitment = {
   id: string;
@@ -144,6 +148,10 @@ function PersistedTodayExecution() {
     api.monthlyTarget.listForMonth,
     isAuthenticated ? { month: currentMonth } : "skip",
   );
+  const annualPlan = useQuery(
+    api.annualPlan.getCurrent,
+    isAuthenticated ? { year: new Date().getFullYear() } : "skip",
+  );
   const prepareDay = useMutation(api.dailyPlan.prepareDay);
   const updateDailyCommitment = useMutation(api.dailyPlan.updateDailyCommitment);
   const closePreparedDay = useMutation(api.dailyPlan.closePreparedDay);
@@ -151,7 +159,10 @@ function PersistedTodayExecution() {
   if (
     isLoading ||
     (isAuthenticated &&
-      (weeklyPlan === undefined || preparedDay === undefined || monthlyTargets === undefined))
+      (weeklyPlan === undefined ||
+        preparedDay === undefined ||
+        monthlyTargets === undefined ||
+        annualPlan === undefined))
   ) {
     return (
       <section className="ep-page today-page today-print-match">
@@ -199,7 +210,8 @@ function PersistedTodayExecution() {
 
   return (
     <TodayWorkspace
-      key={`${weeklyPlan.weekStartDate}:${activePlan?._id ?? "no-active"}:${activePlan?.updatedAt ?? 0}:${todayBlocks.length}:${preparedDay.dailyPlan?._id ?? "unprepared"}:${preparedDay.dailyPlan?.updatedAt ?? 0}:${preparedCommitments.length}:${currentMonthlyTargets.map((target) => `${target.category}:${target.updatedAt}`).join("|")}`}
+      key={`${weeklyPlan.weekStartDate}:${activePlan?._id ?? "no-active"}:${activePlan?.updatedAt ?? 0}:${todayBlocks.length}:${preparedDay.dailyPlan?._id ?? "unprepared"}:${preparedDay.dailyPlan?.updatedAt ?? 0}:${preparedCommitments.length}:${currentMonthlyTargets.map((target) => `${target.category}:${target.updatedAt}`).join("|")}:${annualPlan?._id ?? "no-annual-plan"}:${annualPlan?.updatedAt ?? 0}`}
+      annualPlan={annualPlan ?? null}
       dailyPlanStatus={preparedDay.dailyPlan?.status}
       initialCommitments={preparedCommitments}
       monthlyTargets={currentMonthlyTargets}
@@ -259,6 +271,7 @@ function PersistedTodayExecution() {
 }
 
 function TodayWorkspace({
+  annualPlan,
   dailyPlanStatus,
   initialCommitments,
   monthlyTargets = [],
@@ -271,6 +284,7 @@ function TodayWorkspace({
   weeklyFocus,
   weekLabel,
 }: {
+  annualPlan?: AnnualPlanContext | null;
   dailyPlanStatus?: "prepared" | "closed";
   initialCommitments?: Commitment[];
   monthlyTargets?: MonthlyTargetContext[];
@@ -420,6 +434,7 @@ function TodayWorkspace({
         </main>
 
         <aside className="today-side">
+          <AnnualContextCard annualPlan={annualPlan ?? null} />
           <MonthlyPaceCard targets={monthlyTargets} />
           <CoachCard />
           <button className="today-close-button" type="button" onClick={() => setCloseOpen(true)}>
@@ -708,6 +723,30 @@ function AttentionCard({ source }: { source: TodaySource }) {
           </div>
         ))}
       </div>
+    </article>
+  );
+}
+
+function AnnualContextCard({ annualPlan }: { annualPlan: AnnualPlanContext | null }) {
+  return (
+    <article className="today-panel today-annual-card">
+      <header className="today-card-head">
+        <h2>Direção anual</h2>
+        <small>{annualPlan ? "critério" : "em falta"}</small>
+      </header>
+      {annualPlan ? (
+        <div className="today-annual-context">
+          <p>{annualPlan.primaryDirection}</p>
+          {annualPlan.decisionRule ? <small>Regra: {annualPlan.decisionRule}</small> : null}
+        </div>
+      ) : (
+        <div className="today-annual-empty">
+          <p>Sem direção anual, o Hoje tem menos critério estratégico.</p>
+          <Link className="ep-button secondary" href="/annual">
+            Definir direção
+          </Link>
+        </div>
+      )}
     </article>
   );
 }
