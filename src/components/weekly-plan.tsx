@@ -4,10 +4,12 @@ import {
   Check,
   ChevronDown,
   Copy,
+  Gauge,
   MoreHorizontal,
   Plus,
   Save,
   Sparkles,
+  Target,
   X,
 } from "lucide-react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
@@ -43,12 +45,21 @@ const todayIsoDate = getTodayIsoDate();
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 type PlanStatus = "draft" | "active" | "reviewed" | "archived";
+type MonthlyTargetCategory = "grind" | "study" | "review" | "sport";
+type MonthlyTargetContext = {
+  category: MonthlyTargetCategory;
+  primaryUnit: string;
+  targetValue: number;
+  optionalSecondaryUnit?: string;
+  optionalSecondaryTargetValue?: number;
+};
 type WeeklyPlanWorkspaceProps = {
   demoReason?: string;
   hasPersistence: boolean;
   hasPreviousPlan?: boolean;
   initialDays?: PlanDay[];
   initialFocus?: string;
+  monthlyTargets?: MonthlyTargetContext[];
   initialPlanStatus?: PlanStatus;
   onCopyPreviousWeek?: () => Promise<void>;
   onSavePlan?: (payload: {
@@ -91,6 +102,10 @@ function getDistributionSegments(blocks: PlanBlock[]) {
   }));
 }
 
+function getCurrentMonth() {
+  return new Date().toISOString().slice(0, 7);
+}
+
 export function WeeklyPlan() {
   if (!hasPersistenceConfig) {
     return (
@@ -110,16 +125,21 @@ export function WeeklyPlan() {
 
 function PersistedWeeklyPlan() {
   const { isAuthenticated, isLoading } = useConvexAuth();
+  const currentMonth = getCurrentMonth();
   const weeklyPlan = useQuery(
     api.weeklyPlan.getCurrent,
     isAuthenticated ? { today: todayIsoDate } : "skip",
+  );
+  const monthlyTargets = useQuery(
+    api.monthlyTarget.listForMonth,
+    isAuthenticated ? { month: currentMonth } : "skip",
   );
   const saveWeeklyPlan = useMutation(api.weeklyPlan.save);
   const copyPreviousWeek = useMutation(api.weeklyPlan.copyPreviousWeek);
   const setWeekStartDay = useMutation(api.weeklyPlan.setWeekStartDay);
   const [saveState, setSaveState] = useState<SaveState>("idle");
 
-  if (isLoading || (isAuthenticated && weeklyPlan === undefined)) {
+  if (isLoading || (isAuthenticated && (weeklyPlan === undefined || monthlyTargets === undefined))) {
     return (
       <section className="ep-page ep-weekly-page wp-page">
         <div className="wp-demo-banner">A carregar plano semanal...</div>
@@ -153,6 +173,7 @@ function PersistedWeeklyPlan() {
     weeklyPlan.currentPlan?._id ?? "empty",
     weeklyPlan.currentPlan?.updatedAt ?? 0,
     weeklyPlan.currentBlocks.length,
+    monthlyTargets?.map((target) => `${target.category}:${target.updatedAt}`).join("|") ?? "no-monthly-targets",
   ].join(":");
 
   return (
@@ -163,6 +184,7 @@ function PersistedWeeklyPlan() {
       initialDays={initialDays}
       initialFocus={weeklyPlan.currentPlan?.focus ?? initialWeeklyFocus}
       initialPlanStatus={weeklyPlan.currentPlan?.status ?? "draft"}
+      monthlyTargets={monthlyTargets ?? []}
       onCopyPreviousWeek={async () => {
         setSaveState("saving");
         try {
@@ -211,6 +233,7 @@ function WeeklyPlanWorkspace({
   hasPreviousPlan,
   initialDays = initialPlanDays,
   initialFocus = initialWeeklyFocus,
+  monthlyTargets = [],
   initialPlanStatus = "draft",
   onCopyPreviousWeek,
   onSavePlan,
@@ -236,6 +259,10 @@ function WeeklyPlanWorkspace({
   }, [days, view]);
   const totals = useMemo(() => getWeeklyTimeTotals(days), [days]);
   const summary = useMemo(() => getWeeklySummary(days), [days]);
+  const monthlyPlanContext = useMemo(
+    () => buildMonthlyPlanContext(monthlyTargets, summary),
+    [monthlyTargets, summary],
+  );
 
   function updateDay(dayDate: string, getNextDay: (day: PlanDay) => PlanDay) {
     setDays((currentDays) =>
@@ -441,6 +468,8 @@ function WeeklyPlanWorkspace({
           />
         </div>
 
+        <MonthlyPlanContext context={monthlyPlanContext} />
+
         <div className="wpp-presets" aria-label="Pontos de partida">
           <span>Começar de</span>
           <div className="wpp-preset-chips">
@@ -558,6 +587,8 @@ function WeeklyPlanWorkspace({
         </div>
       </div>
 
+      <MonthlyPlanContext context={monthlyPlanContext} />
+
       <div className="wp-totals">
         <div className="wp-total"><span>Grind</span><strong>{formatPlanMinutes(totals.Grind)}</strong><small>/ 14h</small></div>
         <div className="wp-total"><span>Estudo</span><strong>{formatPlanMinutes(totals.Estudo)}</strong><small>/ 5h</small></div>
@@ -642,6 +673,53 @@ function PlanModeBanner({
         <small>{getSaveStateLabel(saveState)}</small>
       </div>
     </div>
+  );
+}
+
+function MonthlyPlanContext({
+  context,
+}: {
+  context: ReturnType<typeof buildMonthlyPlanContext>;
+}) {
+  if (!context.rows.length) {
+    return (
+      <section className="wp-monthly-context is-empty" aria-label="Contexto dos objetivos mensais">
+        <div>
+          <Target size={16} aria-hidden="true" />
+          <div>
+            <strong>Sem objetivos mensais</strong>
+            <span>O plano semanal tem menos contexto de ritmo.</span>
+          </div>
+        </div>
+        <a className="ep-button secondary" href="/monthly">
+          Definir objetivos mensais
+        </a>
+      </section>
+    );
+  }
+
+  return (
+    <section className="wp-monthly-context" aria-label="Contexto dos objetivos mensais">
+      <div>
+        <Gauge size={16} aria-hidden="true" />
+        <div>
+          <strong>Ritmo mensal</strong>
+          <span>Comparação leve entre esta semana e os objetivos do mês.</span>
+        </div>
+      </div>
+      <div className="wp-monthly-context-list">
+        {context.rows.map((row) => (
+          <div className={`wp-monthly-context-row ${row.kind}`} key={row.category}>
+            <span>{row.label}</span>
+            <strong>{row.plannedLabel}</strong>
+            <small>{row.targetLabel}</small>
+          </div>
+        ))}
+      </div>
+      <a className="ep-button secondary" href="/monthly">
+        Ver objetivos
+      </a>
+    </section>
   );
 }
 
@@ -899,6 +977,7 @@ function WeeklySummary({
   summary,
 }: {
   summary: {
+    grindBlocks: number;
     grindDays: number;
     studyDays: number;
     reviewBlocks: number;
@@ -983,6 +1062,7 @@ function getWeeklySummary(days: PlanDay[]) {
       if (typesInDay.has("Grind")) acc.grindDays += 1;
       if (typesInDay.has("Estudo")) acc.studyDays += 1;
       if (day.isOff) acc.offDays += 1;
+      acc.grindBlocks += day.blocks.filter((block) => block.type === "Grind").length;
       acc.reviewBlocks += day.blocks.filter((block) => block.type === "Review").length;
       acc.sportBlocks += day.blocks.filter((block) => block.type === "Desporto").length;
 
@@ -994,10 +1074,94 @@ function getWeeklySummary(days: PlanDay[]) {
 
       return acc;
     },
-    { grindDays: 0, studyDays: 0, reviewBlocks: 0, sportBlocks: 0, offDays: 0 },
+    { grindBlocks: 0, grindDays: 0, studyDays: 0, reviewBlocks: 0, sportBlocks: 0, offDays: 0 },
   );
 
   return { ...summary, totalMinutes, categoryMinutes };
+}
+
+function formatTargetValue(value: number, unit: string) {
+  if (unit === "horas") return `${value}h`;
+  if (unit === "minutos") return `${value}m`;
+  return `${value} ${unit}`;
+}
+
+function minutesToUnit(minutes: number, unit: string) {
+  if (unit === "horas") return Math.round((minutes / 60) * 10) / 10;
+  if (unit === "minutos") return minutes;
+  return null;
+}
+
+function getWeeklyPlannedValue(
+  target: MonthlyTargetContext,
+  summary: ReturnType<typeof getWeeklySummary>,
+) {
+  if (target.category === "grind") {
+    if (target.primaryUnit === "sessões") return summary.grindBlocks;
+    return null;
+  }
+
+  if (target.category === "study") {
+    return minutesToUnit(summary.categoryMinutes.Estudo, target.primaryUnit);
+  }
+
+  if (target.category === "review") {
+    if (target.primaryUnit === "horas" || target.primaryUnit === "minutos") {
+      return minutesToUnit(summary.categoryMinutes.Review, target.primaryUnit);
+    }
+
+    return null;
+  }
+
+  if (target.category === "sport") {
+    if (target.primaryUnit === "sessões" || target.primaryUnit === "blocos") {
+      return summary.sportBlocks;
+    }
+
+    return minutesToUnit(summary.categoryMinutes.Desporto, target.primaryUnit);
+  }
+
+  return null;
+}
+
+function buildMonthlyPlanContext(
+  targets: MonthlyTargetContext[],
+  summary: ReturnType<typeof getWeeklySummary>,
+) {
+  const labelByCategory: Record<MonthlyTargetCategory, string> = {
+    grind: "Grind",
+    study: "Estudo",
+    review: "Review",
+    sport: "Sport",
+  };
+  const rows = targets.map((target) => {
+    const plannedValue = getWeeklyPlannedValue(target, summary);
+    const targetLabel = `Meta mensal: ${formatTargetValue(target.targetValue, target.primaryUnit)}`;
+
+    if (plannedValue === null) {
+      return {
+        category: target.category,
+        kind: "neutral",
+        label: labelByCategory[target.category],
+        plannedLabel: "Sem comparação direta",
+        targetLabel,
+      };
+    }
+
+    const plannedLabel = `Semana: ${formatTargetValue(plannedValue, target.primaryUnit)}`;
+    const weeklyShare = target.targetValue > 0 ? plannedValue / target.targetValue : 0;
+    const kind = weeklyShare >= 0.2 ? "supporting" : "light";
+
+    return {
+      category: target.category,
+      kind,
+      label: labelByCategory[target.category],
+      plannedLabel,
+      targetLabel,
+    };
+  });
+
+  return { rows };
 }
 
 function getDefaultTitle(type: PlanBlockType) {

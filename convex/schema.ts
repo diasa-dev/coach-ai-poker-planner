@@ -44,6 +44,25 @@ export default defineSchema({
     .index("by_user_year", ["userId", "year"])
     .index("by_user_year_metric", ["userId", "year", "metricKey"]),
 
+  monthlyTargets: defineTable({
+    userId: v.string(),
+    month: v.string(),
+    category: v.union(
+      v.literal("grind"),
+      v.literal("study"),
+      v.literal("review"),
+      v.literal("sport"),
+    ),
+    primaryUnit: v.string(),
+    targetValue: v.number(),
+    optionalSecondaryUnit: v.optional(v.string()),
+    optionalSecondaryTargetValue: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_month", ["userId", "month"])
+    .index("by_user_month_category", ["userId", "month", "category"]),
+
   weeklyPlans: defineTable({
     userId: v.string(),
     weekStartDate: v.string(),

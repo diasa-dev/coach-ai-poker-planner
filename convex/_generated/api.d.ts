@@ -12,6 +12,7 @@ import type * as annualOperatingTarget from "../annualOperatingTarget.js";
 import type * as annualPlan from "../annualPlan.js";
 import type * as coachProposal from "../coachProposal.js";
 import type * as dailyPlan from "../dailyPlan.js";
+import type * as monthlyTarget from "../monthlyTarget.js";
 import type * as pokerSession from "../pokerSession.js";
 import type * as weeklyPlan from "../weeklyPlan.js";
 import type * as weeklyReview from "../weeklyReview.js";
@@ -27,6 +28,7 @@ declare const fullApi: ApiFromModules<{
   annualPlan: typeof annualPlan;
   coachProposal: typeof coachProposal;
   dailyPlan: typeof dailyPlan;
+  monthlyTarget: typeof monthlyTarget;
   pokerSession: typeof pokerSession;
   weeklyPlan: typeof weeklyPlan;
   weeklyReview: typeof weeklyReview;

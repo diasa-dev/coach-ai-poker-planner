@@ -4,7 +4,7 @@ Dashboard-first productivity and accountability app for professional online poke
 
 ## Current Slice
 
-This repository is in Slice 1: technical foundation.
+This repository is in the Planning System MVP implementation phase.
 
 Implemented:
 
@@ -18,14 +18,17 @@ Implemented:
 - Poker session flow spec in `docs/features/poker-session-flow.md`
 - Static prototype preserved in `docs/prototype-static/`
 - Clerk/Convex local integration with signed-out login gate
+- Persisted Annual Direction as strategic operating context
+- Persisted Annual Operating Targets with `effectiveFrom` versioning
+- Persisted Monthly Targets for Grind, Study, Review, and Sport
+- Weekly Plan consumes Monthly Targets as compact strategic pace context
 - Functional slices for Weekly Plan, Today, Sessions, Review, and Coach proposal application
 - Demo UI slices for Study and Settings
 
 Planned next:
 
-- Define the Planning System MVP spec
-- Treat Annual Direction as Strategic Operating Context for monthly targets, weekly plans, Today, sessions, review, and Coach AI
-- Redesign dashboard/navigation around annual direction, monthly targets, weekly plans, and daily execution
+- Bring Monthly Targets context into Today as a compact non-editing summary
+- Continue Strategic Feedback Integration across Today, Sessions, Review, and Coach mock/rules-based feedback
 - Connect Review context into Coach suggestions
 - Replace mocked Study and Settings data with persistence when their specs are approved
 - Keep AI generation mocked until real app data flow is stable

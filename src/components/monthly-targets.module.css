@@ -1,14 +1,26 @@
 .annualStrip,
 .annualStripMissing,
+.demoBanner,
 .emptyState,
 .targetTable,
 .editorPanel,
+.operatingPanel,
 .summaryPanel,
 .contextGrid article {
   border: 1px solid var(--ep-border-1);
   border-radius: var(--ep-radius-md);
   background: var(--ep-bg-surface);
   box-shadow: var(--ep-shadow-sm);
+}
+
+.loadingState,
+.demoBanner {
+  border-radius: var(--ep-radius-md);
+  background: var(--ep-bg-surface-2);
+  color: var(--ep-fg-2);
+  padding: 14px 16px;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .annualStrip,
@@ -204,7 +216,8 @@
 }
 
 .categoryCell small,
-.progressCell small {
+.progressCell small,
+.valueCell small {
   display: block;
   overflow: hidden;
   margin-top: 2px;
@@ -287,6 +300,7 @@
 }
 
 .editorPanel,
+.operatingPanel,
 .summaryPanel {
   display: grid;
   gap: 14px;
@@ -305,6 +319,27 @@
 .editorForm {
   display: grid;
   gap: 10px;
+}
+
+.referenceBox {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(6, 182, 196, 0.24);
+  border-radius: var(--ep-radius-sm);
+  background: rgba(6, 182, 196, 0.08);
+  padding: 10px;
+}
+
+.referenceBox strong {
+  color: var(--ep-fg-1);
+  font-size: 12px;
+}
+
+.referenceBox p {
+  margin: 0;
+  color: var(--ep-fg-2);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .editorForm label {
@@ -400,6 +435,36 @@
   grid-column: 2;
   color: var(--ep-fg-3);
   font-size: 12px;
+}
+
+.operatingPanel ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.operatingPanel li {
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface-2);
+  padding: 9px;
+}
+
+.operatingPanel li strong {
+  color: var(--ep-fg-1);
+  font-size: 12px;
+}
+
+.operatingPanel li small,
+.operatingPanel p {
+  margin: 0;
+  color: var(--ep-fg-3);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .summaryPanel svg {
