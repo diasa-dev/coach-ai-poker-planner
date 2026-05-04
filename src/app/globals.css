@@ -2893,6 +2893,139 @@ dd {
   color: var(--fg-1);
 }
 
+.ep-topbar-actions .ep-auth-button {
+  width: auto;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  background: var(--bg-surface);
+  color: var(--fg-1);
+  font: var(--t-small-strong);
+}
+
+.ep-account-menu {
+  display: grid;
+  grid-template-columns: auto 32px;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg-surface);
+}
+
+.ep-account-menu span,
+.ep-account-menu strong {
+  display: block;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ep-account-menu span {
+  color: var(--fg-muted);
+  font: var(--t-kicker);
+  line-height: 1.1;
+}
+
+.ep-account-menu strong {
+  color: var(--fg-1);
+  font: var(--t-small-strong);
+  line-height: 1.1;
+}
+
+.ep-auth-screen {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(320px, 520px) minmax(260px, 360px);
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  background:
+    linear-gradient(135deg, rgba(17, 34, 64, 0.94), rgba(9, 20, 38, 0.98)),
+    var(--bg-app);
+  padding: 32px;
+}
+
+.ep-auth-loading {
+  color: var(--fg-inverse);
+  font: var(--t-body-strong);
+}
+
+.ep-auth-panel,
+.ep-auth-context {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
+}
+
+.ep-auth-panel {
+  display: grid;
+  gap: 28px;
+  padding: 36px;
+}
+
+.ep-auth-panel img {
+  width: 172px;
+  height: auto;
+}
+
+.ep-auth-eyebrow {
+  display: block;
+  color: var(--fg-muted);
+  font: var(--t-kicker);
+  margin-bottom: 8px;
+}
+
+.ep-auth-panel h1 {
+  color: var(--fg-1);
+  font: var(--t-h1);
+  letter-spacing: 0;
+  margin-bottom: 12px;
+}
+
+.ep-auth-panel p,
+.ep-auth-context p {
+  color: var(--fg-2);
+  font: var(--t-body);
+}
+
+.ep-auth-primary {
+  width: fit-content;
+  min-height: 44px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--fg-inverse);
+  cursor: pointer;
+  font: var(--t-body-strong);
+  padding: 0 18px;
+}
+
+.ep-auth-primary:hover {
+  background: var(--accent-strong);
+}
+
+.ep-auth-context {
+  align-self: stretch;
+  display: grid;
+  align-content: end;
+  gap: 8px;
+  padding: 28px;
+}
+
+.ep-auth-context span {
+  color: var(--fg-muted);
+  font: var(--t-kicker);
+}
+
+.ep-auth-context strong {
+  color: var(--fg-1);
+  font: var(--t-h4);
+}
+
 .ep-main {
   min-width: 0;
   min-height: 0;

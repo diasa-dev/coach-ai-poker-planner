@@ -1,5 +1,6 @@
 "use client";
 
+import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
 import {
   Bell,
   BookOpen,
@@ -21,7 +22,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
 import { api } from "../../convex/_generated/api";
-import { hasPersistenceConfig } from "@/lib/runtime-config";
+import { hasClerkConfig, hasPersistenceConfig } from "@/lib/runtime-config";
 
 const navItems = [
   { href: "/", label: "Hoje", icon: Sun },
@@ -34,12 +35,38 @@ const navItems = [
   { href: "/coach", label: "Coach AI", icon: Sparkles },
 ];
 
+function AuthenticatedUplineaShell({ children }: { children: ReactNode }) {
+  const { isLoaded, isSignedIn } = useUser();
+
+  if (!isLoaded) {
+    return (
+      <div className="ep-auth-screen">
+        <span className="ep-auth-loading">A preparar entrada...</span>
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return <LoginScreen />;
+  }
+
+  return <UplineaShellFrame>{children}</UplineaShellFrame>;
+}
+
 function isActivePath(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export function UplineaShell({ children }: { children: ReactNode }) {
+  if (hasClerkConfig) {
+    return <AuthenticatedUplineaShell>{children}</AuthenticatedUplineaShell>;
+  }
+
+  return <UplineaShellFrame>{children}</UplineaShellFrame>;
+}
+
+function UplineaShellFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const currentItem =
     navItems.find((item) => isActivePath(pathname, item.href)) ??
@@ -110,6 +137,7 @@ export function UplineaShell({ children }: { children: ReactNode }) {
             {pathname === "/" ? (
               <strong className="ep-screen-label">02 — HOJE (DEPOIS DE PREPARAR)</strong>
             ) : null}
+            <AuthControls />
             <button type="button" aria-label="Procurar">
               <Search size={18} aria-hidden="true" />
             </button>
@@ -125,6 +153,69 @@ export function UplineaShell({ children }: { children: ReactNode }) {
         <main className="ep-main">{children}</main>
       </div>
     </div>
+  );
+}
+
+function LoginScreen() {
+  return (
+    <main className="ep-auth-screen">
+      <section className="ep-auth-panel" aria-labelledby="auth-title">
+        <Image
+          src="/uplinea/logo-horizontal.svg"
+          width={172}
+          height={56}
+          alt="Uplinea"
+          priority
+        />
+        <div>
+          <span className="ep-auth-eyebrow">Uplinea</span>
+          <h1 id="auth-title">Entra para preparar a tua semana</h1>
+          <p>
+            Plano semanal, execução diária, sessões, reviews e Coach ficam ligados à tua conta.
+          </p>
+        </div>
+        <SignInButton mode="modal">
+          <button className="ep-auth-primary" type="button">
+            Entrar
+          </button>
+        </SignInButton>
+      </section>
+      <aside className="ep-auth-context" aria-label="Contexto da app">
+        <span>Contexto usado pelo Coach</span>
+        <strong>Plano semanal + sessões + reviews</strong>
+        <p>Nada é aplicado sem confirmação. Tu manténs controlo sobre o plano.</p>
+      </aside>
+    </main>
+  );
+}
+
+function AuthControls() {
+  if (!hasClerkConfig) return null;
+
+  return <ClerkAuthControls />;
+}
+
+function ClerkAuthControls() {
+  const { isLoaded, isSignedIn, user } = useUser();
+
+  if (isLoaded && isSignedIn) {
+    const accountLabel = user.firstName ?? user.primaryEmailAddress?.emailAddress ?? "Conta";
+
+    return (
+      <div className="ep-account-menu" aria-label="Conta">
+        <span>Sessão ativa</span>
+        <strong>{accountLabel}</strong>
+        <UserButton />
+      </div>
+    );
+  }
+
+  return (
+    <SignInButton mode="modal">
+      <button className="ep-auth-button" type="button">
+        Entrar
+      </button>
+    </SignInButton>
   );
 }
 

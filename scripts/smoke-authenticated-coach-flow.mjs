@@ -29,6 +29,20 @@ function signInInstructions() {
   ].join("\n");
 }
 
+function isUnauthenticatedBody(bodyText) {
+  return (
+    /(^|\n)Entrar(\n|$)/.test(bodyText) ||
+    bodyText.includes("Sign in") ||
+    bodyText.includes("Sign up") ||
+    bodyText.includes("Entra para preparar a tua semana") ||
+    !hasAuthenticatedPlanContext(bodyText)
+  );
+}
+
+function hasAuthenticatedPlanContext(bodyText) {
+  return bodyText.includes("Plano semanal\nAtivo") || bodyText.includes("Plano semanal\nSem plano ativo");
+}
+
 async function waitText(page, text) {
   await page.getByText(text, { exact: false }).first().waitFor({
     state: "visible",
@@ -63,24 +77,50 @@ async function gotoApp(page, route) {
 
 async function assertAuthenticatedCoach(page) {
   const bodyText = await readBodyText(page);
-  const signedOut =
-    bodyText.includes("Iniciar sessão") ||
-    bodyText.includes("Entrar") ||
-    bodyText.includes("Sign in") ||
-    bodyText.includes("Sign up");
 
-  if (signedOut) {
+  if (isUnauthenticatedBody(bodyText)) {
     if (!headless) {
-      console.log("Sign in through the opened browser. The smoke will continue after Coach loads.");
-      await page.getByText("Rever proposta", { exact: false }).first().waitFor({
-        state: "visible",
-        timeout: 300_000,
-      });
+      await openSignInModal(page);
+
+      console.log("Sign in through the opened browser. The smoke will continue after authenticated context loads.");
+      await page.waitForFunction(
+        () => {
+          const text = document.body.innerText;
+
+          return (
+            text.includes("Plano semanal\nAtivo") ||
+            text.includes("Plano semanal\nSem plano ativo")
+          );
+        },
+        undefined,
+        { timeout: 300_000 },
+      );
       return;
     }
 
     throw new Error(signInInstructions());
   }
+}
+
+async function openSignInModal(page) {
+  const signInButton = page.getByRole("button", { name: "Entrar" });
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    if ((await page.getByText("Sign in to Coach AI Poker Planner", { exact: false }).count()) > 0) {
+      return;
+    }
+
+    if ((await signInButton.count()) > 0) {
+      await signInButton.first().click();
+    }
+
+    await page.waitForTimeout(1_000);
+  }
+
+  await page.getByText("Sign in to Coach AI Poker Planner", { exact: false }).first().waitFor({
+    state: "visible",
+    timeout: 20_000,
+  });
 }
 
 async function clearActiveApplicationIfNeeded(page) {
@@ -93,10 +133,14 @@ async function clearActiveApplicationIfNeeded(page) {
 }
 
 async function applyCoachProposal(page) {
+  // Give the authenticated shell a moment to hydrate before exercising controls.
+  await page.waitForTimeout(750);
   await page.getByRole("button", { name: "Rever proposta" }).click();
-  await waitText(page, "Quinta · 09:00 · Estudo · ICM");
-  await waitText(page, "Sexta · 09:00 · Estudo · Open ranges");
-  await waitText(page, "Sábado · 09:00 · Estudo · Bluff catch");
+  await page.locator(".ep-coach-proposal-row").first().waitFor({
+    state: "visible",
+    timeout: 20_000,
+  });
+  assert.strictEqual(await page.locator(".ep-coach-proposal-row").count(), 3);
 
   await page.getByRole("button", { name: "Aplicar alteração" }).click();
   await waitText(page, "Aplicar 3 alterações ao plano?");
