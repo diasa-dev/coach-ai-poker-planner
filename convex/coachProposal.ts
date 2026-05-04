@@ -26,6 +26,7 @@ const planBlock = v.object({
   type: blockType,
   title: v.string(),
   targetLabel: v.optional(v.string()),
+  source: v.optional(v.literal("coachProposal")),
   status: blockStatus,
   order: v.number(),
 });
@@ -35,6 +36,7 @@ type StoredPlanBlock = {
   type: "grind" | "study" | "review" | "sport" | "rest" | "admin";
   title: string;
   targetLabel?: string;
+  source?: "coachProposal";
   status: "planned" | "done" | "adjusted" | "notDone";
   order: number;
 };
@@ -87,6 +89,7 @@ async function getPlanBlocks(
       type: block.type,
       title: block.title,
       targetLabel: block.targetLabel,
+      source: block.source,
       status: block.status,
       order: block.order,
     }));
@@ -113,7 +116,7 @@ function applyChanges(currentBlocks: StoredPlanBlock[], changes: CoachChange[]) 
 
     const order = (nextOrderByDay.get(block.dayIndex) ?? -1) + 1;
     nextOrderByDay.set(block.dayIndex, order);
-    nextBlocks.push({ ...block, order });
+    nextBlocks.push({ ...block, source: change.source, order });
   }
 
   return nextBlocks;
@@ -135,6 +138,7 @@ function normalizeBlock(block: StoredPlanBlock): StoredPlanBlock {
     type: block.type,
     title,
     targetLabel: block.targetLabel?.trim() || undefined,
+    source: block.source,
     status: block.status,
     order: block.order,
   };
@@ -166,6 +170,7 @@ async function replacePlanBlocks(
       type: block.type,
       title: block.title,
       targetLabel: block.targetLabel,
+      source: block.source,
       status: block.status,
       order: block.order,
       createdAt: args.now,

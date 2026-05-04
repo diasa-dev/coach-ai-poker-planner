@@ -682,7 +682,10 @@ function DayRow({
           {day.blocks.map((block) => (
             <div className={`${getBlockClassName(block.type)} wp-row-like st-${statusClass(block.status)}`} key={block.id}>
               <div>
-                <span>{block.type}</span>
+                <span>
+                  {block.type}
+                  {block.source === "coachProposal" ? <em className="ep-origin-badge">Coach</em> : null}
+                </span>
                 <strong>{block.title}</strong>
                 <small>{block.target ?? "—"}</small>
               </div>
@@ -770,7 +773,10 @@ function DayColumn({
               onClick={() => setEditing({ dayDate: day.date, block: { ...block } })}
             >
               <div>
-                <span>{block.type}</span>
+                <span>
+                  {block.type}
+                  {block.source === "coachProposal" ? <em className="ep-origin-badge">Coach</em> : null}
+                </span>
                 <strong>{block.title}</strong>
               </div>
               <small>{block.target ?? "—"}</small>

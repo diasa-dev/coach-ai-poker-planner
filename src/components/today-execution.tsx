@@ -628,7 +628,10 @@ function PlannedBlocksCard({
         {blocks.length ? (
           blocks.map((block) => (
             <div className={`today-block-row ${kindClass(block.type)} st-${statusClass(block.status)}`} key={block.id}>
-              <span>{blockLabel(block.type)}</span>
+              <span>
+                {blockLabel(block.type)}
+                {block.source === "coachProposal" ? <em className="ep-origin-badge">Coach</em> : null}
+              </span>
               <strong>{block.title}</strong>
               <small>{block.target ?? "—"}</small>
               <i>{block.status}</i>

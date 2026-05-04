@@ -66,6 +66,7 @@ type CoachPlanBlock = {
   type: StoredBlockType;
   title: string;
   targetLabel?: string;
+  source?: "coachProposal";
   status: "planned";
   order: number;
 };
@@ -658,6 +659,7 @@ function buildApplyPayload(proposal: CoachProposal): CoachPlanApplyPayload {
         type: item.type,
         title: `${item.time.trim()} · ${item.topic.trim()}`,
         targetLabel: item.targetLabel,
+        source: "coachProposal",
         status: "planned",
         order: 0,
       },

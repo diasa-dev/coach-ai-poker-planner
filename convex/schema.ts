@@ -40,6 +40,7 @@ export default defineSchema({
     targetUnit: v.optional(v.string()),
     targetValue: v.optional(v.number()),
     studyType: v.optional(v.string()),
+    source: v.optional(v.literal("coachProposal")),
     status: v.union(
       v.literal("planned"),
       v.literal("done"),
@@ -100,6 +101,7 @@ export default defineSchema({
         ),
         title: v.string(),
         targetLabel: v.optional(v.string()),
+        source: v.optional(v.literal("coachProposal")),
         status: v.union(
           v.literal("planned"),
           v.literal("done"),
@@ -122,6 +124,7 @@ export default defineSchema({
         ),
         title: v.string(),
         targetLabel: v.optional(v.string()),
+        source: v.optional(v.literal("coachProposal")),
         status: v.union(
           v.literal("planned"),
           v.literal("done"),
