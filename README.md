@@ -17,17 +17,18 @@ Implemented:
 - Planning system text wireframes in `docs/design/planning-system-wireframes.md`
 - Poker session flow spec in `docs/features/poker-session-flow.md`
 - Static prototype preserved in `docs/prototype-static/`
+- Clerk/Convex local integration with signed-out login gate
+- Functional slices for Weekly Plan, Today, Sessions, Review, and Coach proposal application
+- Demo UI slices for Study and Settings
 
 Planned next:
 
-- Create Clerk and Convex projects
-- Add local environment values
 - Define the Planning System MVP spec
 - Treat Annual Direction as Strategic Operating Context for monthly targets, weekly plans, Today, sessions, review, and Coach AI
 - Redesign dashboard/navigation around annual direction, monthly targets, weekly plans, and daily execution
-- Include poker sessions and Coach AI as active design-system surfaces
-- Persist weekly planning data before daily check-ins and commitments
-- Keep AI Coach mocked until real data flow is stable
+- Connect Review context into Coach suggestions
+- Replace mocked Study and Settings data with persistence when their specs are approved
+- Keep AI generation mocked until real app data flow is stable
 
 ## Product Design Source Of Truth
 
@@ -94,9 +95,9 @@ npm run lint
 
 ## Environment
 
-Copy `.env.example` to `.env.local` and fill in the Clerk and Convex values when
-those projects exist. Without those values, the dashboard remains available in
-mock mode.
+Copy `.env.example` to `.env.local` and fill in the Clerk and Convex values for
+authenticated local development. Without those values, the dashboard remains
+available in mock mode.
 
 For local UI smoke that should not depend on Clerk sessions, use:
 
