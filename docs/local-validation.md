@@ -149,6 +149,11 @@ SMOKE_BASE_URL=http://localhost:3103 npm run smoke:coach:auth
 This smoke mutates local/dev data by applying the Coach proposal, verifies the
 Coach-origin badge in Weekly, checks that Today still loads, and uses undo before
 the countdown expires. Run it only against local or disposable dev data.
+Google OAuth can reject Playwright's testing browser as insecure. Treat that as
+an auth-provider limitation, not a product failure. Use email/password in the
+Clerk modal for the persistent smoke profile, or validate login manually in a
+normal/private browser and reserve this script for the app flow after a Clerk
+session exists in the profile.
 
 When Clerk is enabled locally, use `http://localhost:<port>` in the browser and
 smoke scripts. Do not use `http://127.0.0.1:<port>` for authenticated smoke:

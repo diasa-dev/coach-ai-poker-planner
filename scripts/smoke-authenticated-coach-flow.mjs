@@ -83,18 +83,7 @@ async function assertAuthenticatedCoach(page) {
       await openSignInModal(page);
 
       console.log("Sign in through the opened browser. The smoke will continue after authenticated context loads.");
-      await page.waitForFunction(
-        () => {
-          const text = document.body.innerText;
-
-          return (
-            text.includes("Plano semanal\nAtivo") ||
-            text.includes("Plano semanal\nSem plano ativo")
-          );
-        },
-        undefined,
-        { timeout: 300_000 },
-      );
+      await waitForAuthenticatedContext(page);
       return;
     }
 
@@ -121,6 +110,35 @@ async function openSignInModal(page) {
     state: "visible",
     timeout: 20_000,
   });
+}
+
+async function waitForAuthenticatedContext(page) {
+  const deadline = Date.now() + 300_000;
+
+  while (Date.now() < deadline) {
+    const bodyText = await page.locator("body").innerText().catch(() => "");
+    const pageUrl = page.url();
+
+    if (hasAuthenticatedPlanContext(bodyText)) return;
+
+    if (
+      pageUrl.includes("accounts.google.com") &&
+      bodyText.includes("Couldn't sign you in") &&
+      bodyText.includes("This browser or app may not be secure")
+    ) {
+      throw new Error(
+        [
+          "Google sign-in rejected the Playwright browser.",
+          "This is an OAuth/provider limitation, not an app bug.",
+          "Use email/password in the Clerk modal for this smoke profile, or validate sign-in manually in a normal/private browser.",
+        ].join("\n"),
+      );
+    }
+
+    await page.waitForTimeout(1_000);
+  }
+
+  throw new Error("Timed out waiting for authenticated Clerk context.");
 }
 
 async function clearActiveApplicationIfNeeded(page) {
