@@ -62,6 +62,10 @@ async function smoke() {
   await page.getByRole("button", { name: "Sim, aplicar" }).click();
   await waitText(page, "Alteração aplicada ao plano");
   await waitText(page, "Plano da semana 18 (2 alterações)");
+  await page.getByRole("button", { name: /Anular \(\d+s\)/ }).waitFor({
+    state: "visible",
+    timeout: 20_000,
+  });
   await page.getByRole("button", { name: /Anular/ }).click();
   await waitText(page, "2 blocos selecionados");
 

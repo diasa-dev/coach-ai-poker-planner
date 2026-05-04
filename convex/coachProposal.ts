@@ -283,7 +283,7 @@ export const undo = mutation({
         status: "expired",
         updatedAt: now,
       });
-      throw new Error("Undo window expired");
+      throw new Error("Já passaram os 30 segundos para anular esta alteração.");
     }
 
     await getOwnedPlan(ctx, application.weeklyPlanId, userId);

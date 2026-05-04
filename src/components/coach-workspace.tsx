@@ -14,7 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -86,11 +86,13 @@ type CoachApplyResult = {
   applied: boolean;
   applicationId?: Id<"coachProposalApplications">;
   message?: string;
+  undoExpiresAt?: number;
 };
 
 type CoachShellProps = {
   context: CoachContext;
   hasActiveApplication?: boolean;
+  activeUndoExpiresAt?: number;
   onApplyProposal?: (payload: CoachPlanApplyPayload) => Promise<CoachApplyResult>;
   onUndoProposal?: () => Promise<CoachApplyResult>;
 };
@@ -118,6 +120,7 @@ const fallbackApplyResult: CoachApplyResult = {
   applied: true,
   message: "Alteração aplicada ao plano",
 };
+const fallbackUndoWindowMs = 30_000;
 
 type ProposalStage = "summary" | "review" | "edit" | "confirm" | "applied";
 
@@ -222,6 +225,7 @@ function PersistedCoachWorkspace() {
     <CoachShell
       context={context}
       hasActiveApplication={Boolean(activeApplication)}
+      activeUndoExpiresAt={activeApplication?.undoExpiresAt}
       onApplyProposal={
         isAuthenticated && weeklyPlan && !currentPlan
           ? async () => ({
@@ -240,6 +244,7 @@ function PersistedCoachWorkspace() {
               return {
                 applied: true,
                 applicationId: result.applicationId,
+                undoExpiresAt: result.undoExpiresAt,
               };
             }
           : undefined
@@ -261,12 +266,24 @@ function PersistedCoachWorkspace() {
   );
 }
 
-function CoachShell({ context, hasActiveApplication = false, onApplyProposal, onUndoProposal }: CoachShellProps) {
+function CoachShell({
+  context,
+  hasActiveApplication = false,
+  activeUndoExpiresAt,
+  onApplyProposal,
+  onUndoProposal,
+}: CoachShellProps) {
   const [proposal, setProposal] = useState(() => buildEditableProposal(context));
   const [proposalStage, setProposalStage] = useState<ProposalStage>("summary");
   const [actionError, setActionError] = useState("");
   const [isApplying, setIsApplying] = useState(false);
+  const [localUndoExpiresAt, setLocalUndoExpiresAt] = useState<number | undefined>();
+  const [now, setNow] = useState(() => Date.now());
   const currentProposalStage: ProposalStage = hasActiveApplication ? "applied" : proposalStage;
+  const undoExpiresAt = activeUndoExpiresAt ?? localUndoExpiresAt;
+  const undoRemainingMs = undoExpiresAt ? Math.max(0, undoExpiresAt - now) : fallbackUndoWindowMs;
+  const undoRemainingSeconds = Math.ceil(undoRemainingMs / 1000);
+  const undoExpired = Boolean(undoExpiresAt && undoRemainingMs <= 0);
   const contextSources = [
     { label: "Plano semanal", state: context.weeklyPlanState },
     { label: "Objetivos mensais", state: context.monthlyGoalsState },
@@ -293,6 +310,7 @@ function CoachShell({ context, hasActiveApplication = false, onApplyProposal, on
   function resetProposal() {
     setProposal(buildEditableProposal(context));
     setProposalStage("summary");
+    setLocalUndoExpiresAt(undefined);
     setActionError("");
   }
 
@@ -314,6 +332,8 @@ function CoachShell({ context, hasActiveApplication = false, onApplyProposal, on
         return;
       }
 
+      setNow(Date.now());
+      setLocalUndoExpiresAt(result.undoExpiresAt ?? Date.now() + fallbackUndoWindowMs);
       setProposalStage("applied");
     } catch (error) {
       setActionError(getActionErrorMessage(error));
@@ -334,6 +354,7 @@ function CoachShell({ context, hasActiveApplication = false, onApplyProposal, on
         return;
       }
 
+      setLocalUndoExpiresAt(undefined);
       setProposalStage("review");
     } catch (error) {
       setActionError(getActionErrorMessage(error));
@@ -341,6 +362,16 @@ function CoachShell({ context, hasActiveApplication = false, onApplyProposal, on
       setIsApplying(false);
     }
   }
+
+  useEffect(() => {
+    if (currentProposalStage !== "applied" || !undoExpiresAt || undoExpired) return;
+
+    const interval = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [currentProposalStage, undoExpired, undoExpiresAt]);
 
   return (
     <section className="ep-coach-page" aria-labelledby="coach-title">
@@ -384,10 +415,14 @@ function CoachShell({ context, hasActiveApplication = false, onApplyProposal, on
               </span>
               <div>
                 <strong>Alteração aplicada ao plano</strong>
-                <small>{getProposalScope(proposal)}</small>
+                <small>
+                  {undoExpired
+                    ? `${getProposalScope(proposal)} · Undo expirado`
+                    : `${getProposalScope(proposal)} · podes anular durante ${undoRemainingSeconds}s`}
+                </small>
               </div>
-              <button type="button" disabled={isApplying} onClick={() => void undoProposal()}>
-                {isApplying ? "A anular..." : "Anular (30s)"}
+              <button type="button" disabled={isApplying || undoExpired} onClick={() => void undoProposal()}>
+                {isApplying ? "A anular..." : undoExpired ? "Undo expirado" : `Anular (${undoRemainingSeconds}s)`}
               </button>
             </article>
           ) : (
