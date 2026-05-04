@@ -8,6 +8,18 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
+  annualPlans: defineTable({
+    userId: v.string(),
+    year: v.number(),
+    primaryDirection: v.string(),
+    priorities: v.array(v.string()),
+    nonNegotiables: v.array(v.string()),
+    avoidRepeating: v.string(),
+    decisionRule: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user_year", ["userId", "year"]),
+
   weeklyPlans: defineTable({
     userId: v.string(),
     weekStartDate: v.string(),

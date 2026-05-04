@@ -11,6 +11,17 @@
   gap: 16px;
 }
 
+.demoBanner,
+.loadingState {
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface-2);
+  color: var(--ep-fg-2);
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .emptyState,
 .directionPanel,
 .panel,
@@ -33,6 +44,27 @@
     linear-gradient(135deg, rgba(208, 140, 42, 0.11), transparent 44%),
     var(--ep-bg-surface);
   padding: 16px;
+}
+
+.emptyState > div {
+  display: grid;
+  gap: 10px;
+}
+
+.emptyChecklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.emptyChecklist span {
+  border: 1px solid rgba(208, 140, 42, 0.24);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface);
+  color: var(--ep-fg-2);
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 850;
 }
 
 .emptyState svg,

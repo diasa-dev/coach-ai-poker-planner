@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as annualPlan from "../annualPlan.js";
 import type * as coachProposal from "../coachProposal.js";
 import type * as dailyPlan from "../dailyPlan.js";
 import type * as pokerSession from "../pokerSession.js";
@@ -21,6 +22,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  annualPlan: typeof annualPlan;
   coachProposal: typeof coachProposal;
   dailyPlan: typeof dailyPlan;
   pokerSession: typeof pokerSession;
