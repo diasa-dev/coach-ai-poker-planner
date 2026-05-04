@@ -53,7 +53,13 @@ type MonthlyTargetContext = {
   optionalSecondaryUnit?: string;
   optionalSecondaryTargetValue?: number;
 };
+type AnnualPlanContext = {
+  primaryDirection: string;
+  priorities: string[];
+  nonNegotiables: string[];
+};
 type WeeklyPlanWorkspaceProps = {
+  annualPlan?: AnnualPlanContext | null;
   demoReason?: string;
   hasPersistence: boolean;
   hasPreviousPlan?: boolean;
@@ -134,12 +140,20 @@ function PersistedWeeklyPlan() {
     api.monthlyTarget.listForMonth,
     isAuthenticated ? { month: currentMonth } : "skip",
   );
+  const annualPlan = useQuery(
+    api.annualPlan.getCurrent,
+    isAuthenticated ? { year: new Date().getFullYear() } : "skip",
+  );
   const saveWeeklyPlan = useMutation(api.weeklyPlan.save);
   const copyPreviousWeek = useMutation(api.weeklyPlan.copyPreviousWeek);
   const setWeekStartDay = useMutation(api.weeklyPlan.setWeekStartDay);
   const [saveState, setSaveState] = useState<SaveState>("idle");
 
-  if (isLoading || (isAuthenticated && (weeklyPlan === undefined || monthlyTargets === undefined))) {
+  if (
+    isLoading ||
+    (isAuthenticated &&
+      (weeklyPlan === undefined || monthlyTargets === undefined || annualPlan === undefined))
+  ) {
     return (
       <section className="ep-page ep-weekly-page wp-page">
         <div className="wp-demo-banner">A carregar plano semanal...</div>
@@ -174,10 +188,13 @@ function PersistedWeeklyPlan() {
     weeklyPlan.currentPlan?.updatedAt ?? 0,
     weeklyPlan.currentBlocks.length,
     monthlyTargets?.map((target) => `${target.category}:${target.updatedAt}`).join("|") ?? "no-monthly-targets",
+    annualPlan?._id ?? "no-annual-plan",
+    annualPlan?.updatedAt ?? 0,
   ].join(":");
 
   return (
     <WeeklyPlanWorkspace
+      annualPlan={annualPlan ?? null}
       key={workspaceKey}
       hasPersistence
       hasPreviousPlan={weeklyPlan.hasPreviousPlan}
@@ -228,6 +245,7 @@ function PersistedWeeklyPlan() {
 }
 
 function WeeklyPlanWorkspace({
+  annualPlan,
   demoReason,
   hasPersistence,
   hasPreviousPlan,
@@ -260,8 +278,8 @@ function WeeklyPlanWorkspace({
   const totals = useMemo(() => getWeeklyTimeTotals(days), [days]);
   const summary = useMemo(() => getWeeklySummary(days), [days]);
   const monthlyPlanContext = useMemo(
-    () => buildMonthlyPlanContext(monthlyTargets, summary),
-    [monthlyTargets, summary],
+    () => buildMonthlyPlanContext(monthlyTargets, summary, annualPlan ?? null),
+    [annualPlan, monthlyTargets, summary],
   );
 
   function updateDay(dayDate: string, getNextDay: (day: PlanDay) => PlanDay) {
@@ -716,6 +734,13 @@ function MonthlyPlanContext({
           </div>
         ))}
       </div>
+      {context.feedback.length ? (
+        <div className="wp-strategic-feedback" aria-label="Feedback estratégico">
+          {context.feedback.map((item) => (
+            <p className={item.kind} key={item.message}>{item.message}</p>
+          ))}
+        </div>
+      ) : null}
       <a className="ep-button secondary" href="/monthly">
         Ver objetivos
       </a>
@@ -1127,6 +1152,7 @@ function getWeeklyPlannedValue(
 function buildMonthlyPlanContext(
   targets: MonthlyTargetContext[],
   summary: ReturnType<typeof getWeeklySummary>,
+  annualPlan: AnnualPlanContext | null,
 ) {
   const labelByCategory: Record<MonthlyTargetCategory, string> = {
     grind: "Grind",
@@ -1134,6 +1160,7 @@ function buildMonthlyPlanContext(
     review: "Review",
     sport: "Sport",
   };
+  const uncoveredCategories: string[] = [];
   const rows = targets.map((target) => {
     const plannedValue = getWeeklyPlannedValue(target, summary);
     const targetLabel = `Meta mensal: ${formatTargetValue(target.targetValue, target.primaryUnit)}`;
@@ -1152,6 +1179,10 @@ function buildMonthlyPlanContext(
     const weeklyShare = target.targetValue > 0 ? plannedValue / target.targetValue : 0;
     const kind = weeklyShare >= 0.2 ? "supporting" : "light";
 
+    if (plannedValue <= 0) {
+      uncoveredCategories.push(labelByCategory[target.category]);
+    }
+
     return {
       category: target.category,
       kind,
@@ -1160,8 +1191,28 @@ function buildMonthlyPlanContext(
       targetLabel,
     };
   });
+  const feedback: Array<{ kind: "info" | "warning"; message: string }> = [];
 
-  return { rows };
+  if (annualPlan?.primaryDirection) {
+    feedback.push({
+      kind: "info",
+      message: `Direção anual: ${annualPlan.primaryDirection}`,
+    });
+  } else {
+    feedback.push({
+      kind: "warning",
+      message: "Sem direção anual, este plano tem menos critério estratégico.",
+    });
+  }
+
+  if (uncoveredCategories.length) {
+    feedback.push({
+      kind: "warning",
+      message: `Sem cobertura planeada esta semana: ${uncoveredCategories.join(", ")}.`,
+    });
+  }
+
+  return { feedback, rows };
 }
 
 function getDefaultTitle(type: PlanBlockType) {
