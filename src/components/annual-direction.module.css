@@ -25,6 +25,7 @@
 .emptyState,
 .directionPanel,
 .panel,
+.operatingPanel,
 .nextPanel,
 .coachPanel,
 .statusPanel {
@@ -101,6 +102,7 @@
 }
 
 .panel,
+.operatingPanel,
 .nextPanel,
 .coachPanel,
 .statusPanel {
@@ -213,7 +215,8 @@
 }
 
 .row button,
-.addButton {
+.addButton,
+.textButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -229,15 +232,179 @@
 }
 
 .row button:hover,
-.addButton:hover {
+.addButton:hover,
+.textButton:hover {
   border-color: rgba(6, 182, 196, 0.54);
   color: var(--ep-navy-800);
 }
 
-.addButton {
+.addButton,
+.textButton {
   min-height: 34px;
   gap: 7px;
   padding: 0 10px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.operatingPanel {
+  background:
+    linear-gradient(135deg, rgba(47, 107, 91, 0.12), transparent 48%),
+    var(--ep-bg-surface);
+}
+
+.operatingList {
+  display: grid;
+  gap: 9px;
+}
+
+.operatingItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content max-content;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface-2);
+  padding: 9px;
+}
+
+.operatingMain {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.operatingIcon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface);
+  color: var(--ep-accent-primary-hover);
+}
+
+.operatingMain strong {
+  display: block;
+  color: var(--ep-fg-1);
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.operatingMain small,
+.historyDetails li {
+  color: var(--ep-fg-3);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.categoryTag {
+  border-radius: 999px;
+  background: var(--pill-active-bg);
+  color: var(--pill-active-fg);
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.historyDetails {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--ep-border-1);
+  padding-top: 8px;
+}
+
+.historyDetails summary {
+  width: max-content;
+  cursor: pointer;
+  color: var(--ep-fg-2);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.historyDetails ul {
+  display: grid;
+  gap: 4px;
+  margin: 7px 0 0;
+  padding-left: 16px;
+}
+
+.operatingEmpty {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px dashed var(--ep-border-2);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface-2);
+  padding: 12px;
+}
+
+.operatingEmpty svg {
+  color: var(--ep-fg-3);
+}
+
+.operatingEmpty p {
+  margin: 0;
+  color: var(--ep-fg-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.operatingForm {
+  display: grid;
+  gap: 11px;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface-2);
+  padding: 12px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.formGrid label,
+.dateField {
+  display: grid;
+  gap: 6px;
+  color: var(--ep-fg-3);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.formGrid input,
+.formGrid select,
+.dateField input {
+  min-height: 34px;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface);
+  color: var(--ep-fg-1);
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.operatingActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.errorText {
+  margin: 0;
+  border: 1px solid rgba(197, 72, 63, 0.24);
+  border-radius: var(--ep-radius-sm);
+  background: var(--pill-notdone-bg);
+  color: var(--pill-notdone-fg);
+  padding: 8px 9px;
   font-size: 12px;
   font-weight: 850;
 }
@@ -288,11 +455,17 @@
   .layout {
     grid-template-columns: 1fr;
   }
+
+  .formGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
   .emptyState,
-  .row {
+  .row,
+  .formGrid,
+  .operatingItem {
     grid-template-columns: 1fr;
   }
 
@@ -306,5 +479,14 @@
 
   .row button {
     width: 100%;
+  }
+
+  .operatingActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .operatingItem .textButton {
+    justify-self: stretch;
   }
 }

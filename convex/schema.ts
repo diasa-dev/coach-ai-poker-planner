@@ -20,6 +20,30 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_user_year", ["userId", "year"]),
 
+  annualOperatingTargets: defineTable({
+    userId: v.string(),
+    year: v.number(),
+    metricKey: v.string(),
+    label: v.string(),
+    category: v.union(
+      v.literal("grind"),
+      v.literal("study"),
+      v.literal("review"),
+      v.literal("sport"),
+      v.literal("recovery"),
+      v.literal("custom"),
+    ),
+    unit: v.string(),
+    cadence: v.union(v.literal("weekly"), v.literal("monthly")),
+    targetValue: v.number(),
+    effectiveFrom: v.string(),
+    active: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_year", ["userId", "year"])
+    .index("by_user_year_metric", ["userId", "year", "metricKey"]),
+
   weeklyPlans: defineTable({
     userId: v.string(),
     weekStartDate: v.string(),
