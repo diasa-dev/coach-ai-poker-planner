@@ -114,7 +114,7 @@ Coach proposal flow plus adjacent route checks against demo data. This server
 runs on `http://localhost:3103` by default and is only for demo smoke.
 
 For authenticated Coach smoke against the real Clerk/Convex local session, use
-a normal authenticated dev server on localhost first. The first run can be
+the normal authenticated dev server on `http://localhost:3100`. The first run is
 headful so Clerk stores the session in `.coach-dev/auth-smoke-profile`:
 
 ```bash
@@ -123,6 +123,12 @@ npm run dev:coach:status
 AUTH_SMOKE_HEADFUL=1 SMOKE_BASE_URL=http://localhost:3100 npm run smoke:coach:auth
 SMOKE_BASE_URL=http://localhost:3100 npm run smoke:coach:auth
 ```
+
+The headless command reuses the same persistent Playwright profile. Use
+`AUTH_SMOKE_PROFILE=/path/to/profile` only when intentionally testing with a
+different profile. If the smoke reports a missing, expired, or invalid Clerk
+session, rerun the headful login command. Delete `.coach-dev/auth-smoke-profile`
+only when intentionally resetting the stored local Clerk session.
 
 This applies the Coach proposal, verifies the Coach badge in Weekly, checks
 Today still loads, and then uses undo to clean up the applied proposal.

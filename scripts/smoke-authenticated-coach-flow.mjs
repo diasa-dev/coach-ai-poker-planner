@@ -1,14 +1,15 @@
 import assert from "node:assert";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
+import {
+  createAuthSmokeSessionConfig,
+  ensureAuthenticatedSmokeSession,
+  launchAuthenticatedSmokeContext,
+} from "./auth-smoke-session.mjs";
 
-const baseUrl = process.env.SMOKE_BASE_URL || "http://localhost:3100";
-const headless = process.env.AUTH_SMOKE_HEADFUL === "1" ? false : true;
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, "..");
-const userDataDir =
-  process.env.AUTH_SMOKE_PROFILE || path.join(repoRoot, ".coach-dev", "auth-smoke-profile");
+const authSmokeConfig = createAuthSmokeSessionConfig({
+  command: "npm run smoke:coach:auth",
+  name: "Authenticated Coach smoke",
+});
+const { baseUrl } = authSmokeConfig;
 
 const ignoredConsoleErrorFragments = [
   "Download the React DevTools",
@@ -16,56 +17,6 @@ const ignoredConsoleErrorFragments = [
   "The resource",
   "Failed to load resource: the server responded with a status of 404",
 ];
-
-function signInInstructions() {
-  return [
-    "Authenticated smoke requires a Clerk session.",
-    "",
-    "Run this once and sign in through the opened browser:",
-    `AUTH_SMOKE_HEADFUL=1 SMOKE_BASE_URL=${baseUrl} npm run smoke:coach:auth`,
-    "",
-    "Then close the browser and rerun:",
-    `SMOKE_BASE_URL=${baseUrl} npm run smoke:coach:auth`,
-  ].join("\n");
-}
-
-function assertAuthenticatedSmokeTarget() {
-  const parsedUrl = new URL(baseUrl);
-
-  if (parsedUrl.hostname !== "localhost") {
-    throw new Error(
-      [
-        "Authenticated smoke must run against localhost.",
-        `Current SMOKE_BASE_URL is ${baseUrl}.`,
-        "Use the normal authenticated dev server, for example: SMOKE_BASE_URL=http://localhost:3100 npm run smoke:coach:auth",
-      ].join("\n"),
-    );
-  }
-
-  if (parsedUrl.port === "3103") {
-    throw new Error(
-      [
-        "Authenticated smoke is pointing at port 3103, which is reserved for demo smoke with auth disabled.",
-        "Start the normal authenticated dev server with `npm run dev:coach:bg`, then run:",
-        "SMOKE_BASE_URL=http://localhost:3100 npm run smoke:coach:auth",
-      ].join("\n"),
-    );
-  }
-}
-
-function isUnauthenticatedBody(bodyText) {
-  return (
-    /(^|\n)Entrar(\n|$)/.test(bodyText) ||
-    bodyText.includes("Sign in") ||
-    bodyText.includes("Sign up") ||
-    bodyText.includes("Entra para preparar a tua semana") ||
-    !hasAuthenticatedPlanContext(bodyText)
-  );
-}
-
-function hasAuthenticatedPlanContext(bodyText) {
-  return bodyText.includes("Plano semanal\nAtivo") || bodyText.includes("Plano semanal\nSem plano ativo");
-}
 
 async function waitText(page, text) {
   await page.getByText(text, { exact: false }).first().waitFor({
@@ -107,69 +58,7 @@ async function gotoApp(page, route) {
 }
 
 async function assertAuthenticatedCoach(page) {
-  const bodyText = await readBodyText(page);
-
-  if (isUnauthenticatedBody(bodyText)) {
-    if (!headless) {
-      await openSignInModal(page);
-
-      console.log("Sign in through the opened browser. The smoke will continue after authenticated context loads.");
-      await waitForAuthenticatedContext(page);
-      return;
-    }
-
-    throw new Error(signInInstructions());
-  }
-}
-
-async function openSignInModal(page) {
-  const signInButton = page.getByRole("button", { name: "Entrar" });
-
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    if ((await page.getByText("Sign in to Coach AI Poker Planner", { exact: false }).count()) > 0) {
-      return;
-    }
-
-    if ((await signInButton.count()) > 0) {
-      await signInButton.first().click();
-    }
-
-    await page.waitForTimeout(1_000);
-  }
-
-  await page.getByText("Sign in to Coach AI Poker Planner", { exact: false }).first().waitFor({
-    state: "visible",
-    timeout: 20_000,
-  });
-}
-
-async function waitForAuthenticatedContext(page) {
-  const deadline = Date.now() + 300_000;
-
-  while (Date.now() < deadline) {
-    const bodyText = await page.locator("body").innerText().catch(() => "");
-    const pageUrl = page.url();
-
-    if (hasAuthenticatedPlanContext(bodyText)) return;
-
-    if (
-      pageUrl.includes("accounts.google.com") &&
-      bodyText.includes("Couldn't sign you in") &&
-      bodyText.includes("This browser or app may not be secure")
-    ) {
-      throw new Error(
-        [
-          "Google sign-in rejected the Playwright browser.",
-          "This is an OAuth/provider limitation, not an app bug.",
-          "Use email/password in the Clerk modal for this smoke profile, or validate sign-in manually in a normal/private browser.",
-        ].join("\n"),
-      );
-    }
-
-    await page.waitForTimeout(1_000);
-  }
-
-  throw new Error("Timed out waiting for authenticated Clerk context.");
+  await ensureAuthenticatedSmokeSession(page, authSmokeConfig, { readBodyText });
 }
 
 async function clearActiveApplicationIfNeeded(page) {
@@ -203,12 +92,7 @@ async function applyCoachProposal(page) {
 }
 
 async function smoke() {
-  assertAuthenticatedSmokeTarget();
-
-  const context = await chromium.launchPersistentContext(userDataDir, {
-    headless,
-    viewport: { width: 1440, height: 1000 },
-  });
+  const context = await launchAuthenticatedSmokeContext(authSmokeConfig);
   const page = context.pages()[0] ?? (await context.newPage());
   const consoleErrors = [];
 

@@ -141,21 +141,28 @@ npm run dev:coach:bg
 npm run dev:coach:status
 ```
 
-The expected authenticated smoke target is `http://localhost:3100`, unless
-`COACH_DEV_PORT` was set when starting the server.
+The expected authenticated smoke target is always `http://localhost:3100`.
+Do not run authenticated smoke against the demo smoke server on port `3103`.
 
-For authenticated Coach smoke, run a normal authenticated dev server on
-localhost, then store a Clerk session once in the persistent Playwright profile:
+For authenticated Coach smoke, run the normal authenticated dev server on
+localhost, then store a Clerk session once in the persistent Playwright profile
+at `.coach-dev/auth-smoke-profile`:
 
 ```bash
 AUTH_SMOKE_HEADFUL=1 SMOKE_BASE_URL=http://localhost:3100 npm run smoke:coach:auth
 ```
 
-After signing in and closing the browser, rerun headless:
+After signing in and closing the browser, rerun headless with the same profile:
 
 ```bash
 SMOKE_BASE_URL=http://localhost:3100 npm run smoke:coach:auth
 ```
+
+Use `AUTH_SMOKE_PROFILE=/path/to/profile` only when intentionally testing with a
+different persistent Playwright profile. If the smoke reports a missing, expired,
+or invalid Clerk session, rerun the headful command above. Delete
+`.coach-dev/auth-smoke-profile` only when intentionally resetting the stored
+local Clerk session.
 
 This smoke mutates local/dev data by applying the Coach proposal, verifies the
 Coach-origin badge in Weekly, checks that Today still loads, and uses undo before
