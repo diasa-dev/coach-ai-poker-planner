@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Check,
   ChevronDown,
+  Compass,
   Clock3,
   FileText,
   MessageSquareText,
@@ -75,6 +76,27 @@ type SessionReviewContext = {
   nextActions: string[];
 };
 
+type AnnualDirectionContext = {
+  primaryDirection: string;
+  priorities: string[];
+  nonNegotiables: string[];
+};
+
+type MonthlyTargetCategory = CategoryId;
+
+type MonthlyTargetContext = {
+  category: MonthlyTargetCategory;
+  primaryUnit: string;
+  targetValue: number;
+  optionalSecondaryUnit?: string;
+  optionalSecondaryTargetValue?: number;
+};
+
+type StrategicReviewContext = {
+  annualDirection: AnnualDirectionContext | null;
+  monthlyTargets: MonthlyTargetContext[];
+};
+
 type WeeklyReviewForm = {
   status: ReviewStatus;
   ratings: {
@@ -92,6 +114,7 @@ type WeeklyReviewForm = {
 };
 
 const todayIsoDate = getTodayIsoDate();
+const currentMonth = getCurrentMonth();
 
 const reasonOptions = [
   "Pouca energia",
@@ -131,6 +154,20 @@ const demoSessionReviewContext: SessionReviewContext = {
   nextActions: ["Fazer review antes da sessão de domingo.", "Reduzir mesas se energia ficar em 2/5."],
 };
 
+const demoStrategicReviewContext: StrategicReviewContext = {
+  annualDirection: {
+    primaryDirection: "Construir um ano mais consistente: menos volume automático, mais decisões boas e estudo com intenção.",
+    priorities: ["Qualidade antes de volume", "Review semanal sem falhar"],
+    nonNegotiables: ["Proteger sono antes de sessões longas"],
+  },
+  monthlyTargets: [
+    { category: "grind", primaryUnit: "sessões", targetValue: 18, optionalSecondaryUnit: "torneios", optionalSecondaryTargetValue: 120 },
+    { category: "study", primaryUnit: "horas", targetValue: 10 },
+    { category: "review", primaryUnit: "mãos", targetValue: 40 },
+    { category: "sport", primaryUnit: "sessões", targetValue: 8 },
+  ],
+};
+
 const demoWeeklyReviewForm: WeeklyReviewForm = {
   status: "available",
   ratings: {
@@ -163,6 +200,7 @@ export function ReviewSection() {
       initialReview={demoWeeklyReviewForm}
       planSummary={demoCategorySummary}
       sessionReviewContext={demoSessionReviewContext}
+      strategicContext={demoStrategicReviewContext}
     />
     );
   }
@@ -177,6 +215,14 @@ function PersistedReviewSection() {
   const weeklyReview = useQuery(
     api.weeklyReview.getByWeek,
     isAuthenticated && weeklyPlan ? { weekStartDate: weeklyPlan.weekStartDate } : "skip",
+  );
+  const annualDirection = useQuery(
+    api.annualPlan.getCurrent,
+    isAuthenticated ? { year: new Date().getFullYear() } : "skip",
+  );
+  const monthlyTargets = useQuery(
+    api.monthlyTarget.listForMonth,
+    isAuthenticated ? { month: currentMonth } : "skip",
   );
   const saveWeeklyReview = useMutation(api.weeklyReview.save);
   const planSummary = useMemo(() => {
@@ -220,7 +266,12 @@ function PersistedReviewSection() {
 
   if (
     isLoading ||
-    (isAuthenticated && (weeklyPlan === undefined || sessions === undefined || weeklyReview === undefined))
+    (isAuthenticated &&
+      (weeklyPlan === undefined ||
+        sessions === undefined ||
+        weeklyReview === undefined ||
+        annualDirection === undefined ||
+        monthlyTargets === undefined))
   ) {
     return (
       <section className="ep-page">
@@ -281,6 +332,10 @@ function PersistedReviewSection() {
       }
       planSummary={planSummary}
       sessionReviewContext={sessionReviewContext}
+      strategicContext={{
+        annualDirection: annualDirection ?? null,
+        monthlyTargets: monthlyTargets ?? [],
+      }}
     />
   );
 }
@@ -290,11 +345,13 @@ function ReviewWorkspace({
   onSaveReview,
   planSummary,
   sessionReviewContext,
+  strategicContext,
 }: {
   initialReview: WeeklyReviewForm;
   onSaveReview?: (review: WeeklyReviewForm) => Promise<void>;
   planSummary: CategorySummary[];
   sessionReviewContext: SessionReviewContext;
+  strategicContext: StrategicReviewContext;
 }) {
   const [status, setStatus] = useState<ReviewStatus>(initialReview.status);
   const [expanded, setExpanded] = useState<CategoryId | null>("study");
@@ -306,6 +363,7 @@ function ReviewWorkspace({
 
   const adjustedCount = planSummary.reduce((total, item) => total + item.adjusted, 0);
   const missedCount = planSummary.reduce((total, item) => total + item.missed, 0);
+  const strategicReflection = buildStrategicReflection(strategicContext, planSummary);
   const availableReasonOptions = mergeUnique([
     ...reasonOptions,
     ...getPlanReasonList(planSummary),
@@ -407,6 +465,57 @@ function ReviewWorkspace({
 
           <section className={styles.panel}>
             <PanelHead
+              eyebrow="Contexto estratégico"
+              icon={<Compass size={17} aria-hidden="true" />}
+              title="Direção anual e objetivos mensais"
+            />
+
+            <div className={styles.strategicContextGrid}>
+              <article className={strategicContext.annualDirection ? styles.annualContext : styles.missingContext}>
+                <span>{strategicContext.annualDirection ? "Direção anual" : "Sem direção anual"}</span>
+                <strong>
+                  {strategicContext.annualDirection?.primaryDirection ??
+                    "A revisão continua disponível, mas com menos critério estratégico."}
+                </strong>
+                {strategicContext.annualDirection?.priorities.length ? (
+                  <ul>
+                    {strategicContext.annualDirection.priorities.slice(0, 2).map((priority) => (
+                      <li key={priority}>{priority}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </article>
+
+              <article className={strategicContext.monthlyTargets.length ? styles.monthlyContext : styles.missingContext}>
+                <span>{strategicContext.monthlyTargets.length ? "Objetivos deste mês" : "Sem objetivos mensais"}</span>
+                {strategicContext.monthlyTargets.length ? (
+                  <div className={styles.monthlyTargetList}>
+                    {strategicContext.monthlyTargets.map((target) => (
+                      <div key={target.category}>
+                        <strong>{getCategoryLabel(target.category)}</strong>
+                        <small>{formatMonthlyTarget(target)}</small>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <strong>A semana pode ser revista, mas sem comparar contra o ritmo do mês.</strong>
+                )}
+              </article>
+            </div>
+
+            <article className={styles.strategicReflectionCard}>
+              <strong>{strategicReflection.title}</strong>
+              <p>{strategicReflection.body}</p>
+              <ul>
+                {strategicReflection.prompts.map((prompt) => (
+                  <li key={prompt}>{prompt}</li>
+                ))}
+              </ul>
+            </article>
+          </section>
+
+          <section className={styles.panel}>
+            <PanelHead
               eyebrow="Sessões revistas"
               icon={<Spade size={17} aria-hidden="true" />}
               title="Sinais das sessões"
@@ -494,6 +603,7 @@ function ReviewWorkspace({
             <div className={styles.formGrid}>
               <label>
                 Principais wins
+                <span>O que nesta semana aproximou a tua direção anual ou os objetivos do mês?</span>
                 <textarea
                   value={reflection.wins}
                   onChange={(event) => updateReflection("wins", event.target.value)}
@@ -501,6 +611,7 @@ function ReviewWorkspace({
               </label>
               <label>
                 Principais leaks/problemas
+                <span>O que ficou desalinhado com o mês ou com a direção que queres construir?</span>
                 <textarea
                   value={reflection.leaks}
                   onChange={(event) => updateReflection("leaks", event.target.value)}
@@ -527,6 +638,7 @@ function ReviewWorkspace({
 
             <label className={styles.fullField}>
               Ajuste para a próxima semana
+              <span>Escolhe um ajuste que proteja a direção anual e recupere o objetivo mensal mais frágil.</span>
               <textarea value={reflection.next} onChange={(event) => updateReflection("next", event.target.value)} />
             </label>
 
@@ -543,16 +655,20 @@ function ReviewWorkspace({
 
           <section className={coachUnlocked ? styles.coachPanel : styles.coachPanelLocked}>
             <PanelHead
-              eyebrow={coachUnlocked ? "Contexto usado · plano semanal + execução + sessões" : "Aparece depois da tua reflexão"}
+              eyebrow={
+                coachUnlocked
+                  ? "Contexto usado · plano semanal + execução + sessões + direção anual + objetivos mensais"
+                  : "Aparece depois da tua reflexão"
+              }
               icon={<Sparkles size={17} aria-hidden="true" />}
               title="Sugestão do Coach"
             />
             {coachUnlocked ? (
               <>
                 <p>
-                  O padrão principal não é falta de vontade: é estudo e review a ficarem depois da sessão. Para a
-                  próxima semana, coloca o bloco de estudo antes do primeiro grind e deixa um bloco curto de review
-                  separado do fim da noite.
+                  O padrão principal não é falta de vontade: é estudo e review a ficarem depois da sessão. Para proteger
+                  a direção anual e o ritmo mensal, coloca estudo antes do primeiro grind e deixa review curto separado
+                  do fim da noite.
                 </p>
                 <article className={styles.proposalCard}>
                   <div>
@@ -866,11 +982,89 @@ function average(values: Array<number | undefined>) {
   return Math.round((numericValues.reduce((total, value) => total + value, 0) / numericValues.length) * 10) / 10;
 }
 
+function getCurrentMonth() {
+  return new Date().toISOString().slice(0, 7);
+}
+
 function formatElapsed(startedAt: number, endedAt = Date.now()) {
   const minutes = Math.max(0, Math.floor((endedAt - startedAt) / 60000));
   const hours = Math.floor(minutes / 60);
   const remaining = minutes % 60;
   return hours ? `${hours}h ${remaining}m` : `${remaining}m`;
+}
+
+function getCategoryLabel(category: MonthlyTargetCategory) {
+  const labels: Record<MonthlyTargetCategory, string> = {
+    grind: "Grind",
+    study: "Estudo",
+    review: "Review",
+    sport: "Sport",
+  };
+
+  return labels[category];
+}
+
+function formatTargetValue(value: number, unit: string) {
+  return `${value} ${unit}`;
+}
+
+function formatMonthlyTarget(target: MonthlyTargetContext) {
+  const primary = formatTargetValue(target.targetValue, target.primaryUnit);
+
+  if (target.optionalSecondaryUnit && target.optionalSecondaryTargetValue) {
+    return `${primary} · ${formatTargetValue(target.optionalSecondaryTargetValue, target.optionalSecondaryUnit)}`;
+  }
+
+  return primary;
+}
+
+function buildStrategicReflection(context: StrategicReviewContext, planSummary: CategorySummary[]) {
+  const uncoveredTargets = context.monthlyTargets
+    .filter((target) => {
+      const category = planSummary.find((item) => item.id === target.category);
+      return !category || category.completion === 0;
+    })
+    .map((target) => getCategoryLabel(target.category));
+  const prompts = [
+    "A semana aproximou-te da direção anual ou foi só volume?",
+    "Que objetivo mensal ficou mais servido?",
+  ];
+
+  if (uncoveredTargets.length) {
+    prompts.push(`Que ajuste recupera ${uncoveredTargets.slice(0, 2).join(" e ")} sem criar uma semana irrealista?`);
+  } else {
+    prompts.push("O ritmo do mês continua realista para a próxima semana?");
+  }
+
+  if (!context.annualDirection && !context.monthlyTargets.length) {
+    return {
+      title: "Revê a semana pelo que aprendeste, não por métricas pesadas.",
+      body: "Ainda não há contexto anual ou mensal guardado. Mantém a reflexão curta e escolhe um ajuste prático.",
+      prompts,
+    };
+  }
+
+  if (!context.annualDirection) {
+    return {
+      title: "Há objetivos mensais, mas falta critério anual.",
+      body: "Usa os objetivos deste mês para avaliar ritmo, sem transformar a revisão num relatório.",
+      prompts,
+    };
+  }
+
+  if (!context.monthlyTargets.length) {
+    return {
+      title: "Há direção anual, mas falta ritmo mensal.",
+      body: "Usa a direção anual para perceber se a semana ajudou a construir o tipo de jogador que queres ser este ano.",
+      prompts,
+    };
+  }
+
+  return {
+    title: "Fecha a semana contra estratégia, não só contra tarefas.",
+    body: "Usa este contexto para separar progresso real de uma semana apenas ocupada.",
+    prompts,
+  };
 }
 
 function getSessionSignalCopy(context: SessionReviewContext) {

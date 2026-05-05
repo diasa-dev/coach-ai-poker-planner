@@ -267,6 +267,104 @@
   padding-left: 18px;
 }
 
+.strategicContextGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.annualContext,
+.monthlyContext,
+.missingContext,
+.strategicReflectionCard {
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-md);
+  background: var(--ep-bg-surface-2);
+  padding: 12px;
+}
+
+.annualContext,
+.monthlyContext {
+  border-color: rgba(6, 182, 196, 0.22);
+}
+
+.missingContext {
+  border-style: dashed;
+}
+
+.annualContext span,
+.monthlyContext span,
+.missingContext span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ep-fg-3);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.annualContext strong,
+.monthlyContext strong,
+.missingContext strong,
+.strategicReflectionCard strong {
+  display: block;
+  color: var(--ep-fg-1);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.annualContext ul,
+.strategicReflectionCard ul {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.annualContext li,
+.strategicReflectionCard li,
+.strategicReflectionCard p {
+  color: var(--ep-fg-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.monthlyTargetList {
+  display: grid;
+  gap: 8px;
+}
+
+.monthlyTargetList div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--ep-border-1);
+  padding-bottom: 7px;
+}
+
+.monthlyTargetList div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.monthlyTargetList small {
+  color: var(--ep-fg-2);
+  font: var(--t-mono-sm);
+  text-align: right;
+}
+
+.strategicReflectionCard {
+  background:
+    linear-gradient(135deg, rgba(6, 182, 196, 0.08), transparent 56%),
+    var(--ep-bg-surface-2);
+}
+
+.strategicReflectionCard p {
+  margin-top: 6px;
+}
+
 .categoryRow {
   overflow: hidden;
   border: 1px solid var(--ep-border-1);
@@ -443,6 +541,16 @@
   gap: 7px;
 }
 
+.formGrid label > span,
+.fullField > span {
+  color: var(--ep-fg-2);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.35;
+  text-transform: none;
+}
+
 .formGrid textarea,
 .fullField textarea {
   width: 100%;
@@ -580,6 +688,10 @@
 
 @media (max-width: 1180px) {
   .reviewLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .strategicContextGrid {
     grid-template-columns: 1fr;
   }
 
