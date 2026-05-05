@@ -2758,7 +2758,14 @@ dd {
   color: var(--ep-accent-primary);
 }
 
-.ep-session-cta.active-session svg {
+.ep-session-cta.review-pending {
+  border: 1px solid color-mix(in srgb, var(--ep-cat-review) 55%, transparent);
+  background: color-mix(in srgb, var(--ep-cat-review) 16%, transparent);
+  color: var(--ep-cat-review);
+}
+
+.ep-session-cta.active-session svg,
+.ep-session-cta.review-pending svg {
   fill: currentColor;
 }
 
