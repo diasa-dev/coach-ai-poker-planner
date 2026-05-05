@@ -31,6 +31,12 @@ type CoachContext = {
   weeklyPlanState: string;
   weeklyPlanScope: string;
   monthlyGoalsState: string;
+  studyLogState: string;
+  studyWeeklyMinutes: number;
+  studyMonthlyMinutes: number;
+  studyAverageQuality: number;
+  studyTopType?: string;
+  studyPaceState: "missing-target" | "no-logs" | "below" | "on" | "complete";
   sessionsState: string;
   reviewState: string;
   reviewStatus: ReviewStatus;
@@ -146,6 +152,12 @@ const demoCoachContext: CoachContext = {
   weeklyPlanState: "Ativo",
   weeklyPlanScope: "Plano da semana demo",
   monthlyGoalsState: "Demo",
+  studyLogState: "1h55 registadas · abaixo do ritmo",
+  studyWeeklyMinutes: 115,
+  studyMonthlyMinutes: 410,
+  studyAverageQuality: 4,
+  studyTopType: "Solver",
+  studyPaceState: "below",
   sessionsState: "3 sessões usadas",
   reviewState: "Rascunho demo",
   reviewStatus: "draft",
@@ -172,6 +184,10 @@ function PersistedCoachWorkspace() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const weeklyPlan = useQuery(api.weeklyPlan.getCurrent, isAuthenticated ? { today: todayIsoDate } : "skip");
   const monthlyTargets = useQuery(api.monthlyTarget.listForMonth, isAuthenticated ? { month: currentMonth } : "skip");
+  const studyContext = useQuery(
+    api.studySession.getCurrent,
+    isAuthenticated ? { today: todayIsoDate, month: currentMonth } : "skip",
+  );
   const sessions = useQuery(api.pokerSession.list, isAuthenticated ? {} : "skip");
   const weeklyReview = useQuery(
     api.weeklyReview.getByWeek,
@@ -190,17 +206,19 @@ function PersistedCoachWorkspace() {
     (isAuthenticated &&
       (weeklyPlan === undefined ||
         monthlyTargets === undefined ||
+        studyContext === undefined ||
         sessions === undefined ||
         weeklyReview === undefined));
 
   const context = useMemo<CoachContext>(() => {
-    if (!isAuthenticated || !weeklyPlan || !monthlyTargets || !sessions || weeklyReview === undefined) {
+    if (!isAuthenticated || !weeklyPlan || !monthlyTargets || !studyContext || !sessions || weeklyReview === undefined) {
       return {
         ...demoCoachContext,
         isDemo: true,
         weeklyPlanState: isFetching ? "A carregar" : "Demo",
         weeklyPlanScope: isFetching ? "Plano da semana a carregar" : "Plano da semana demo",
         monthlyGoalsState: isFetching ? "A carregar" : "Demo",
+        studyLogState: isFetching ? "A carregar" : demoCoachContext.studyLogState,
         sessionsState: isFetching ? "A carregar" : "Demo",
         reviewState: isFetching ? "A carregar" : "Demo",
       };
@@ -210,12 +228,20 @@ function PersistedCoachWorkspace() {
     const pendingSessionReviews = sessions.filter((session) => session.status === "reviewPending");
     const recentSessions = sessions.slice(0, 3);
     const reviewStatus = weeklyReview?.status ?? "available";
+    const studyTarget = monthlyTargets.find((target) => target.category === "study");
+    const studyPaceState = getStudyPaceState(studyTarget?.currentValue ?? 0, studyTarget?.targetValue ?? 0);
 
     return {
       isDemo: false,
       weeklyPlanState: weeklyPlan.currentPlan ? "Ativo" : "Sem plano ativo",
       weeklyPlanScope: formatWeekScope(weeklyPlan.weekStartDate),
       monthlyGoalsState: getMonthlyGoalsState(monthlyTargets.length),
+      studyLogState: getStudyLogState(studyContext.weeklySummary.minutes, studyPaceState),
+      studyWeeklyMinutes: studyContext.weeklySummary.minutes,
+      studyMonthlyMinutes: studyContext.monthlySummary.minutes,
+      studyAverageQuality: studyContext.weeklySummary.averageQuality,
+      studyTopType: studyContext.weeklySummary.topStudyType,
+      studyPaceState,
       sessionsState: recentSessions.length ? `${recentSessions.length} sessões usadas` : "Sem sessões",
       reviewState: getReviewStateCopy(reviewStatus),
       reviewStatus,
@@ -232,7 +258,7 @@ function PersistedCoachWorkspace() {
         .filter((value): value is string => Boolean(value))
         .slice(0, 2),
     };
-  }, [isAuthenticated, isFetching, monthlyTargets, sessions, weeklyPlan, weeklyReview]);
+  }, [isAuthenticated, isFetching, monthlyTargets, sessions, studyContext, weeklyPlan, weeklyReview]);
 
   const currentPlan = weeklyPlan?.currentPlan ?? null;
   const activeApplicationId = applicationId ?? activeApplication?._id ?? null;
@@ -303,6 +329,9 @@ function CoachShell({
   const contextSources = [
     { label: "Plano semanal", state: context.weeklyPlanState },
     { label: "Objetivos mensais", state: context.monthlyGoalsState },
+    ...(context.studyWeeklyMinutes || context.studyMonthlyMinutes
+      ? [{ label: "Registo de estudo", state: context.studyLogState }]
+      : []),
     { label: "3 últimas sessões", state: context.sessionsState },
     { label: "Revisão semanal", state: context.reviewState },
   ];
@@ -416,11 +445,7 @@ function CoachShell({
               <Sparkles size={15} aria-hidden="true" />
             </div>
             <div>
-              <p>
-                Estás 1h 45m abaixo do ritmo da semana. Em vez de adicionar um bloco
-                grande, tenho uma proposta com três blocos curtos antes das sessões da
-                manhã. Mantém o volume de grind intacto.
-              </p>
+              <p>{getCoachReply(context)}</p>
             </div>
           </article>
 
@@ -612,7 +637,7 @@ function CoachShell({
             <div className="ep-coach-composer-footer">
               <div className="ep-coach-context-line">
                 <span />
-                Contexto: plano semanal + revisão semanal + sessões recentes
+                Contexto: plano semanal + registo de estudo + revisão semanal + sessões recentes
               </div>
               <button className="ep-coach-send" type="button" aria-label="Enviar pergunta">
                 <ArrowUp size={16} aria-hidden="true" />
@@ -669,6 +694,25 @@ function CoachShell({
               <li>
                 <CircleDot size={14} aria-hidden="true" />
                 {context.leaks || "Sem leaks registados nesta revisão."}
+              </li>
+            </ul>
+          </section>
+
+          <section className="ep-coach-panel quiet">
+            <div className="ep-coach-panel-head">
+              <span>Sinais de estudo</span>
+              <Clock3 size={16} aria-hidden="true" />
+            </div>
+            <div className="ep-coach-signal-grid">
+              <Signal label="Estudo esta semana" value={formatMinutes(context.studyWeeklyMinutes)} />
+              <Signal label="Estudo este mês" value={formatMinutes(context.studyMonthlyMinutes)} />
+              <Signal label="Qualidade média" value={formatRating(context.studyAverageQuality)} />
+              <Signal label="Tipo frequente" value={context.studyTopType ? getStudyTypeLabel(context.studyTopType) : "-"} />
+            </div>
+            <ul>
+              <li>
+                <CircleDot size={14} aria-hidden="true" />
+                {getStudyPaceCopy(context.studyPaceState)}
               </li>
             </ul>
           </section>
@@ -753,6 +797,75 @@ function normalizeProposalItem(item: CoachProposalItem): CoachProposalItem {
   };
 }
 
+function getStudyPaceState(currentValue: number, targetValue: number): CoachContext["studyPaceState"] {
+  if (!targetValue) return "missing-target";
+  if (currentValue <= 0) return "no-logs";
+  if (currentValue >= targetValue) return "complete";
+
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const expectedProgress = now.getDate() / daysInMonth;
+  const progress = currentValue / targetValue;
+
+  return progress < expectedProgress - 0.08 ? "below" : "on";
+}
+
+function getStudyLogState(weeklyMinutes: number, paceState: CoachContext["studyPaceState"]) {
+  if (!weeklyMinutes) return "Sem registos esta semana";
+
+  return `${formatMinutes(weeklyMinutes)} registados · ${getStudyPaceShortLabel(paceState)}`;
+}
+
+function getStudyPaceShortLabel(paceState: CoachContext["studyPaceState"]) {
+  if (paceState === "below") return "abaixo do ritmo";
+  if (paceState === "on") return "dentro do ritmo";
+  if (paceState === "complete") return "objetivo completo";
+  if (paceState === "no-logs") return "sem ritmo";
+  return "sem meta";
+}
+
+function getStudyPaceCopy(paceState: CoachContext["studyPaceState"]) {
+  if (paceState === "below") return "O registo de estudo está abaixo do ritmo mensal. A proposta deve recuperar com blocos curtos.";
+  if (paceState === "on") return "O registo de estudo está dentro do ritmo. Mantém blocos leves, sem inflacionar a semana.";
+  if (paceState === "complete") return "Objetivo mensal de estudo já está completo. Não é preciso adicionar volume por defeito.";
+  if (paceState === "no-logs") return "Há meta de estudo, mas ainda não há registos. Começa com um bloco pequeno e confirmado.";
+  return "Sem meta mensal de estudo. O Coach usa só os registos existentes como contexto.";
+}
+
+function getCoachReply(context: CoachContext) {
+  if (context.studyPaceState === "below" || context.studyPaceState === "no-logs") {
+    return `O registo de estudo mostra ${getStudyPaceShortLabel(context.studyPaceState)}. Em vez de inventar um plano grande, proponho blocos curtos antes das sessões e deixo tudo para confirmação.`;
+  }
+
+  return `O registo de estudo está ${getStudyPaceShortLabel(context.studyPaceState)}. A proposta mantém estudo leve e protege o plano atual, sem adicionar complexidade.`;
+}
+
+function formatMinutes(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const remaining = minutes % 60;
+
+  if (!hours) return `${remaining}m`;
+  if (!remaining) return `${hours}h`;
+  return `${hours}h ${remaining}m`;
+}
+
+function getStudyTypeLabel(value: string) {
+  const labels: Record<string, string> = {
+    Drills: "Drills",
+    "Hand review": "Revisão de mãos",
+    "Tournament review": "Revisão de torneios",
+    Solver: "Solver",
+    "Individual lesson": "Aula individual",
+    "Group lesson": "Aula de grupo",
+    "Video/course": "Vídeo/curso",
+    "Group study": "Estudo em grupo",
+    "Theory/concepts": "Teoria/conceitos",
+    Other: "Outro",
+  };
+
+  return labels[value] ?? value;
+}
+
 function getDayOption(dayIndex: number) {
   return dayOptions.find((option) => option.dayIndex === dayIndex) ?? dayOptions[0];
 }
@@ -762,44 +875,53 @@ function getTypeOption(type: StoredBlockType) {
 }
 
 function buildEditableProposal(context: CoachContext): CoachProposal {
+  const topic = context.studyTopType ? getStudyTypeLabel(context.studyTopType) : "Estudo focado";
+  const needsStudyRecovery = context.studyPaceState === "below" || context.studyPaceState === "no-logs";
+  const items: CoachProposalItem[] = [
+    {
+      dayIndex: 4,
+      dayLabel: "Quinta",
+      time: "09:00",
+      type: "study",
+      typeLabel: "Estudo",
+      topic,
+      targetLabel: "30m",
+      detail: needsStudyRecovery
+        ? "Registo de estudo indica ritmo fraco; proteger antes do Grind manhã"
+        : "Manter o estudo curto antes do Grind manhã",
+    },
+    {
+      dayIndex: 5,
+      dayLabel: "Sexta",
+      time: "09:00",
+      type: "study",
+      typeLabel: "Estudo",
+      topic: "Open ranges",
+      targetLabel: "30m",
+      detail: context.nextActions[0] || "Bloco leve para manter consistência",
+    },
+  ];
+
+  if (needsStudyRecovery) {
+    items.push({
+      dayIndex: 6,
+      dayLabel: "Sábado",
+      time: "09:00",
+      type: "study",
+      typeLabel: "Estudo",
+      topic: "Bluff catch",
+      targetLabel: "30m",
+      detail:
+        context.pendingSessionReviews > 0
+          ? `${context.pendingSessionReviews} reviews pendentes antes do Grind manhã`
+          : "30m antes do Grind manhã",
+    });
+  }
+
   return {
-    title: "3 blocos de 30 min antes da sessão da manhã",
+    title: needsStudyRecovery ? "3 blocos curtos para recuperar estudo" : "2 blocos para manter estudo no ritmo",
     scope: context.weeklyPlanScope,
-    items: [
-      {
-        dayIndex: 4,
-        dayLabel: "Quinta",
-        time: "09:00",
-        type: "study",
-        typeLabel: "Estudo",
-        topic: "ICM",
-        targetLabel: "30m",
-        detail: context.adjustmentNextWeek || "30m antes do Grind manhã",
-      },
-      {
-        dayIndex: 5,
-        dayLabel: "Sexta",
-        time: "09:00",
-        type: "study",
-        typeLabel: "Estudo",
-        topic: "Open ranges",
-        targetLabel: "30m",
-        detail: context.nextActions[0] || "30m antes do Grind manhã",
-      },
-      {
-        dayIndex: 6,
-        dayLabel: "Sábado",
-        time: "09:00",
-        type: "study",
-        typeLabel: "Estudo",
-        topic: "Bluff catch",
-        targetLabel: "30m",
-        detail:
-          context.pendingSessionReviews > 0
-            ? `${context.pendingSessionReviews} reviews pendentes antes do Grind manhã`
-            : "30m antes do Grind manhã",
-      },
-    ],
+    items,
   };
 }
 
