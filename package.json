@@ -19,6 +19,7 @@
     "lint": "eslint",
     "smoke:coach": "node scripts/smoke-coach-flow.mjs",
     "smoke:coach:auth": "node scripts/smoke-authenticated-coach-flow.mjs",
+    "smoke:mvp:auth": "node scripts/smoke-authenticated-mvp-flow.mjs",
     "smoke:study:auth": "node scripts/smoke-authenticated-study-flow.mjs"
   },
   "dependencies": {
