@@ -35,6 +35,11 @@ function validateMonth(month: string) {
   }
 }
 
+function studyMinutesToUnit(minutes: number, unit: string) {
+  if (unit === "horas") return Math.round((minutes / 60) * 10) / 10;
+  return minutes;
+}
+
 function validateTarget({
   category,
   primaryUnit,
@@ -86,10 +91,24 @@ export const listForMonth = query({
       .query("monthlyTargets")
       .withIndex("by_user_month", (q) => q.eq("userId", userId).eq("month", args.month))
       .collect();
+    const monthlyStudyMinutes = targets.some((target) => target.category === "study")
+      ? (
+          await ctx.db
+            .query("studySessions")
+            .withIndex("by_user_month", (q) => q.eq("userId", userId).eq("month", args.month))
+            .collect()
+        ).reduce((total, session) => total + session.durationMinutes, 0)
+      : 0;
 
-    return targets.sort(
-      (a, b) => categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category),
-    );
+    return targets
+      .sort((a, b) => categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category))
+      .map((target) => ({
+        ...target,
+        currentValue:
+          target.category === "study"
+            ? studyMinutesToUnit(monthlyStudyMinutes, target.primaryUnit)
+            : 0,
+      }));
   },
 });
 
