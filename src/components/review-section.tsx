@@ -76,6 +76,25 @@ type SessionReviewContext = {
   nextActions: string[];
 };
 
+type StudyReviewLog = {
+  id: string;
+  date: string;
+  durationMinutes: number;
+  quality: number;
+  studyType: string;
+  blockTitle?: string;
+  linkedToWeeklyBlock: boolean;
+};
+
+type StudyReviewContext = {
+  minutes: number;
+  averageQuality: number;
+  linkedLogCount: number;
+  standaloneLogCount: number;
+  topStudyTypes: { studyType: string; count: number }[];
+  logs: StudyReviewLog[];
+};
+
 type AnnualDirectionContext = {
   primaryDirection: string;
   priorities: string[];
@@ -154,6 +173,45 @@ const demoSessionReviewContext: SessionReviewContext = {
   nextActions: ["Fazer review antes da sessão de domingo.", "Reduzir mesas se energia ficar em 2/5."],
 };
 
+const demoStudyReviewContext: StudyReviewContext = {
+  minutes: 115,
+  averageQuality: 4,
+  linkedLogCount: 2,
+  standaloneLogCount: 1,
+  topStudyTypes: [
+    { studyType: "Solver", count: 2 },
+    { studyType: "Hand review", count: 1 },
+  ],
+  logs: [
+    {
+      id: "demo-study-linked-1",
+      date: "14 Mai",
+      durationMinutes: 45,
+      quality: 4,
+      studyType: "Solver",
+      blockTitle: "ICM até bolha",
+      linkedToWeeklyBlock: true,
+    },
+    {
+      id: "demo-study-standalone-1",
+      date: "13 Mai",
+      durationMinutes: 25,
+      quality: 4,
+      studyType: "Hand review",
+      linkedToWeeklyBlock: false,
+    },
+    {
+      id: "demo-study-linked-2",
+      date: "12 Mai",
+      durationMinutes: 45,
+      quality: 4,
+      studyType: "Solver",
+      blockTitle: "Push/fold spots",
+      linkedToWeeklyBlock: true,
+    },
+  ],
+};
+
 const demoStrategicReviewContext: StrategicReviewContext = {
   annualDirection: {
     primaryDirection: "Construir um ano mais consistente: menos volume automático, mais decisões boas e estudo com intenção.",
@@ -200,6 +258,7 @@ export function ReviewSection() {
       initialReview={demoWeeklyReviewForm}
       planSummary={demoCategorySummary}
       sessionReviewContext={demoSessionReviewContext}
+      studyReviewContext={demoStudyReviewContext}
       strategicContext={demoStrategicReviewContext}
     />
     );
@@ -214,6 +273,10 @@ function PersistedReviewSection() {
   const sessions = useQuery(api.pokerSession.list, isAuthenticated ? {} : "skip");
   const weeklyReview = useQuery(
     api.weeklyReview.getByWeek,
+    isAuthenticated && weeklyPlan ? { weekStartDate: weeklyPlan.weekStartDate } : "skip",
+  );
+  const studyReviewContext = useQuery(
+    api.studySession.getWeekReviewContext,
     isAuthenticated && weeklyPlan ? { weekStartDate: weeklyPlan.weekStartDate } : "skip",
   );
   const annualDirection = useQuery(
@@ -270,6 +333,7 @@ function PersistedReviewSection() {
       (weeklyPlan === undefined ||
         sessions === undefined ||
         weeklyReview === undefined ||
+        studyReviewContext === undefined ||
         annualDirection === undefined ||
         monthlyTargets === undefined))
   ) {
@@ -306,7 +370,7 @@ function PersistedReviewSection() {
 
   return (
     <ReviewWorkspace
-      key={`${weeklyPlan?.weekStartDate ?? "demo"}:${weeklyReview?.updatedAt ?? 0}`}
+      key={`${weeklyPlan?.weekStartDate ?? "demo"}:${weeklyReview?.updatedAt ?? 0}:${studyReviewContext?.minutes ?? 0}:${studyReviewContext?.logs.length ?? 0}`}
       initialReview={initialReview}
       onSaveReview={
         isAuthenticated && weeklyPlan
@@ -332,6 +396,7 @@ function PersistedReviewSection() {
       }
       planSummary={planSummary}
       sessionReviewContext={sessionReviewContext}
+      studyReviewContext={studyReviewContext ?? demoStudyReviewContext}
       strategicContext={{
         annualDirection: annualDirection ?? null,
         monthlyTargets: monthlyTargets ?? [],
@@ -345,12 +410,14 @@ function ReviewWorkspace({
   onSaveReview,
   planSummary,
   sessionReviewContext,
+  studyReviewContext,
   strategicContext,
 }: {
   initialReview: WeeklyReviewForm;
   onSaveReview?: (review: WeeklyReviewForm) => Promise<void>;
   planSummary: CategorySummary[];
   sessionReviewContext: SessionReviewContext;
+  studyReviewContext: StudyReviewContext;
   strategicContext: StrategicReviewContext;
 }) {
   const [status, setStatus] = useState<ReviewStatus>(initialReview.status);
@@ -461,6 +528,16 @@ function ReviewWorkspace({
                 ))}
               </div>
             ) : null}
+          </section>
+
+          <section className={styles.panel}>
+            <PanelHead
+              eyebrow="Estudo real"
+              icon={<Target size={17} aria-hidden="true" />}
+              title="Contexto de estudo da semana"
+            />
+
+            <StudyContextPanel context={studyReviewContext} />
           </section>
 
           <section className={styles.panel}>
@@ -873,6 +950,49 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function StudyContextPanel({ context }: { context: StudyReviewContext }) {
+  const topTypes = context.topStudyTypes
+    .map((item) => `${getStudyTypeLabel(item.studyType)} x${item.count}`)
+    .join(" · ");
+
+  return (
+    <div className={styles.studyContext}>
+      <div className={styles.sessionSignalsGrid}>
+        <Metric label="Tempo registado" value={formatPlanMinutes(context.minutes)} />
+        <Metric label="Qualidade média" value={context.averageQuality ? `${context.averageQuality}/5` : "-"} />
+        <Metric label="Ligados ao plano" value={String(context.linkedLogCount)} />
+        <Metric label="Avulsos" value={String(context.standaloneLogCount)} />
+      </div>
+
+      <article className={styles.sessionAdjustmentCard}>
+        <strong>{context.logs.length ? "Estudo registado nesta semana" : "Sem estudo registado nesta semana"}</strong>
+        <p>
+          {context.logs.length
+            ? `Tipos mais frequentes: ${topTypes || "sem padrão suficiente"}.`
+            : "O espelho de estudo fica só com o plano enquanto não existirem registos."}
+        </p>
+      </article>
+
+      {context.logs.length ? (
+        <div className={styles.studyLogList}>
+          {context.logs.map((log) => (
+            <article className={styles.studyLogRow} key={log.id}>
+              <div>
+                <span>{formatDateLabel(log.date)}</span>
+                <strong>
+                  {getStudyTypeLabel(log.studyType)} · {formatPlanMinutes(log.durationMinutes)}
+                </strong>
+                <small>{log.blockTitle ?? "Registo avulso"} · qualidade {log.quality}/5</small>
+              </div>
+              <em>{log.linkedToWeeklyBlock ? "Ligado ao plano" : "Avulso"}</em>
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function buildCategorySummary(days: PlanDay[]): CategorySummary[] {
   const categories: Array<{
     id: CategoryId;
@@ -991,6 +1111,34 @@ function formatElapsed(startedAt: number, endedAt = Date.now()) {
   const hours = Math.floor(minutes / 60);
   const remaining = minutes % 60;
   return hours ? `${hours}h ${remaining}m` : `${remaining}m`;
+}
+
+function formatDateLabel(value: string) {
+  if (!value.includes("-")) return value;
+
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return new Intl.DateTimeFormat("pt-PT", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  }).format(date);
+}
+
+function getStudyTypeLabel(value: string) {
+  const labels: Record<string, string> = {
+    Drills: "Drills",
+    "Hand review": "Revisão de mãos",
+    "Tournament review": "Revisão de torneios",
+    Solver: "Solver",
+    "Individual lesson": "Aula individual",
+    "Group lesson": "Aula de grupo",
+    "Video/course": "Vídeo/curso",
+    "Group study": "Estudo em grupo",
+    "Theory/concepts": "Teoria/conceitos",
+    Other: "Outro",
+  };
+
+  return labels[value] ?? value;
 }
 
 function getCategoryLabel(category: MonthlyTargetCategory) {
