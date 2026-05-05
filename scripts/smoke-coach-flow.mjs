@@ -10,6 +10,13 @@ async function waitText(page, text) {
   });
 }
 
+async function waitTextPattern(page, pattern) {
+  await page.getByText(pattern).first().waitFor({
+    state: "visible",
+    timeout: 20_000,
+  });
+}
+
 async function smoke() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
@@ -40,7 +47,7 @@ async function smoke() {
     timeout: 20_000,
   });
   await page.getByRole("button", { name: "Eliminar bloco 2" }).click();
-  await waitText(page, "Plano da semana 18 (2 alterações)");
+  await waitTextPattern(page, /Plano .*\(2 alterações\)/);
   await page.locator('input[value="ICM"]').waitFor({
     state: "visible",
     timeout: 20_000,
@@ -61,7 +68,7 @@ async function smoke() {
   await page.getByRole("button", { name: "Aplicar alteração" }).click();
   await page.getByRole("button", { name: "Sim, aplicar" }).click();
   await waitText(page, "Alteração aplicada ao plano");
-  await waitText(page, "Plano da semana 18 (2 alterações)");
+  await waitTextPattern(page, /Plano .*\(2 alterações\)/);
   await page.getByRole("button", { name: /Anular \(\d+s\)/ }).waitFor({
     state: "visible",
     timeout: 20_000,
