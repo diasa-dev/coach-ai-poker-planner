@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BookOpenCheck,
   Check,
   ChevronDown,
   Copy,
@@ -13,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import {
@@ -78,6 +80,14 @@ type WeeklyPlanWorkspaceProps = {
   weekRange?: string;
   weekStartDay?: number;
 };
+
+function isPlannedStudyBlock(block: PlanBlock) {
+  return block.type === "Estudo" && block.status === "Planeado";
+}
+
+function getStudyBlockHref(blockId: string) {
+  return `/study?weeklyPlanBlockId=${encodeURIComponent(blockId)}`;
+}
 
 function statusClass(status: PlanBlockStatus) {
   if (status === "Feito") return "done";
@@ -792,7 +802,15 @@ function DayRow({
                 <strong>{block.title}</strong>
                 <small>{block.target ?? "—"}</small>
               </div>
-              <i aria-label={block.status} className={`st-dot st-${statusClass(block.status)}`} />
+              <div className="wp-row-actions">
+                <i aria-label={block.status} className={`st-dot st-${statusClass(block.status)}`} />
+                {isPlannedStudyBlock(block) ? (
+                  <Link className="wp-row-action" href={getStudyBlockHref(block.id)}>
+                    <BookOpenCheck size={12} aria-hidden="true" />
+                    Registar estudo
+                  </Link>
+                ) : null}
+              </div>
             </div>
           ))}
           <button className="wp-row-add" type="button" onClick={onAdd}>
