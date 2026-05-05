@@ -78,8 +78,8 @@ const initialLogs: StudyLog[] = [
 
 const demoBlocks: StudyBlockOption[] = [
   {
-    id: "demo-study-1" as Id<"weeklyPlanBlocks">,
-    title: "ICM até bolha",
+    id: "thu-study" as Id<"weeklyPlanBlocks">,
+    title: "Bluff catch — river",
     targetLabel: "45m",
     status: "planned",
   },
@@ -98,7 +98,11 @@ const demoMonthlySummary = {
   topStudyType: "Hand review",
 };
 
-export function StudySection() {
+export function StudySection({
+  selectedWeeklyPlanBlockId,
+}: {
+  selectedWeeklyPlanBlockId?: string;
+}) {
   if (!hasPersistenceConfig) {
     return (
       <StudyWorkspace
@@ -107,15 +111,20 @@ export function StudySection() {
         hasPersistence={false}
         initialLogs={initialLogs}
         monthlySummary={demoMonthlySummary}
+        selectedWeeklyPlanBlockId={selectedWeeklyPlanBlockId}
         weeklySummary={demoWeeklySummary}
       />
     );
   }
 
-  return <PersistedStudySection />;
+  return <PersistedStudySection selectedWeeklyPlanBlockId={selectedWeeklyPlanBlockId} />;
 }
 
-function PersistedStudySection() {
+function PersistedStudySection({
+  selectedWeeklyPlanBlockId,
+}: {
+  selectedWeeklyPlanBlockId?: string;
+}) {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const studyContext = useQuery(
     api.studySession.getCurrent,
@@ -140,6 +149,7 @@ function PersistedStudySection() {
         hasPersistence={false}
         initialLogs={initialLogs}
         monthlySummary={demoMonthlySummary}
+        selectedWeeklyPlanBlockId={selectedWeeklyPlanBlockId}
         weeklySummary={demoWeeklySummary}
       />
     );
@@ -165,6 +175,7 @@ function PersistedStudySection() {
       onSaveLog={async (payload) => {
         await createStudySession(payload);
       }}
+      selectedWeeklyPlanBlockId={selectedWeeklyPlanBlockId}
       weekLabel={formatIsoRange(studyContext.weekStartDate, studyContext.weekEndDate)}
       weeklySummary={studyContext.weeklySummary}
     />
@@ -179,6 +190,7 @@ function StudyWorkspace({
   monthlySummary,
   onMarkWeeklyBlockDone,
   onSaveLog,
+  selectedWeeklyPlanBlockId,
   weekLabel = "Semana demo",
   weeklySummary,
 }: {
@@ -196,13 +208,14 @@ function StudyWorkspace({
     note?: string;
     weeklyPlanBlockId?: Id<"weeklyPlanBlocks">;
   }) => Promise<void>;
+  selectedWeeklyPlanBlockId?: string;
   weekLabel?: string;
   weeklySummary: StudySummary;
 }) {
   const [duration, setDuration] = useState(45);
   const [studyType, setStudyType] = useState(studyTypes[0].value);
   const [quality, setQuality] = useState(4);
-  const [weeklyBlockId, setWeeklyBlockId] = useState("");
+  const [weeklyBlockId, setWeeklyBlockId] = useState(selectedWeeklyPlanBlockId ?? "");
   const [note, setNote] = useState("");
   const [logs, setLogs] = useState(initialLogs);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -213,11 +226,12 @@ function StudyWorkspace({
   const displayedLogs = hasPersistence ? initialLogs : logs;
   const selectedBlock = blockOptions.find((block) => block.id === weeklyBlockId);
   const availableBlocks = blockOptions.filter((block) => block.status !== "done");
+  const visibleWeeklyBlockId = availableBlocks.some((block) => block.id === weeklyBlockId) ? weeklyBlockId : "";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const weeklyPlanBlockId = weeklyBlockId ? (weeklyBlockId as Id<"weeklyPlanBlocks">) : undefined;
+    const weeklyPlanBlockId = selectedBlock ? (selectedBlock.id as Id<"weeklyPlanBlocks">) : undefined;
     const trimmedNote = note.trim();
     const nextLog: StudyLog = {
       id: `local-${Date.now()}`,
@@ -347,7 +361,7 @@ function StudyWorkspace({
 
           <label className={styles.field}>
             <span>Bloco semanal (opcional)</span>
-            <select value={weeklyBlockId} onChange={(event) => setWeeklyBlockId(event.target.value)}>
+            <select value={visibleWeeklyBlockId} onChange={(event) => setWeeklyBlockId(event.target.value)}>
               <option value="">Sem bloco</option>
               {availableBlocks.map((block) => (
                 <option key={block.id} value={block.id}>

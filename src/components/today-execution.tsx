@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Edit3, Gauge, MoreHorizontal, Sparkles, Target, X } from "lucide-react";
+import { BookOpenCheck, Check, Edit3, Gauge, MoreHorizontal, Sparkles, Target, X } from "lucide-react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { type ReactNode, useMemo, useState } from "react";
@@ -115,6 +115,14 @@ function kindClass(kind: CommitmentKind | PlanBlockType) {
 
 function blockLabel(type: PlanBlockType) {
   return type === "Desporto" ? "Sport" : type;
+}
+
+function isPlannedStudyBlock(block: PlanBlock) {
+  return block.type === "Estudo" && block.status === "Planeado";
+}
+
+function getStudyBlockHref(blockId: string) {
+  return `/study?weeklyPlanBlockId=${encodeURIComponent(blockId)}`;
 }
 
 export function TodayExecution() {
@@ -665,16 +673,26 @@ function PlannedBlocksCard({
         {blocks.length ? (
           blocks.map((block) => (
             <div className={`today-block-row ${kindClass(block.type)} st-${statusClass(block.status)}`} key={block.id}>
-              <span>
-                {blockLabel(block.type)}
-                {block.source === "coachProposal" ? <em className="ep-origin-badge">Coach</em> : null}
-              </span>
-              <strong>{block.title}</strong>
-              <small>{block.target ?? "—"}</small>
-              <i>{block.status}</i>
-              <button type="button" aria-label={`Mais ações para ${block.title}`}>
-                <MoreHorizontal size={15} aria-hidden="true" />
-              </button>
+              <div className="today-block-main">
+                <span>
+                  {blockLabel(block.type)}
+                  {block.source === "coachProposal" ? <em className="ep-origin-badge">Coach</em> : null}
+                </span>
+                <strong>{block.title}</strong>
+                <small>{block.target ?? "—"}</small>
+              </div>
+              <div className="today-block-actions">
+                <i>{block.status}</i>
+                {isPlannedStudyBlock(block) ? (
+                  <Link className="today-row-action" href={getStudyBlockHref(block.id)}>
+                    <BookOpenCheck size={13} aria-hidden="true" />
+                    Registar estudo
+                  </Link>
+                ) : null}
+                <button type="button" aria-label={`Mais ações para ${block.title}`}>
+                  <MoreHorizontal size={15} aria-hidden="true" />
+                </button>
+              </div>
             </div>
           ))
         ) : (
