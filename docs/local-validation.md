@@ -122,7 +122,7 @@ npm run build
 ```
 
 For browser smoke that must not depend on Clerk sessions or matching Clerk keys,
-start the app with auth disabled:
+start the dedicated demo smoke server with auth disabled:
 
 ```bash
 npm run dev:smoke
@@ -130,20 +130,31 @@ SMOKE_BASE_URL=http://localhost:3103 npm run smoke:coach
 ```
 
 This mode intentionally uses demo data and skips Clerk/Convex providers. Use it
-for UI and route smoke. Use the normal authenticated dev server separately when
-the slice specifically changes persistence or auth behavior.
+for UI and route smoke only. It runs on `http://localhost:3103` by default and
+must not be used for authenticated smoke.
+
+Use the normal authenticated dev server separately when the slice specifically
+changes persistence or auth behavior:
+
+```bash
+npm run dev:coach:bg
+npm run dev:coach:status
+```
+
+The expected authenticated smoke target is `http://localhost:3100`, unless
+`COACH_DEV_PORT` was set when starting the server.
 
 For authenticated Coach smoke, run a normal authenticated dev server on
 localhost, then store a Clerk session once in the persistent Playwright profile:
 
 ```bash
-AUTH_SMOKE_HEADFUL=1 SMOKE_BASE_URL=http://localhost:3103 npm run smoke:coach:auth
+AUTH_SMOKE_HEADFUL=1 SMOKE_BASE_URL=http://localhost:3100 npm run smoke:coach:auth
 ```
 
 After signing in and closing the browser, rerun headless:
 
 ```bash
-SMOKE_BASE_URL=http://localhost:3103 npm run smoke:coach:auth
+SMOKE_BASE_URL=http://localhost:3100 npm run smoke:coach:auth
 ```
 
 This smoke mutates local/dev data by applying the Coach proposal, verifies the

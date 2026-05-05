@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
-const baseUrl = process.env.SMOKE_BASE_URL || "http://localhost:3103";
+const baseUrl = process.env.SMOKE_BASE_URL || "http://localhost:3100";
 const headless = process.env.AUTH_SMOKE_HEADFUL === "1" ? false : true;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -27,6 +27,30 @@ function signInInstructions() {
     "Then close the browser and rerun:",
     "SMOKE_BASE_URL=http://localhost:3103 npm run smoke:coach:auth",
   ].join("\n");
+}
+
+function assertAuthenticatedSmokeTarget() {
+  const parsedUrl = new URL(baseUrl);
+
+  if (parsedUrl.hostname !== "localhost") {
+    throw new Error(
+      [
+        "Authenticated smoke must run against localhost.",
+        `Current SMOKE_BASE_URL is ${baseUrl}.`,
+        "Use the normal authenticated dev server, for example: SMOKE_BASE_URL=http://localhost:3100 npm run smoke:coach:auth",
+      ].join("\n"),
+    );
+  }
+
+  if (parsedUrl.port === "3103") {
+    throw new Error(
+      [
+        "Authenticated smoke is pointing at port 3103, which is reserved for demo smoke with auth disabled.",
+        "Start the normal authenticated dev server with `npm run dev:coach:bg`, then run:",
+        "SMOKE_BASE_URL=http://localhost:3100 npm run smoke:coach:auth",
+      ].join("\n"),
+    );
+  }
 }
 
 function isUnauthenticatedBody(bodyText) {
@@ -172,6 +196,8 @@ async function applyCoachProposal(page) {
 }
 
 async function smoke() {
+  assertAuthenticatedSmokeTarget();
+
   const context = await chromium.launchPersistentContext(userDataDir, {
     headless,
     viewport: { width: 1440, height: 1000 },
