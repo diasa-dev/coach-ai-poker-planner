@@ -35,6 +35,15 @@ async function getActiveSession(ctx: QueryCtx | MutationCtx, userId: string) {
   return activeSessions.sort((a, b) => b.startedAt - a.startedAt)[0] ?? null;
 }
 
+async function getPendingReviewSession(ctx: QueryCtx | MutationCtx, userId: string) {
+  const pendingSessions = await ctx.db
+    .query("pokerSessions")
+    .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "reviewPending"))
+    .collect();
+
+  return pendingSessions.sort((a, b) => b.startedAt - a.startedAt)[0] ?? null;
+}
+
 async function insertEvent(
   ctx: MutationCtx,
   args: {
@@ -73,6 +82,14 @@ export const getActive = query({
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
     return await getActiveSession(ctx, userId);
+  },
+});
+
+export const getPendingReview = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    return await getPendingReviewSession(ctx, userId);
   },
 });
 
@@ -126,6 +143,11 @@ export const start = mutation({
     const userId = await requireUserId(ctx);
     const now = Date.now();
     const existingActive = await getActiveSession(ctx, userId);
+    const sessionFocus = args.sessionFocus.trim();
+
+    if (!sessionFocus) {
+      throw new Error("Session focus is required");
+    }
 
     if (existingActive) {
       return existingActive._id;
@@ -137,7 +159,7 @@ export const start = mutation({
       weeklyPlanId: args.weeklyPlanId,
       weeklyPlanBlockId: args.weeklyPlanBlockId,
       status: "active",
-      sessionFocus: args.sessionFocus.trim() || "Sessão MTT",
+      sessionFocus,
       weeklyFocus: args.weeklyFocus,
       blockLabel: args.blockLabel,
       maxTables: args.maxTables,
@@ -158,7 +180,7 @@ export const start = mutation({
       sessionId,
       type: "started",
       title: "Sessão iniciada",
-      detail: `Foco · ${args.sessionFocus.trim() || "Sessão MTT"}`,
+      detail: `Foco · ${sessionFocus}`,
       createdAt: now,
     });
 

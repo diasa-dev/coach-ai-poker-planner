@@ -14,7 +14,7 @@ import {
   Square,
 } from "lucide-react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -80,6 +80,8 @@ type SessionEventView = {
 const todayIsoDate = getTodayIsoDate();
 
 const demoStartedAt = Date.now() - 84 * 60 * 1000;
+const demoSessionCtaStorageKey = "uplinea-demo-session-cta-state";
+const demoSessionCtaEvent = "uplinea-demo-session-state-change";
 const handTemplates = ["ICM", "Pote grande", "Bluff catch", "All-in marginal", "River difícil", "Exploit / read", "Erro emocional"];
 const microSuggestions = ["Não pagar river sem motivo", "Folda marginais em UTG", "Respira entre mesas", "Não abrir mais mesas", "Pausa às 16:00"];
 const statusCopy: Record<SessionStatus, string> = {
@@ -333,6 +335,8 @@ function SessionsWorkspace({
   const effectivePendingReviewSession = demoMode ? demoPendingReviewSession : pendingReviewSession;
   const effectiveRows = demoMode ? demoRows : rows;
   const visibleActiveSession = activeSession ?? demoActiveSession;
+  const trimmedStartFocus = startFocus.trim();
+  const canStartSession = Boolean(trimmedStartFocus);
   const summary = useMemo(
     () => ({
       sessions: effectiveRows.length,
@@ -347,12 +351,30 @@ function SessionsWorkspace({
   );
   const sessionInsight = getSessionInsight(summary);
 
+  useEffect(() => {
+    if (!demoMode) return;
+
+    const nextCtaState = visibleActiveSession
+      ? { status: "active", startedAt: visibleActiveSession.startedAt }
+      : effectivePendingReviewSession
+        ? { status: "pendingReview" }
+        : { status: "idle" };
+
+    window.localStorage.setItem(demoSessionCtaStorageKey, JSON.stringify(nextCtaState));
+    window.dispatchEvent(new Event(demoSessionCtaEvent));
+  }, [demoMode, effectivePendingReviewSession, visibleActiveSession]);
+
   async function submitStartSession() {
+    if (!canStartSession) {
+      setActionError("Define um foco curto antes de iniciar a sessão.");
+      return;
+    }
+
     await runSessionAction(async () => {
       await onStartSession({
         weeklyPlanBlockId: selectedBlock?.id as Id<"weeklyPlanBlocks"> | undefined,
         blockLabel: selectedBlock ? `Grind · ${selectedBlock.title}${selectedBlock.target ? ` (${selectedBlock.target})` : ""}` : undefined,
-        sessionFocus: startFocus,
+        sessionFocus: trimmedStartFocus,
         maxTables,
         energy,
         focusScore,
@@ -362,7 +384,7 @@ function SessionsWorkspace({
       if (demoMode) {
         setDemoActiveSession({
           ...demoSession,
-          sessionFocus: startFocus,
+          sessionFocus: trimmedStartFocus,
           blockLabel: selectedBlock ? `Grind · ${selectedBlock.title}${selectedBlock.target ? ` (${selectedBlock.target})` : ""}` : undefined,
           maxTables,
           currentTables: maxTables,
@@ -427,6 +449,11 @@ function SessionsWorkspace({
           }}
           onTogglePause={async () => {
             if (visibleActiveSession._id) await onTogglePause(visibleActiveSession._id);
+            if (demoMode) {
+              setDemoActiveSession((current) =>
+                current ? { ...current, isPaused: !current.isPaused } : current,
+              );
+            }
           }}
           session={visibleActiveSession}
         />
@@ -504,7 +531,15 @@ function SessionsWorkspace({
           <div className={styles.formGrid}>
             <label className={styles.fullField}>
               Foco da sessão
-              <input value={startFocus} onChange={(event) => setStartFocus(event.target.value)} />
+              <input
+                aria-invalid={!canStartSession}
+                required
+                value={startFocus}
+                onChange={(event) => {
+                  setStartFocus(event.target.value);
+                  if (actionError) setActionError("");
+                }}
+              />
             </label>
             <label>
               Bloco
@@ -538,7 +573,7 @@ function SessionsWorkspace({
             <div className={styles.ratingGrid}>
               <Rating label="Energia" min={1} value={energy} onChange={setEnergy} />
               <Rating label="Foco" min={1} value={focusScore} onChange={setFocusScore} />
-              <Rating label="Tilt" min={1} tone="tilt" value={tilt} onChange={setTilt} />
+              <Rating label="Tilt" min={0} tone="tilt" value={tilt} onChange={setTilt} />
             </div>
           </section>
           <button className={styles.qualityRuleButton} type="button">
@@ -548,7 +583,7 @@ function SessionsWorkspace({
             <button className="ep-button secondary" type="button" onClick={() => setModal(null)}>
               Cancelar
             </button>
-            <button className="ep-button primary" type="button" disabled={isSubmitting} onClick={submitStartSession}>
+            <button className="ep-button primary" type="button" disabled={isSubmitting || !canStartSession} onClick={submitStartSession}>
               <Play size={15} aria-hidden="true" />
               {isSubmitting ? "A iniciar..." : "Iniciar sessão"}
             </button>
@@ -583,6 +618,20 @@ function SessionsWorkspace({
                 microIntention: payload.microIntention,
               });
             }
+            if (demoMode) {
+              setDemoActiveSession((current) =>
+                current
+                  ? {
+                      ...current,
+                      currentTables: payload.tables,
+                      energy: payload.energy,
+                      focusScore: payload.focusScore,
+                      microIntention: payload.microIntention || current.microIntention,
+                      tilt: payload.tilt,
+                    }
+                  : current,
+              );
+            }
             setModal(null);
           }}
         />
@@ -599,6 +648,11 @@ function SessionsWorkspace({
               template,
               note,
             });
+            if (demoMode) {
+              setDemoActiveSession((current) =>
+                current ? { ...current, handsToReview: current.handsToReview + 1 } : current,
+              );
+            }
             setModal(null);
           }}
         />
@@ -642,7 +696,7 @@ function SessionsWorkspace({
             <div className={styles.ratingGrid}>
               <Rating label="Energia" min={1} value={finalEnergy} onChange={setFinalEnergy} />
               <Rating label="Foco" min={1} value={finalFocus} onChange={setFinalFocus} />
-              <Rating label="Tilt" min={1} tone="tilt" value={finalTilt} onChange={setFinalTilt} />
+              <Rating label="Tilt" min={0} tone="tilt" value={finalTilt} onChange={setFinalTilt} />
             </div>
           </section>
           <div className={styles.formGrid}>
@@ -1067,7 +1121,7 @@ function CheckupModal({
       <div className={styles.ratingStack}>
         <Rating label="Energia" min={1} value={energy} onChange={setEnergy} />
         <Rating label="Foco" min={1} value={focusScore} onChange={setFocusScore} />
-        <Rating label="Tilt" min={1} value={tilt} onChange={setTilt} />
+        <Rating label="Tilt" min={0} value={tilt} onChange={setTilt} />
       </div>
       <label className={styles.inlineField}>
         Mesas atuais
@@ -1206,7 +1260,7 @@ function Rating({
   value,
 }: {
   label: string;
-  min: 1;
+  min: 0 | 1;
   onChange: (value: number) => void;
   tone?: "tilt";
   value: number;
@@ -1215,7 +1269,7 @@ function Rating({
     <div className={styles.rating}>
       <span>{label}</span>
       <div>
-        {Array.from({ length: 5 }, (_, index) => index + min).map((item) => (
+        {Array.from({ length: min === 0 ? 6 : 5 }, (_, index) => index + min).map((item) => (
           <button
             className={item === value ? (tone === "tilt" ? styles.selectedTiltRating : styles.selectedRating) : ""}
             key={item}

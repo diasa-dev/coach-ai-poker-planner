@@ -20,9 +20,12 @@ import { useConvexAuth, useQuery } from "convex/react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import { hasClerkConfig, hasPersistenceConfig } from "@/lib/runtime-config";
+
+const demoSessionCtaStorageKey = "uplinea-demo-session-cta-state";
+const demoSessionCtaEvent = "uplinea-demo-session-state-change";
 
 const navItems = [
   { href: "/", label: "Hoje", icon: Sun },
@@ -87,7 +90,7 @@ function UplineaShellFrame({ children }: { children: ReactNode }) {
           />
         </Link>
 
-        {hasPersistenceConfig ? <PersistedSessionCta /> : <SessionCta activeSession={null} />}
+        {hasPersistenceConfig ? <PersistedSessionCta /> : <DemoSessionCta />}
 
         <nav className="ep-nav" aria-label="Navegação principal">
           {navItems.map((item) => {
@@ -222,15 +225,69 @@ function ClerkAuthControls() {
 function PersistedSessionCta() {
   const { isAuthenticated } = useConvexAuth();
   const activeSession = useQuery(api.pokerSession.getActive, isAuthenticated ? {} : "skip");
+  const pendingReviewSession = useQuery(api.pokerSession.getPendingReview, isAuthenticated ? {} : "skip");
 
-  return <SessionCta activeSession={activeSession ?? null} />;
+  return <SessionCta activeSession={activeSession ?? null} hasPendingReview={Boolean(pendingReviewSession)} />;
 }
 
-function SessionCta({ activeSession }: { activeSession: { startedAt: number } | null }) {
+function DemoSessionCta() {
+  const [state, setState] = useState<{ status: "idle" | "active" | "pendingReview"; startedAt?: number }>({
+    status: "idle",
+  });
+
+  useEffect(() => {
+    function readDemoState() {
+      const rawValue = window.localStorage.getItem(demoSessionCtaStorageKey);
+      if (!rawValue) {
+        setState({ status: "idle" });
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(rawValue) as { status?: string; startedAt?: number };
+        if (parsed.status === "active" || parsed.status === "pendingReview" || parsed.status === "idle") {
+          setState({ status: parsed.status, startedAt: parsed.startedAt });
+        }
+      } catch {
+        setState({ status: "idle" });
+      }
+    }
+
+    readDemoState();
+    window.addEventListener(demoSessionCtaEvent, readDemoState);
+    return () => window.removeEventListener(demoSessionCtaEvent, readDemoState);
+  }, []);
+
   return (
-    <Link className={activeSession ? "ep-session-cta active-session" : "ep-session-cta"} href="/sessions">
+    <SessionCta
+      activeSession={state.status === "active" && state.startedAt ? { startedAt: state.startedAt } : null}
+      hasPendingReview={state.status === "pendingReview"}
+    />
+  );
+}
+
+function SessionCta({
+  activeSession,
+  hasPendingReview = false,
+}: {
+  activeSession: { startedAt: number } | null;
+  hasPendingReview?: boolean;
+}) {
+  const ctaState = activeSession ? "active" : hasPendingReview ? "pendingReview" : "idle";
+  const label =
+    activeSession
+      ? `Sessão ativa · ${formatSessionDuration(activeSession.startedAt)}`
+      : ctaState === "pendingReview"
+        ? "Terminar e rever"
+        : "Iniciar sessão";
+
+  return (
+    <Link
+      className={ctaState === "idle" ? "ep-session-cta" : `ep-session-cta ${ctaState === "active" ? "active-session" : "review-pending"}`}
+      href="/sessions"
+    >
       <Play size={16} aria-hidden="true" />
-      <span>{activeSession ? `Sessão ativa · ${formatSessionDuration(activeSession.startedAt)}` : "Iniciar sessão"}</span>
+      <span>{label}</span>
     </Link>
   );
 }
