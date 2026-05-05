@@ -14,6 +14,7 @@ import type * as coachProposal from "../coachProposal.js";
 import type * as dailyPlan from "../dailyPlan.js";
 import type * as monthlyTarget from "../monthlyTarget.js";
 import type * as pokerSession from "../pokerSession.js";
+import type * as studySession from "../studySession.js";
 import type * as weeklyPlan from "../weeklyPlan.js";
 import type * as weeklyReview from "../weeklyReview.js";
 
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   dailyPlan: typeof dailyPlan;
   monthlyTarget: typeof monthlyTarget;
   pokerSession: typeof pokerSession;
+  studySession: typeof studySession;
   weeklyPlan: typeof weeklyPlan;
   weeklyReview: typeof weeklyReview;
 }>;

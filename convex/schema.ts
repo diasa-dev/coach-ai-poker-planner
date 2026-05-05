@@ -1,6 +1,19 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+const studyType = v.union(
+  v.literal("Drills"),
+  v.literal("Hand review"),
+  v.literal("Tournament review"),
+  v.literal("Solver"),
+  v.literal("Individual lesson"),
+  v.literal("Group lesson"),
+  v.literal("Video/course"),
+  v.literal("Group study"),
+  v.literal("Theory/concepts"),
+  v.literal("Other"),
+);
+
 export default defineSchema({
   userPreferences: defineTable({
     userId: v.string(),
@@ -136,6 +149,26 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_user_week", ["userId", "weekStartDate"]),
+
+  studySessions: defineTable({
+    userId: v.string(),
+    date: v.string(),
+    weekStartDate: v.string(),
+    month: v.string(),
+    weeklyPlanId: v.optional(v.id("weeklyPlans")),
+    weeklyPlanBlockId: v.optional(v.id("weeklyPlanBlocks")),
+    durationMinutes: v.number(),
+    studyType,
+    quality: v.number(),
+    note: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_date", ["userId", "date"])
+    .index("by_user_week", ["userId", "weekStartDate"])
+    .index("by_user_month", ["userId", "month"])
+    .index("by_user_created", ["userId", "createdAt"])
+    .index("by_user_block", ["userId", "weeklyPlanBlockId"]),
 
   coachProposalApplications: defineTable({
     userId: v.string(),
