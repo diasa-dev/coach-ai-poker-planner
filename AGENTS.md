@@ -24,6 +24,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Do not start the next slice without user confirmation.
 - At the end of every implementation slice/chunk, after validation and before the next slice, reconcile Linear: identify the related issue, add a concise implementation comment, recommend or apply the correct status, move it to In Review if implemented but not fully validated/committed, move it to Done only if validation passed and changes were committed/pushed, create or recommend a new issue if none exists, then stop and wait before new implementation work.
 - Keep user-facing UI copy in Portuguese from Portugal. Keep code, schema, commits, and technical documentation in English.
+- Respond to the user in Portuguese from Portugal by default, even when the prompt is in English. Keep responses short, practical, and decision-oriented. Avoid technical names, file names, variables, and internal details unless they matter for a decision. Always start with a simple summary, and go deeper only when asked or when there is relevant technical risk.
 - Do not create generic full pages without a real flow, data model, and product purpose.
 - Before implementing any meaningful product feature, new section, page, or major change to an existing section, run the Product Discovery Workflow first. Do not implement until the user approves the direction/spec.
 
