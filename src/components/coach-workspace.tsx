@@ -29,6 +29,7 @@ type ReviewStatus = "available" | "draft" | "completed" | "skipped";
 type CoachContext = {
   isDemo: boolean;
   weeklyPlanState: string;
+  weeklyPlanScope: string;
   monthlyGoalsState: string;
   sessionsState: string;
   reviewState: string;
@@ -126,6 +127,12 @@ type ProposalStage = "summary" | "review" | "edit" | "confirm" | "applied";
 
 const todayIsoDate = getTodayIsoDate();
 
+function getCurrentMonth() {
+  return new Date().toISOString().slice(0, 7);
+}
+
+const currentMonth = getCurrentMonth();
+
 const promptChips = [
   "Ajusta esta semana",
   "Analisa o ritmo do mês",
@@ -137,7 +144,8 @@ const promptChips = [
 const demoCoachContext: CoachContext = {
   isDemo: true,
   weeklyPlanState: "Ativo",
-  monthlyGoalsState: "Mock",
+  weeklyPlanScope: "Plano da semana demo",
+  monthlyGoalsState: "Demo",
   sessionsState: "3 sessões usadas",
   reviewState: "Rascunho demo",
   reviewStatus: "draft",
@@ -163,6 +171,7 @@ export function CoachWorkspace() {
 function PersistedCoachWorkspace() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const weeklyPlan = useQuery(api.weeklyPlan.getCurrent, isAuthenticated ? { today: todayIsoDate } : "skip");
+  const monthlyTargets = useQuery(api.monthlyTarget.listForMonth, isAuthenticated ? { month: currentMonth } : "skip");
   const sessions = useQuery(api.pokerSession.list, isAuthenticated ? {} : "skip");
   const weeklyReview = useQuery(
     api.weeklyReview.getByWeek,
@@ -178,14 +187,20 @@ function PersistedCoachWorkspace() {
 
   const isFetching =
     isLoading ||
-    (isAuthenticated && (weeklyPlan === undefined || sessions === undefined || weeklyReview === undefined));
+    (isAuthenticated &&
+      (weeklyPlan === undefined ||
+        monthlyTargets === undefined ||
+        sessions === undefined ||
+        weeklyReview === undefined));
 
   const context = useMemo<CoachContext>(() => {
-    if (!isAuthenticated || !weeklyPlan || !sessions || weeklyReview === undefined) {
+    if (!isAuthenticated || !weeklyPlan || !monthlyTargets || !sessions || weeklyReview === undefined) {
       return {
         ...demoCoachContext,
         isDemo: true,
         weeklyPlanState: isFetching ? "A carregar" : "Demo",
+        weeklyPlanScope: isFetching ? "Plano da semana a carregar" : "Plano da semana demo",
+        monthlyGoalsState: isFetching ? "A carregar" : "Demo",
         sessionsState: isFetching ? "A carregar" : "Demo",
         reviewState: isFetching ? "A carregar" : "Demo",
       };
@@ -199,7 +214,8 @@ function PersistedCoachWorkspace() {
     return {
       isDemo: false,
       weeklyPlanState: weeklyPlan.currentPlan ? "Ativo" : "Sem plano ativo",
-      monthlyGoalsState: "Mock",
+      weeklyPlanScope: formatWeekScope(weeklyPlan.weekStartDate),
+      monthlyGoalsState: getMonthlyGoalsState(monthlyTargets.length),
       sessionsState: recentSessions.length ? `${recentSessions.length} sessões usadas` : "Sem sessões",
       reviewState: getReviewStateCopy(reviewStatus),
       reviewStatus,
@@ -216,7 +232,7 @@ function PersistedCoachWorkspace() {
         .filter((value): value is string => Boolean(value))
         .slice(0, 2),
     };
-  }, [isAuthenticated, isFetching, sessions, weeklyPlan, weeklyReview]);
+  }, [isAuthenticated, isFetching, monthlyTargets, sessions, weeklyPlan, weeklyReview]);
 
   const currentPlan = weeklyPlan?.currentPlan ?? null;
   const activeApplicationId = applicationId ?? activeApplication?._id ?? null;
@@ -718,7 +734,7 @@ function getProposalTitle(proposal: CoachProposal) {
 }
 
 function getProposalScope(proposal: CoachProposal) {
-  return `Plano da semana 18 (${formatChangeCount(proposal.items.length)})`;
+  return `${proposal.scope} (${formatChangeCount(proposal.items.length)})`;
 }
 
 function normalizeProposalItem(item: CoachProposalItem): CoachProposalItem {
@@ -748,7 +764,7 @@ function getTypeOption(type: StoredBlockType) {
 function buildEditableProposal(context: CoachContext): CoachProposal {
   return {
     title: "3 blocos de 30 min antes da sessão da manhã",
-    scope: "Plano da semana 18 (3 alterações)",
+    scope: context.weeklyPlanScope,
     items: [
       {
         dayIndex: 4,
@@ -797,6 +813,32 @@ function getReviewStateCopy(status: ReviewStatus) {
   if (status === "draft") return "Rascunho";
   if (status === "skipped") return "Saltada";
   return "Em falta";
+}
+
+function getMonthlyGoalsState(targetCount: number) {
+  if (targetCount === 0) return "Sem objetivos definidos";
+  if (targetCount === 1) return "1 objetivo definido";
+  return `${targetCount} objetivos definidos`;
+}
+
+function formatWeekScope(weekStartDate: string) {
+  const startDate = parseIsoDate(weekStartDate);
+  const endDate = new Date(startDate);
+  endDate.setUTCDate(startDate.getUTCDate() + 6);
+
+  return `Plano ${formatShortDate(startDate)}-${formatShortDate(endDate)}`;
+}
+
+function parseIsoDate(value: string) {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+function formatShortDate(date: Date) {
+  return new Intl.DateTimeFormat("pt-PT", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "UTC",
+  }).format(date);
 }
 
 function average(values: Array<number | undefined>) {
