@@ -22,10 +22,10 @@ function signInInstructions() {
     "Authenticated smoke requires a Clerk session.",
     "",
     "Run this once and sign in through the opened browser:",
-    "AUTH_SMOKE_HEADFUL=1 SMOKE_BASE_URL=http://localhost:3103 npm run smoke:coach:auth",
+    `AUTH_SMOKE_HEADFUL=1 SMOKE_BASE_URL=${baseUrl} npm run smoke:coach:auth`,
     "",
     "Then close the browser and rerun:",
-    "SMOKE_BASE_URL=http://localhost:3103 npm run smoke:coach:auth",
+    `SMOKE_BASE_URL=${baseUrl} npm run smoke:coach:auth`,
   ].join("\n");
 }
 
@@ -69,6 +69,13 @@ function hasAuthenticatedPlanContext(bodyText) {
 
 async function waitText(page, text) {
   await page.getByText(text, { exact: false }).first().waitFor({
+    state: "visible",
+    timeout: 20_000,
+  });
+}
+
+async function waitTextPattern(page, pattern) {
+  await page.getByText(pattern).first().waitFor({
     state: "visible",
     timeout: 20_000,
   });
@@ -188,7 +195,7 @@ async function applyCoachProposal(page) {
   await waitText(page, "Aplicar 3 alterações ao plano?");
   await page.getByRole("button", { name: "Sim, aplicar" }).click();
   await waitText(page, "Alteração aplicada ao plano");
-  await waitText(page, "Plano da semana 18 (3 alterações)");
+  await waitTextPattern(page, /Plano .*\(3 alterações\)/);
   await page.getByRole("button", { name: /Anular \(\d+s\)/ }).waitFor({
     state: "visible",
     timeout: 20_000,
