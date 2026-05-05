@@ -91,15 +91,33 @@ async function applyCoachProposal(page) {
   });
 }
 
+async function waitForCoachCleanupState(page) {
+  await page.getByRole("button", { name: /Anular/ }).waitFor({
+    state: "hidden",
+    timeout: 20_000,
+  });
+  await page.locator(".ep-coach-proposal-row").first().waitFor({
+    state: "visible",
+    timeout: 20_000,
+  });
+  await page.getByRole("button", { name: "Aplicar alteração" }).waitFor({
+    state: "visible",
+    timeout: 20_000,
+  });
+}
+
 async function smoke() {
   const context = await launchAuthenticatedSmokeContext(authSmokeConfig);
   const page = context.pages()[0] ?? (await context.newPage());
+  const verificationPage = await context.newPage();
   const consoleErrors = [];
 
-  page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors.push(message.text());
-  });
-  page.on("pageerror", (error) => consoleErrors.push(error.message));
+  for (const smokePage of [page, verificationPage]) {
+    smokePage.on("console", (message) => {
+      if (message.type() === "error") consoleErrors.push(message.text());
+    });
+    smokePage.on("pageerror", (error) => consoleErrors.push(error.message));
+  }
 
   try {
     await gotoApp(page, "/coach");
@@ -108,23 +126,24 @@ async function smoke() {
     await clearActiveApplicationIfNeeded(page);
     await applyCoachProposal(page);
 
-    await gotoApp(page, "/weekly");
-    await page.locator(".ep-origin-badge", { hasText: "Coach" }).first().waitFor({
+    await gotoApp(verificationPage, "/weekly");
+    await verificationPage.locator(".ep-origin-badge", { hasText: "Coach" }).first().waitFor({
       state: "visible",
       timeout: 20_000,
     });
 
-    await gotoApp(page, "/");
-
-    await gotoApp(page, "/coach");
     const undoButton = page.getByRole("button", { name: /Anular \(\d+s\)/ });
 
     if ((await undoButton.count()) === 0) {
-      throw new Error("Undo window expired before authenticated smoke could clean up.");
+      throw new Error(
+        "Authenticated smoke cleanup could not find the Coach undo button after verifying the Weekly badge. The undo window may have expired, the Coach page may have lost active proposal state, or the apply step did not expose cleanup.",
+      );
     }
 
     await undoButton.first().click();
-    await waitText(page, "Rever proposta");
+    await waitForCoachCleanupState(page);
+
+    await gotoApp(verificationPage, "/");
 
     const blockingErrors = consoleErrors.filter(
       (entry) => !ignoredConsoleErrorFragments.some((fragment) => entry.includes(fragment)),
