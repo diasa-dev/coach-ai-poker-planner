@@ -47,6 +47,7 @@ type MonthlyTargetRecord = {
   category: CategoryId;
   primaryUnit: string;
   targetValue: number;
+  currentValue?: number;
   optionalSecondaryUnit?: string;
   optionalSecondaryTargetValue?: number;
 };
@@ -200,7 +201,7 @@ function buildRows(targets: MonthlyTargetRecord[]): TargetRow[] {
       accent: config.accent,
       primaryUnit: target?.primaryUnit ?? config.defaultUnit,
       targetValue: target?.targetValue ?? 0,
-      currentValue: 0,
+      currentValue: target?.currentValue ?? 0,
       secondaryUnit: target?.optionalSecondaryUnit,
       secondaryTargetValue: target?.optionalSecondaryTargetValue,
       currentSecondaryValue: target?.optionalSecondaryUnit ? 0 : undefined,
@@ -291,6 +292,7 @@ function PersistedMonthlyTargets({ month }: { month: string }) {
     annualPlan?._id ?? "no-annual-plan",
     annualPlan?.updatedAt ?? 0,
     monthlyTargets?.map((target) => `${target.category}:${target.updatedAt}`).join("|") ?? "empty",
+    monthlyTargets?.map((target) => `${target.category}:${target.currentValue ?? 0}`).join("|") ?? "progress-empty",
   ].join(":");
 
   return (

@@ -26,6 +26,7 @@ type MonthlyTargetContext = {
   category: MonthlyTargetCategory;
   primaryUnit: string;
   targetValue: number;
+  currentValue?: number;
   optionalSecondaryUnit?: string;
   optionalSecondaryTargetValue?: number;
 };
@@ -218,7 +219,7 @@ function PersistedTodayExecution() {
 
   return (
     <TodayWorkspace
-      key={`${weeklyPlan.weekStartDate}:${activePlan?._id ?? "no-active"}:${activePlan?.updatedAt ?? 0}:${todayBlocks.length}:${preparedDay.dailyPlan?._id ?? "unprepared"}:${preparedDay.dailyPlan?.updatedAt ?? 0}:${preparedCommitments.length}:${currentMonthlyTargets.map((target) => `${target.category}:${target.updatedAt}`).join("|")}:${annualPlan?._id ?? "no-annual-plan"}:${annualPlan?.updatedAt ?? 0}`}
+      key={`${weeklyPlan.weekStartDate}:${activePlan?._id ?? "no-active"}:${activePlan?.updatedAt ?? 0}:${todayBlocks.length}:${preparedDay.dailyPlan?._id ?? "unprepared"}:${preparedDay.dailyPlan?.updatedAt ?? 0}:${preparedCommitments.length}:${currentMonthlyTargets.map((target) => `${target.category}:${target.updatedAt}:${target.currentValue ?? 0}`).join("|")}:${annualPlan?._id ?? "no-annual-plan"}:${annualPlan?.updatedAt ?? 0}`}
       annualPlan={annualPlan ?? null}
       dailyPlanStatus={preparedDay.dailyPlan?.status}
       initialCommitments={preparedCommitments}
@@ -817,7 +818,7 @@ function buildMonthlyPaceRows(targets: MonthlyTargetContext[]) {
   };
 
   return targets.map((target) => {
-    const currentValue = 0;
+    const currentValue = target.currentValue ?? 0;
     const status = getMonthlyPaceStatus(currentValue, target.targetValue);
 
     return {
