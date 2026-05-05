@@ -167,6 +167,23 @@ local Clerk session.
 This smoke mutates local/dev data by applying the Coach proposal, verifies the
 Coach-origin badge in Weekly, checks that Today still loads, and uses undo before
 the countdown expires. Run it only against local or disposable dev data.
+
+For authenticated Study flow smoke, use the same authenticated dev server and
+Clerk profile:
+
+```bash
+SMOKE_BASE_URL=http://localhost:3100 npm run smoke:study:auth
+```
+
+If the profile is not signed in yet:
+
+```bash
+AUTH_SMOKE_HEADFUL=1 SMOKE_BASE_URL=http://localhost:3100 npm run smoke:study:auth
+```
+
+This smoke covers the focused Study cycle: planned Study block -> open Study ->
+save linked log -> explicit mark-done confirmation -> Monthly/Today, Weekly
+Review, and Coach context surfaces.
 Google OAuth can reject Playwright's testing browser as insecure. Treat that as
 an auth-provider limitation, not a product failure. Use email/password in the
 Clerk modal for the persistent smoke profile, or validate login manually in a
