@@ -184,6 +184,30 @@ AUTH_SMOKE_HEADFUL=1 SMOKE_BASE_URL=http://localhost:3100 npm run smoke:study:au
 This smoke covers the focused Study cycle: planned Study block -> open Study ->
 save linked log -> explicit mark-done confirmation -> Monthly/Today, Weekly
 Review, and Coach context surfaces.
+
+For the integrated authenticated MVP smoke, use the same authenticated dev
+server and Clerk profile:
+
+```bash
+SMOKE_BASE_URL=http://localhost:3100 npm run smoke:mvp:auth
+```
+
+If the profile is not signed in yet:
+
+```bash
+AUTH_SMOKE_HEADFUL=1 SMOKE_BASE_URL=http://localhost:3100 npm run smoke:mvp:auth
+```
+
+This smoke covers the shortest persisted MVP loop across Monthly context,
+Weekly Plan, Today, Study, Weekly Review, and Coach. It tolerates existing local
+dev data, reuses an existing valid Study block when available, and applies a
+Coach proposal only when needed to create one. It mutates local/dev data by
+saving the Study monthly target, creating a linked Study log, preparing or
+updating Today, and saving the Weekly Review. If a temporary Coach proposal can
+still be undone, the smoke undoes it; if the undo window has expired, the
+remaining local/dev Weekly Plan mutation is expected and should not be treated
+as a product failure.
+
 Google OAuth can reject Playwright's testing browser as insecure. Treat that as
 an auth-provider limitation, not a product failure. Use email/password in the
 Clerk modal for the persistent smoke profile, or validate login manually in a
