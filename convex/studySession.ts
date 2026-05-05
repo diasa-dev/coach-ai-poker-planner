@@ -84,6 +84,56 @@ function getTopStudyType(sessions: { studyType: string }[]) {
   return studyType;
 }
 
+function getTopStudyTypes(sessions: { studyType: string }[]) {
+  const counts = sessions.reduce<Record<string, number>>((acc, session) => {
+    acc[session.studyType] = (acc[session.studyType] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 3)
+    .map(([studyType, count]) => ({ studyType, count }));
+}
+
+export const getWeekReviewContext = query({
+  args: {
+    weekStartDate: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const sessions = await ctx.db
+      .query("studySessions")
+      .withIndex("by_user_week", (q) => q.eq("userId", userId).eq("weekStartDate", args.weekStartDate))
+      .collect();
+    const linkedBlockIds = Array.from(
+      new Set(sessions.map((session) => session.weeklyPlanBlockId).filter((id): id is Id<"weeklyPlanBlocks"> => Boolean(id))),
+    );
+    const linkedBlocks = await Promise.all(linkedBlockIds.map((id) => ctx.db.get(id)));
+    const blockTitles = new Map(
+      linkedBlocks.flatMap((block) => (block && block.userId === userId ? [[block._id, block.title] as const] : [])),
+    );
+    const sortedSessions = sessions.sort((a, b) => b.createdAt - a.createdAt);
+
+    return {
+      minutes: sessions.reduce((total, session) => total + session.durationMinutes, 0),
+      averageQuality: average(sessions.map((session) => session.quality)),
+      topStudyTypes: getTopStudyTypes(sessions),
+      linkedLogCount: sessions.filter((session) => session.weeklyPlanBlockId).length,
+      standaloneLogCount: sessions.filter((session) => !session.weeklyPlanBlockId).length,
+      logs: sortedSessions.slice(0, 6).map((session) => ({
+        id: session._id,
+        date: session.date,
+        durationMinutes: session.durationMinutes,
+        quality: session.quality,
+        studyType: session.studyType,
+        blockTitle: session.weeklyPlanBlockId ? blockTitles.get(session.weeklyPlanBlockId) : undefined,
+        linkedToWeeklyBlock: Boolean(session.weeklyPlanBlockId),
+      })),
+    };
+  },
+});
+
 export const getCurrent = query({
   args: {
     today: v.string(),
