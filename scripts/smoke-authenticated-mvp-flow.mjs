@@ -12,6 +12,8 @@ const authSmokeConfig = createAuthSmokeSessionConfig({
 const { baseUrl } = authSmokeConfig;
 
 const smokeRunId = `Smoke MVP ${new Date().toISOString()}`;
+const smokeStudyBlockTitle = `${smokeRunId}: estudo`;
+const smokeTodayCommitmentTitle = `${smokeRunId}: compromisso mínimo`;
 
 const ignoredConsoleErrorFragments = [
   "Download the React DevTools",
@@ -27,13 +29,6 @@ async function readBodyText(page) {
 
 async function waitText(page, text) {
   await page.getByText(text, { exact: false }).first().waitFor({
-    state: "visible",
-    timeout: 20_000,
-  });
-}
-
-async function waitTextPattern(page, pattern) {
-  await page.getByText(pattern).first().waitFor({
     state: "visible",
     timeout: 20_000,
   });
@@ -118,30 +113,45 @@ async function hasWeeklyStudyRegistrationLink(page) {
   return (await page.getByRole("link", { name: "Registar estudo" }).count()) > 0;
 }
 
-async function applyCoachProposalForStudyBlocks(page) {
-  await clearActiveCoachApplicationIfPossible(page);
-  await waitText(page, "Rever proposta");
-  await page.getByRole("button", { name: "Rever proposta" }).click();
-  await page.locator(".ep-coach-proposal-row").first().waitFor({
-    state: "visible",
-    timeout: 20_000,
-  });
-  await page.getByRole("button", { name: "Aplicar alteração" }).click();
-  await waitTextPattern(page, /Aplicar \d+ alterações ao plano\?/);
-  await page.getByRole("button", { name: "Sim, aplicar" }).click();
-  await waitText(page, "Alteração aplicada ao plano");
-}
-
 async function ensureWeeklyStudyBlock(page) {
   if (await hasWeeklyStudyRegistrationLink(page)) return "existing";
 
-  await applyCoachProposalForStudyBlocks(page);
+  await createFreshWeeklyStudyBlock(page);
 
   if (!(await hasWeeklyStudyRegistrationLink(page))) {
     throw new Error("MVP smoke could not find or create a valid Weekly Study block.");
   }
 
-  return "coach-proposal";
+  return "weekly-plan";
+}
+
+async function createFreshWeeklyStudyBlock(page) {
+  await gotoApp(page, "/weekly");
+  await waitText(page, "Plano semanal");
+  await page.getByRole("button", { name: "Planear semana" }).click();
+  await waitText(page, "Planear semana");
+
+  const todayColumn = page.locator(".ep-day-column.today").first();
+  await todayColumn.waitFor({ state: "visible", timeout: 20_000 });
+  await todayColumn.getByRole("button", { name: "Adicionar" }).click();
+  await todayColumn.locator(".wpp-add-pop").getByRole("button", { name: "Estudo" }).click();
+
+  const newBlockButton = todayColumn.locator(".wpp-block-main").last();
+  await newBlockButton.waitFor({ state: "visible", timeout: 20_000 });
+  await newBlockButton.click();
+
+  const drawer = page.getByRole("dialog", { name: "Editar bloco" });
+  await drawer.waitFor({ state: "visible", timeout: 20_000 });
+  await drawer.getByLabel("Título").fill(smokeStudyBlockTitle);
+  await drawer.getByRole("button", { name: "Guardar" }).click();
+  await drawer.waitFor({ state: "hidden", timeout: 20_000 });
+
+  await page.getByRole("button", { name: "Ativar plano" }).click();
+  await waitText(page, "Plano semanal");
+  await page.getByText(smokeStudyBlockTitle, { exact: true }).waitFor({
+    state: "visible",
+    timeout: 20_000,
+  });
 }
 
 async function expectSelectedWeeklyBlock(select) {
@@ -155,7 +165,14 @@ async function expectSelectedWeeklyBlock(select) {
 
 async function saveLinkedStudyLog(page) {
   await gotoApp(page, "/weekly");
-  const studyLink = page.getByRole("link", { name: "Registar estudo" }).first();
+  const studyBlockRow = page
+    .locator(".wp-row-like")
+    .filter({ hasText: smokeStudyBlockTitle });
+  const studyLink =
+    (await studyBlockRow.count()) > 0
+      ? studyBlockRow.first().getByRole("link", { name: "Registar estudo" })
+      : page.getByRole("link", { name: "Registar estudo" }).first();
+
   await studyLink.waitFor({ state: "visible", timeout: 20_000 });
   await studyLink.click();
 
@@ -175,23 +192,40 @@ async function ensureTodayPreparedAndDone(page) {
 
   const commitmentsCard = page.locator(".today-commitments-card");
 
-  if ((await commitmentsCard.getByRole("button", { name: "Feito" }).count()) === 0) {
-    await page.getByRole("button", { name: /Preparar dia|Editar dia/ }).first().click();
-    await waitText(page, "Preparar dia");
-    await page.getByLabel("Adicionar compromisso (opcional)").fill(`${smokeRunId}: compromisso mínimo`);
-    await page.getByRole("button", { name: "Confirmar dia" }).click();
-    await commitmentsCard.getByRole("button", { name: "Feito" }).first().waitFor({
-      state: "visible",
-      timeout: 20_000,
-    });
+  await page.getByRole("button", { name: /Preparar dia|Editar dia/ }).first().click();
+  await page.getByRole("dialog", { name: "Preparar dia" }).waitFor({
+    state: "visible",
+    timeout: 20_000,
+  });
+  const prepareDialog = page.getByRole("dialog", { name: "Preparar dia" });
+  const selectedOptions = prepareDialog.locator('input[type="checkbox"]:checked');
+  const selectedCount = await selectedOptions.count();
+
+  for (let index = selectedCount - 1; index >= 0; index -= 1) {
+    await selectedOptions.nth(index).uncheck();
   }
 
-  await commitmentsCard.getByRole("button", { name: "Feito" }).first().click();
+  await page.getByLabel("Adicionar compromisso (opcional)").fill(smokeTodayCommitmentTitle);
+  await page.getByRole("button", { name: "Confirmar dia" }).click();
+
+  const smokeCommitment = commitmentsCard
+    .locator(".today-commitment")
+    .filter({ hasText: smokeTodayCommitmentTitle })
+    .first();
+  await smokeCommitment.waitFor({
+    state: "visible",
+    timeout: 20_000,
+  });
+
+  await smokeCommitment.getByRole("button", { name: /^Feito$/ }).click();
   await page.getByText("A guardar", { exact: false }).waitFor({
     state: "hidden",
     timeout: 20_000,
   }).catch(() => undefined);
-  await waitText(page, "Feito");
+  await smokeCommitment.locator(".today-status-pill.done").waitFor({
+    state: "visible",
+    timeout: 20_000,
+  });
 }
 
 async function saveMinimalWeeklyReview(page) {
@@ -260,9 +294,9 @@ async function smoke() {
       return false;
     });
 
-    if (!cleaned && studyBlockSource === "coach-proposal") {
+    if (!cleaned && studyBlockSource === "weekly-plan") {
       cleanupNotes.push(
-        "Coach proposal undo was not available; local/dev Weekly Plan mutations are expected for this smoke.",
+        "Fresh Study block was left in the local/dev Weekly Plan so repeated MVP smoke runs stay independent.",
       );
     }
 
