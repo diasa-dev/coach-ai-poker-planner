@@ -24,6 +24,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import {
   buildPlanDaysFromStoredBlocks,
+  createEmptyPlanDays,
   formatPlanMinutes,
   getTodayIsoDate,
   initialPlanDays,
@@ -243,6 +244,21 @@ const demoWeeklyReviewForm: WeeklyReviewForm = {
 };
 
 const demoCategorySummary = buildCategorySummary(initialPlanDays);
+const emptyWeeklyReviewForm: WeeklyReviewForm = {
+  status: "available",
+  ratings: {
+    execution: 3,
+    energy: 3,
+    focus: 3,
+    quality: 3,
+  },
+  reflection: {
+    wins: "",
+    leaks: "",
+    reasons: [],
+    next: "",
+  },
+};
 
 const statusCopy: Record<BlockStatus, string> = {
   planned: "Planeado",
@@ -255,12 +271,12 @@ export function ReviewSection() {
   if (!hasPersistenceConfig) {
     return (
       <ReviewWorkspace
-      initialReview={demoWeeklyReviewForm}
-      planSummary={demoCategorySummary}
-      sessionReviewContext={demoSessionReviewContext}
-      studyReviewContext={demoStudyReviewContext}
-      strategicContext={demoStrategicReviewContext}
-    />
+        initialReview={demoWeeklyReviewForm}
+        planSummary={demoCategorySummary}
+        sessionReviewContext={demoSessionReviewContext}
+        studyReviewContext={demoStudyReviewContext}
+        strategicContext={demoStrategicReviewContext}
+      />
     );
   }
 
@@ -289,7 +305,15 @@ function PersistedReviewSection() {
   );
   const saveWeeklyReview = useMutation(api.weeklyReview.save);
   const planSummary = useMemo(() => {
-    if (!isAuthenticated || !weeklyPlan?.currentPlan) return demoCategorySummary;
+    if (!isAuthenticated) return demoCategorySummary;
+    if (!weeklyPlan?.currentPlan) {
+      return buildCategorySummary(
+        createEmptyPlanDays({
+          today: todayIsoDate,
+          weekStartDate: weeklyPlan?.weekStartDate ?? todayIsoDate,
+        }),
+      );
+    }
 
     return buildCategorySummary(
       buildPlanDaysFromStoredBlocks({
@@ -344,6 +368,8 @@ function PersistedReviewSection() {
     );
   }
 
+  const hasCurrentPlan = Boolean(weeklyPlan?.currentPlan);
+
   const initialReview: WeeklyReviewForm = weeklyReview
     ? {
         status: weeklyReview.status === "draft" ? "draft" : weeklyReview.status,
@@ -360,13 +386,15 @@ function PersistedReviewSection() {
           next: weeklyReview.adjustmentNextWeek,
         },
       }
-    : {
-        ...demoWeeklyReviewForm,
-        reflection: {
-          ...demoWeeklyReviewForm.reflection,
-          reasons: getPlanReasons(planSummary) || demoWeeklyReviewForm.reflection.reasons,
-        },
-      };
+    : isAuthenticated
+      ? emptyWeeklyReviewForm
+      : {
+          ...demoWeeklyReviewForm,
+          reflection: {
+            ...demoWeeklyReviewForm.reflection,
+            reasons: getPlanReasons(planSummary) || demoWeeklyReviewForm.reflection.reasons,
+          },
+        };
 
   return (
     <ReviewWorkspace
@@ -394,6 +422,7 @@ function PersistedReviewSection() {
             }
           : undefined
       }
+      hasCurrentPlan={hasCurrentPlan}
       planSummary={planSummary}
       sessionReviewContext={sessionReviewContext}
       studyReviewContext={studyReviewContext ?? demoStudyReviewContext}
@@ -406,6 +435,7 @@ function PersistedReviewSection() {
 }
 
 function ReviewWorkspace({
+  hasCurrentPlan = true,
   initialReview,
   onSaveReview,
   planSummary,
@@ -413,6 +443,7 @@ function ReviewWorkspace({
   studyReviewContext,
   strategicContext,
 }: {
+  hasCurrentPlan?: boolean;
   initialReview: WeeklyReviewForm;
   onSaveReview?: (review: WeeklyReviewForm) => Promise<void>;
   planSummary: CategorySummary[];
@@ -491,6 +522,19 @@ function ReviewWorkspace({
       </div>
 
       <ReviewStateBanner status={status} onResume={() => setStatus("draft")} />
+
+      {!hasCurrentPlan ? (
+        <article className={styles.stateBanner}>
+          <FileText size={18} aria-hidden="true" />
+          <div>
+            <strong>Ainda não há plano semanal real para rever.</strong>
+            <p>Podes criar a primeira semana agora e voltar à revisão quando houver execução.</p>
+          </div>
+          <Link className="ep-button secondary" href="/weekly">
+            Criar plano semanal
+          </Link>
+        </article>
+      ) : null}
 
       <div className={styles.reviewLayout}>
         <main className={styles.mainColumn}>
@@ -894,18 +938,28 @@ function CategoryRow({
 
       {expanded ? (
         <div className={styles.categoryDetails}>
-          {category.details.map((detail) => (
-            <div className={styles.detailRow} key={detail.id}>
-              <span className={`${styles.statusPill} ${styles[detail.status]}`}>{statusCopy[detail.status]}</span>
+          {category.details.length ? (
+            category.details.map((detail) => (
+              <div className={styles.detailRow} key={detail.id}>
+                <span className={`${styles.statusPill} ${styles[detail.status]}`}>{statusCopy[detail.status]}</span>
+                <div>
+                  <strong>{detail.title}</strong>
+                  <small>
+                    {detail.meta}
+                    {detail.reason ? ` · ${detail.reason}` : ""}
+                  </small>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className={styles.detailRow}>
+              <span className={`${styles.statusPill} ${styles.planned}`}>Vazio</span>
               <div>
-                <strong>{detail.title}</strong>
-                <small>
-                  {detail.meta}
-                  {detail.reason ? ` · ${detail.reason}` : ""}
-                </small>
+                <strong>Sem blocos reais nesta categoria.</strong>
+                <small>Adiciona blocos no Plano semanal para criar contexto de revisão.</small>
               </div>
             </div>
-          ))}
+          )}
         </div>
       ) : null}
     </article>
