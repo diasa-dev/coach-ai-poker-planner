@@ -16,12 +16,13 @@ import {
   Sun,
   Target,
 } from "lucide-react";
-import { useConvexAuth, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
+import { usePersistenceAuth } from "@/lib/persistence-auth";
 import { hasClerkConfig, hasPersistenceConfig } from "@/lib/runtime-config";
 
 const demoSessionCtaStorageKey = "uplinea-demo-session-cta-state";
@@ -246,9 +247,10 @@ function ClerkAuthControls() {
 }
 
 function PersistedSessionCta() {
-  const { isAuthenticated } = useConvexAuth();
-  const activeSession = useQuery(api.pokerSession.getActive, isAuthenticated ? {} : "skip");
-  const pendingReviewSession = useQuery(api.pokerSession.getPendingReview, isAuthenticated ? {} : "skip");
+  const auth = usePersistenceAuth();
+  const canUsePersistence = auth.kind === "ready";
+  const activeSession = useQuery(api.pokerSession.getActive, canUsePersistence ? {} : "skip");
+  const pendingReviewSession = useQuery(api.pokerSession.getPendingReview, canUsePersistence ? {} : "skip");
 
   return <SessionCta activeSession={activeSession ?? null} hasPendingReview={Boolean(pendingReviewSession)} />;
 }

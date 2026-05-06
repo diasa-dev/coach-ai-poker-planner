@@ -13,7 +13,7 @@ import {
   Target,
   X,
 } from "lucide-react";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { api } from "../../convex/_generated/api";
@@ -41,6 +41,8 @@ import {
   type PlanBlockType,
   type PlanDay,
 } from "@/lib/planning/weekly-plan";
+import { PersistenceUnavailable } from "@/components/persistence-unavailable";
+import { usePersistenceAuth } from "@/lib/persistence-auth";
 import { hasPersistenceConfig } from "@/lib/runtime-config";
 
 const planOrder = ["Grind", "Estudo", "Review", "Desporto", "Descanso", "Admin"] as const;
@@ -142,19 +144,20 @@ export function WeeklyPlan() {
 }
 
 function PersistedWeeklyPlan() {
-  const { isAuthenticated, isLoading } = useConvexAuth();
+  const auth = usePersistenceAuth();
+  const canUsePersistence = auth.kind === "ready";
   const currentMonth = getCurrentMonth();
   const weeklyPlan = useQuery(
     api.weeklyPlan.getCurrent,
-    isAuthenticated ? { today: todayIsoDate } : "skip",
+    canUsePersistence ? { today: todayIsoDate } : "skip",
   );
   const monthlyTargets = useQuery(
     api.monthlyTarget.listForMonth,
-    isAuthenticated ? { month: currentMonth } : "skip",
+    canUsePersistence ? { month: currentMonth } : "skip",
   );
   const annualPlan = useQuery(
     api.annualPlan.getCurrent,
-    isAuthenticated ? { year: new Date().getFullYear() } : "skip",
+    canUsePersistence ? { year: new Date().getFullYear() } : "skip",
   );
   const saveWeeklyPlan = useMutation(api.weeklyPlan.save);
   const copyPreviousWeek = useMutation(api.weeklyPlan.copyPreviousWeek);
@@ -162,8 +165,8 @@ function PersistedWeeklyPlan() {
   const [saveState, setSaveState] = useState<SaveState>("idle");
 
   if (
-    isLoading ||
-    (isAuthenticated &&
+    auth.kind === "loading" ||
+    (canUsePersistence &&
       (weeklyPlan === undefined || monthlyTargets === undefined || annualPlan === undefined))
   ) {
     return (
@@ -173,7 +176,7 @@ function PersistedWeeklyPlan() {
     );
   }
 
-  if (!isAuthenticated) {
+  if (auth.kind === "signed-out") {
     return (
       <WeeklyPlanWorkspace
         demoReason="Sessão não iniciada. Estás a ver dados mock; entra para guardar o plano no Convex."
@@ -184,6 +187,10 @@ function PersistedWeeklyPlan() {
         weekStartDay={1}
       />
     );
+  }
+
+  if (auth.kind === "unavailable") {
+    return <PersistenceUnavailable featureName="Plano semanal" className="ep-page ep-weekly-page wp-page" />;
   }
 
   if (!weeklyPlan || !monthlyTargets || annualPlan === undefined) {

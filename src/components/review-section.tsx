@@ -16,7 +16,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 
@@ -33,6 +33,8 @@ import {
   type PlanBlockType,
   type PlanDay,
 } from "@/lib/planning/weekly-plan";
+import { PersistenceUnavailable } from "@/components/persistence-unavailable";
+import { usePersistenceAuth } from "@/lib/persistence-auth";
 import { hasPersistenceConfig } from "@/lib/runtime-config";
 import styles from "./review-section.module.css";
 
@@ -284,28 +286,29 @@ export function ReviewSection() {
 }
 
 function PersistedReviewSection() {
-  const { isAuthenticated, isLoading } = useConvexAuth();
-  const weeklyPlan = useQuery(api.weeklyPlan.getCurrent, isAuthenticated ? { today: todayIsoDate } : "skip");
-  const sessions = useQuery(api.pokerSession.list, isAuthenticated ? {} : "skip");
+  const auth = usePersistenceAuth();
+  const canUsePersistence = auth.kind === "ready";
+  const weeklyPlan = useQuery(api.weeklyPlan.getCurrent, canUsePersistence ? { today: todayIsoDate } : "skip");
+  const sessions = useQuery(api.pokerSession.list, canUsePersistence ? {} : "skip");
   const weeklyReview = useQuery(
     api.weeklyReview.getByWeek,
-    isAuthenticated && weeklyPlan ? { weekStartDate: weeklyPlan.weekStartDate } : "skip",
+    canUsePersistence && weeklyPlan ? { weekStartDate: weeklyPlan.weekStartDate } : "skip",
   );
   const studyReviewContext = useQuery(
     api.studySession.getWeekReviewContext,
-    isAuthenticated && weeklyPlan ? { weekStartDate: weeklyPlan.weekStartDate } : "skip",
+    canUsePersistence && weeklyPlan ? { weekStartDate: weeklyPlan.weekStartDate } : "skip",
   );
   const annualDirection = useQuery(
     api.annualPlan.getCurrent,
-    isAuthenticated ? { year: new Date().getFullYear() } : "skip",
+    canUsePersistence ? { year: new Date().getFullYear() } : "skip",
   );
   const monthlyTargets = useQuery(
     api.monthlyTarget.listForMonth,
-    isAuthenticated ? { month: currentMonth } : "skip",
+    canUsePersistence ? { month: currentMonth } : "skip",
   );
   const saveWeeklyReview = useMutation(api.weeklyReview.save);
   const planSummary = useMemo(() => {
-    if (!isAuthenticated) return demoCategorySummary;
+    if (auth.kind === "signed-out") return demoCategorySummary;
     if (!weeklyPlan?.currentPlan) {
       return buildCategorySummary(
         createEmptyPlanDays({
@@ -322,10 +325,10 @@ function PersistedReviewSection() {
         weekStartDate: weeklyPlan.weekStartDate,
       }),
     );
-  }, [isAuthenticated, weeklyPlan]);
+  }, [auth.kind, weeklyPlan]);
 
   const sessionReviewContext = useMemo(() => {
-    if (!isAuthenticated) return demoSessionReviewContext;
+    if (auth.kind === "signed-out") return demoSessionReviewContext;
     if (!sessions) {
       return {
         pendingReviews: [],
@@ -364,11 +367,11 @@ function PersistedReviewSection() {
         .filter((value): value is string => Boolean(value))
         .slice(0, 2),
     };
-  }, [isAuthenticated, sessions, weeklyPlan]);
+  }, [auth.kind, sessions, weeklyPlan]);
 
   if (
-    isLoading ||
-    (isAuthenticated &&
+    auth.kind === "loading" ||
+    (canUsePersistence &&
       (weeklyPlan === undefined ||
         sessions === undefined ||
         weeklyReview === undefined ||
@@ -381,6 +384,10 @@ function PersistedReviewSection() {
         <div className="wp-demo-banner">A carregar contexto da revisão...</div>
       </section>
     );
+  }
+
+  if (auth.kind === "unavailable") {
+    return <PersistenceUnavailable featureName="Revisão" />;
   }
 
   const hasCurrentPlan = Boolean(weeklyPlan?.currentPlan);
@@ -401,7 +408,7 @@ function PersistedReviewSection() {
           next: weeklyReview.adjustmentNextWeek,
         },
       }
-    : isAuthenticated
+    : auth.kind === "ready"
       ? emptyWeeklyReviewForm
       : {
           ...demoWeeklyReviewForm,
@@ -416,7 +423,7 @@ function PersistedReviewSection() {
       key={`${weeklyPlan?.weekStartDate ?? "demo"}:${weeklyReview?.updatedAt ?? 0}:${studyReviewContext?.minutes ?? 0}:${studyReviewContext?.logs.length ?? 0}`}
       initialReview={initialReview}
       onSaveReview={
-        isAuthenticated && weeklyPlan
+        canUsePersistence && weeklyPlan
           ? async (review) => {
               await saveWeeklyReview({
                 weekStartDate: weeklyPlan.weekStartDate,

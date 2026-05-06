@@ -13,7 +13,7 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useEffect, useMemo, useState } from "react";
 
 import { api } from "../../convex/_generated/api";
@@ -22,6 +22,7 @@ import {
   getTodayIsoDate,
   type StoredBlockType,
 } from "@/lib/planning/weekly-plan";
+import { usePersistenceAuth } from "@/lib/persistence-auth";
 import { hasPersistenceConfig } from "@/lib/runtime-config";
 
 type ReviewStatus = "available" | "draft" | "completed" | "skipped";
@@ -203,6 +204,31 @@ function getEmptyCoachContext(isFetching = false): CoachContext {
   };
 }
 
+const persistenceUnavailableCoachContext: CoachContext = {
+  isDemo: false,
+  weeklyPlanState: "Dados indisponíveis",
+  weeklyPlanScope: "Sessão ativa sem ligação Convex",
+  monthlyGoalsState: "Dados indisponíveis",
+  studyLogState: "Dados indisponíveis",
+  studyWeeklyMinutes: 0,
+  studyMonthlyMinutes: 0,
+  studyAverageQuality: 0,
+  studyPaceState: "missing-target",
+  sessionsState: "Dados indisponíveis",
+  reviewState: "Dados indisponíveis",
+  reviewStatus: "available",
+  reviewedSessions: 0,
+  pendingSessionReviews: 0,
+  handsToReview: 0,
+  averageDecisionQuality: 0,
+  averageFinalTilt: 0,
+  sessionAttention: "Não estamos a usar contexto demo numa conta autenticada. É preciso corrigir a ligação Clerk/Convex.",
+  adjustmentNextWeek: "",
+  wins: "",
+  leaks: "",
+  nextActions: ["Verificar configuração Clerk/Convex antes de aplicar propostas."],
+};
+
 export function CoachWorkspace() {
   if (!hasPersistenceConfig) {
     return <CoachShell context={demoCoachContext} />;
@@ -212,29 +238,30 @@ export function CoachWorkspace() {
 }
 
 function PersistedCoachWorkspace() {
-  const { isAuthenticated, isLoading } = useConvexAuth();
-  const weeklyPlan = useQuery(api.weeklyPlan.getCurrent, isAuthenticated ? { today: todayIsoDate } : "skip");
-  const monthlyTargets = useQuery(api.monthlyTarget.listForMonth, isAuthenticated ? { month: currentMonth } : "skip");
+  const auth = usePersistenceAuth();
+  const canUsePersistence = auth.kind === "ready";
+  const weeklyPlan = useQuery(api.weeklyPlan.getCurrent, canUsePersistence ? { today: todayIsoDate } : "skip");
+  const monthlyTargets = useQuery(api.monthlyTarget.listForMonth, canUsePersistence ? { month: currentMonth } : "skip");
   const studyContext = useQuery(
     api.studySession.getCurrent,
-    isAuthenticated ? { today: todayIsoDate, month: currentMonth } : "skip",
+    canUsePersistence ? { today: todayIsoDate, month: currentMonth } : "skip",
   );
-  const sessions = useQuery(api.pokerSession.list, isAuthenticated ? {} : "skip");
+  const sessions = useQuery(api.pokerSession.list, canUsePersistence ? {} : "skip");
   const weeklyReview = useQuery(
     api.weeklyReview.getByWeek,
-    isAuthenticated && weeklyPlan ? { weekStartDate: weeklyPlan.weekStartDate } : "skip",
+    canUsePersistence && weeklyPlan ? { weekStartDate: weeklyPlan.weekStartDate } : "skip",
   );
   const activeApplication = useQuery(
     api.coachProposal.getActive,
-    isAuthenticated && weeklyPlan?.currentPlan ? { weeklyPlanId: weeklyPlan.currentPlan._id } : "skip",
+    canUsePersistence && weeklyPlan?.currentPlan ? { weeklyPlanId: weeklyPlan.currentPlan._id } : "skip",
   );
   const applyCoachProposal = useMutation(api.coachProposal.apply);
   const undoCoachProposal = useMutation(api.coachProposal.undo);
   const [applicationId, setApplicationId] = useState<Id<"coachProposalApplications"> | null>(null);
 
   const isFetching =
-    isLoading ||
-    (isAuthenticated &&
+    auth.kind === "loading" ||
+    (canUsePersistence &&
       (weeklyPlan === undefined ||
         monthlyTargets === undefined ||
         studyContext === undefined ||
@@ -242,8 +269,16 @@ function PersistedCoachWorkspace() {
         weeklyReview === undefined));
 
   const context = useMemo<CoachContext>(() => {
-    if (!isAuthenticated) {
+    if (auth.kind === "signed-out") {
       return demoCoachContext;
+    }
+
+    if (auth.kind === "loading") {
+      return getEmptyCoachContext(true);
+    }
+
+    if (auth.kind === "unavailable") {
+      return persistenceUnavailableCoachContext;
     }
 
     if (!weeklyPlan || !monthlyTargets || !studyContext || !sessions || weeklyReview === undefined) {
@@ -300,7 +335,7 @@ function PersistedCoachWorkspace() {
       leaks: weeklyReview?.leaks ?? "",
       nextActions,
     };
-  }, [isAuthenticated, isFetching, monthlyTargets, sessions, studyContext, weeklyPlan, weeklyReview]);
+  }, [auth.kind, isFetching, monthlyTargets, sessions, studyContext, weeklyPlan, weeklyReview]);
 
   const currentPlan = weeklyPlan?.currentPlan ?? null;
   const activeApplicationId = applicationId ?? activeApplication?._id ?? null;
@@ -311,12 +346,12 @@ function PersistedCoachWorkspace() {
       hasActiveApplication={Boolean(activeApplication)}
       activeUndoExpiresAt={activeApplication?.undoExpiresAt}
       onApplyProposal={
-        isAuthenticated && weeklyPlan && !currentPlan
+        canUsePersistence && weeklyPlan && !currentPlan
           ? async () => ({
               applied: false,
               message: "Cria ou ativa um plano semanal antes de aplicar propostas do Coach.",
             })
-          : isAuthenticated && weeklyPlan && currentPlan
+          : canUsePersistence && weeklyPlan && currentPlan
           ? async (payload) => {
               const result = await applyCoachProposal({
                 weeklyPlanId: currentPlan._id,
@@ -334,7 +369,7 @@ function PersistedCoachWorkspace() {
           : undefined
       }
       onUndoProposal={
-        isAuthenticated && activeApplicationId
+        canUsePersistence && activeApplicationId
           ? async () => {
               await undoCoachProposal({ applicationId: activeApplicationId });
               setApplicationId(null);

@@ -2,6 +2,7 @@ import assert from "node:assert";
 import {
   createAuthSmokeSessionConfig,
   ensureAuthenticatedSmokeSession,
+  hasAuthenticatedPlanContext,
   launchAuthenticatedSmokeContext,
 } from "./auth-smoke-session.mjs";
 
@@ -20,6 +21,19 @@ const ignoredConsoleErrorFragments = [
   "webpack-hmr",
   "The resource",
   "Failed to load resource: the server responded with a status of 404",
+];
+
+const authenticatedDemoFallbackFragments = [
+  "Modo demo/mock",
+  "Sessão não iniciada. Today está a usar dados mock até entrares.",
+  "Semana demo",
+  "QUARTA-FEIRA, 6 DE MAIO · SEMANA DEMO",
+  "Rever 5 mãos marcadas da sessão de ontem",
+  "Manter disciplina em ICM até bolha",
+  "25m de estudo de open ranges",
+  "Sessão MTT — manhã",
+  "Plano da semana demo",
+  "Rascunho demo",
 ];
 
 async function readBodyText(page) {
@@ -46,6 +60,24 @@ async function assertNoErrorBoundary(page, route) {
   }
 }
 
+async function assertNoAuthenticatedDemoFallback(page, route) {
+  const text = await readBodyText(page);
+  const isAuthenticatedSurface =
+    text.includes("Sessão ativa") ||
+    text.includes("Conta ativa") ||
+    hasAuthenticatedPlanContext(text);
+
+  if (!isAuthenticatedSurface) return;
+
+  const found = authenticatedDemoFallbackFragments.filter((fragment) => text.includes(fragment));
+
+  assert.deepStrictEqual(
+    found,
+    [],
+    `${route} rendered demo/mock fallback text for an authenticated session: ${found.join(", ")}`,
+  );
+}
+
 async function gotoApp(page, route) {
   await page.goto(`${baseUrl}${route}`, {
     waitUntil: "domcontentloaded",
@@ -53,6 +85,7 @@ async function gotoApp(page, route) {
   });
   await waitForShellToSettle(page);
   await assertNoErrorBoundary(page, route);
+  await assertNoAuthenticatedDemoFallback(page, route);
 }
 
 async function waitForShellToSettle(page) {

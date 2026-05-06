@@ -15,10 +15,12 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { api } from "../../convex/_generated/api";
+import { PersistenceUnavailable } from "@/components/persistence-unavailable";
+import { usePersistenceAuth } from "@/lib/persistence-auth";
 import { hasPersistenceConfig } from "@/lib/runtime-config";
 
 import styles from "./monthly-targets.module.css";
@@ -246,27 +248,28 @@ export function MonthlyTargets() {
 }
 
 function PersistedMonthlyTargets({ month }: { month: string }) {
-  const { isAuthenticated, isLoading } = useConvexAuth();
+  const auth = usePersistenceAuth();
+  const canUsePersistence = auth.kind === "ready";
   const currentYear = new Date().getFullYear();
   const annualPlan = useQuery(
     api.annualPlan.getCurrent,
-    isAuthenticated ? { year: currentYear } : "skip",
+    canUsePersistence ? { year: currentYear } : "skip",
   );
   const operatingTargets = useQuery(
     api.annualOperatingTarget.listByYear,
-    isAuthenticated ? { year: currentYear } : "skip",
+    canUsePersistence ? { year: currentYear } : "skip",
   );
   const monthlyTargets = useQuery(
     api.monthlyTarget.listForMonth,
-    isAuthenticated ? { month } : "skip",
+    canUsePersistence ? { month } : "skip",
   );
   const saveCategory = useMutation(api.monthlyTarget.saveCategory);
   const clearCategory = useMutation(api.monthlyTarget.clearCategory);
   const [saveState, setSaveState] = useState<SaveState>("idle");
 
   if (
-    isLoading ||
-    (isAuthenticated &&
+    auth.kind === "loading" ||
+    (canUsePersistence &&
       (annualPlan === undefined || operatingTargets === undefined || monthlyTargets === undefined))
   ) {
     return (
@@ -276,7 +279,7 @@ function PersistedMonthlyTargets({ month }: { month: string }) {
     );
   }
 
-  if (!isAuthenticated) {
+  if (auth.kind === "signed-out") {
     return (
       <MonthlyTargetsWorkspace
         demoReason="Sessão não iniciada. Estás a ver um draft local; entra para guardar os objetivos no Convex."
@@ -285,6 +288,10 @@ function PersistedMonthlyTargets({ month }: { month: string }) {
         month={month}
       />
     );
+  }
+
+  if (auth.kind === "unavailable") {
+    return <PersistenceUnavailable featureName="Objetivos mensais" />;
   }
 
   const workspaceKey = [

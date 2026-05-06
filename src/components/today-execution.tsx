@@ -1,7 +1,7 @@
 "use client";
 
 import { BookOpenCheck, Check, Edit3, Gauge, MoreHorizontal, Sparkles, Target, X } from "lucide-react";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { type ReactNode, useMemo, useState } from "react";
 import { api } from "../../convex/_generated/api";
@@ -16,11 +16,12 @@ import {
   type PlanBlockStatus,
   type PlanBlockType,
 } from "@/lib/planning/weekly-plan";
+import { getSignedInPersistenceMessage, usePersistenceAuth } from "@/lib/persistence-auth";
 import { hasPersistenceConfig } from "@/lib/runtime-config";
 
 type CommitmentStatus = "planned" | "done" | "adjusted" | "not-done";
 type CommitmentKind = PlanBlockType | "Foco" | "Revisão";
-type TodaySource = "demo" | "active" | "no-active-plan";
+type TodaySource = "demo" | "active" | "no-active-plan" | "persistence-unavailable";
 type MonthlyTargetCategory = "grind" | "study" | "review" | "sport";
 type MonthlyTargetContext = {
   category: MonthlyTargetCategory;
@@ -143,31 +144,32 @@ export function TodayExecution() {
 }
 
 function PersistedTodayExecution() {
-  const { isAuthenticated, isLoading } = useConvexAuth();
+  const auth = usePersistenceAuth();
+  const canUsePersistence = auth.kind === "ready";
   const currentMonth = getCurrentMonth();
   const weeklyPlan = useQuery(
     api.weeklyPlan.getCurrent,
-    isAuthenticated ? { today: todayIsoDate } : "skip",
+    canUsePersistence ? { today: todayIsoDate } : "skip",
   );
   const preparedDay = useQuery(
     api.dailyPlan.getPreparedDay,
-    isAuthenticated ? { date: todayIsoDate } : "skip",
+    canUsePersistence ? { date: todayIsoDate } : "skip",
   );
   const monthlyTargets = useQuery(
     api.monthlyTarget.listForMonth,
-    isAuthenticated ? { month: currentMonth } : "skip",
+    canUsePersistence ? { month: currentMonth } : "skip",
   );
   const annualPlan = useQuery(
     api.annualPlan.getCurrent,
-    isAuthenticated ? { year: new Date().getFullYear() } : "skip",
+    canUsePersistence ? { year: new Date().getFullYear() } : "skip",
   );
   const prepareDay = useMutation(api.dailyPlan.prepareDay);
   const updateDailyCommitment = useMutation(api.dailyPlan.updateDailyCommitment);
   const closePreparedDay = useMutation(api.dailyPlan.closePreparedDay);
 
   if (
-    isLoading ||
-    (isAuthenticated &&
+    auth.kind === "loading" ||
+    (canUsePersistence &&
       (weeklyPlan === undefined ||
         preparedDay === undefined ||
         monthlyTargets === undefined ||
@@ -180,7 +182,7 @@ function PersistedTodayExecution() {
     );
   }
 
-  if (!isAuthenticated) {
+  if (auth.kind === "signed-out") {
     return (
       <TodayWorkspace
         source="demo"
@@ -188,6 +190,19 @@ function PersistedTodayExecution() {
         todayBlocks={getDemoTodayBlocks()}
         weeklyFocus={initialWeeklyFocus}
         weekLabel="Semana demo"
+      />
+    );
+  }
+
+  if (auth.kind === "unavailable") {
+    return (
+      <TodayWorkspace
+        greetingName={auth.firstName}
+        source="persistence-unavailable"
+        sourceMessage={getSignedInPersistenceMessage("Today")}
+        todayBlocks={[]}
+        weeklyFocus="Dados reais ainda indisponíveis."
+        weekLabel="Dados reais indisponíveis"
       />
     );
   }
@@ -222,6 +237,7 @@ function PersistedTodayExecution() {
       dailyPlanStatus={safePreparedDay.dailyPlan?.status}
       initialCommitments={preparedCommitments}
       monthlyTargets={currentMonthlyTargets}
+      greetingName={auth.firstName}
       onCloseDay={
         safePreparedDay.dailyPlan
           ? async () => {
@@ -290,6 +306,7 @@ function TodayWorkspace({
   todayBlocks,
   weeklyFocus,
   weekLabel,
+  greetingName,
 }: {
   annualPlan?: AnnualPlanContext | null;
   dailyPlanStatus?: "prepared" | "closed";
@@ -307,6 +324,7 @@ function TodayWorkspace({
   todayBlocks: PlanBlock[];
   weeklyFocus: string;
   weekLabel: string;
+  greetingName?: string;
 }) {
   const defaultCommitments = initialCommitments ?? (source === "demo" ? initialCommitmentsFallback : []);
   const [commitments, setCommitments] = useState(defaultCommitments);
@@ -408,7 +426,7 @@ function TodayWorkspace({
       <div className="ep-page-header today-head">
         <div>
           <span>{getTodayHeaderLabel(weekLabel)}</span>
-          <h1>Bom dia, João.</h1>
+          <h1>{greetingName ? `Bom dia, ${greetingName}.` : "Bom dia."}</h1>
           <p>
             Foco da semana · <strong>{weeklyFocus}</strong>
           </p>
@@ -486,6 +504,8 @@ function TodayModeBanner({ message, source }: { message: string; source: TodaySo
             ? "Plano ativo ligado"
             : source === "no-active-plan"
               ? "Sem plano semanal ativo"
+              : source === "persistence-unavailable"
+                ? "Dados reais indisponíveis"
               : "Modo demo/mock"}
         </strong>
         <span>{message}</span>

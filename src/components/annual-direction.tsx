@@ -19,9 +19,11 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useMemo, useState } from "react";
 import { api } from "../../convex/_generated/api";
+import { PersistenceUnavailable } from "@/components/persistence-unavailable";
+import { usePersistenceAuth } from "@/lib/persistence-auth";
 import { hasPersistenceConfig } from "@/lib/runtime-config";
 
 import styles from "./annual-direction.module.css";
@@ -254,14 +256,15 @@ export function AnnualDirection() {
 }
 
 function PersistedAnnualDirection() {
-  const { isAuthenticated, isLoading } = useConvexAuth();
+  const auth = usePersistenceAuth();
+  const canUsePersistence = auth.kind === "ready";
   const annualPlan = useQuery(
     api.annualPlan.getCurrent,
-    isAuthenticated ? { year: currentYear } : "skip",
+    canUsePersistence ? { year: currentYear } : "skip",
   );
   const operatingTargets = useQuery(
     api.annualOperatingTarget.listByYear,
-    isAuthenticated ? { year: currentYear } : "skip",
+    canUsePersistence ? { year: currentYear } : "skip",
   );
   const saveAnnualPlan = useMutation(api.annualPlan.save);
   const saveOperatingTarget = useMutation(api.annualOperatingTarget.saveVersion);
@@ -269,8 +272,8 @@ function PersistedAnnualDirection() {
   const [operatingSaveState, setOperatingSaveState] = useState<SaveState>("idle");
 
   if (
-    isLoading ||
-    (isAuthenticated && (annualPlan === undefined || operatingTargets === undefined))
+    auth.kind === "loading" ||
+    (canUsePersistence && (annualPlan === undefined || operatingTargets === undefined))
   ) {
     return (
       <section className="ep-page">
@@ -279,7 +282,7 @@ function PersistedAnnualDirection() {
     );
   }
 
-  if (!isAuthenticated) {
+  if (auth.kind === "signed-out") {
     return (
       <AnnualDirectionWorkspace
         demoReason="Sessão não iniciada. Estás a ver um draft local; entra para guardar a direção no Convex."
@@ -290,6 +293,10 @@ function PersistedAnnualDirection() {
         year={currentYear}
       />
     );
+  }
+
+  if (auth.kind === "unavailable") {
+    return <PersistenceUnavailable featureName="Direção anual" />;
   }
 
   const workspaceKey = annualPlan

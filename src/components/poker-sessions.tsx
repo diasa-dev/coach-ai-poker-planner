@@ -13,7 +13,7 @@ import {
   Sparkles,
   Square,
 } from "lucide-react";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useEffect, useMemo, useState } from "react";
 
 import { api } from "../../convex/_generated/api";
@@ -23,6 +23,8 @@ import {
   getTodayIsoDate,
   type PlanBlock,
 } from "@/lib/planning/weekly-plan";
+import { PersistenceUnavailable } from "@/components/persistence-unavailable";
+import { usePersistenceAuth } from "@/lib/persistence-auth";
 import { hasPersistenceConfig } from "@/lib/runtime-config";
 import styles from "./poker-sessions.module.css";
 
@@ -128,13 +130,14 @@ export function PokerSessions() {
 }
 
 function PersistedPokerSessions() {
-  const { isAuthenticated, isLoading } = useConvexAuth();
-  const weeklyPlan = useQuery(api.weeklyPlan.getCurrent, isAuthenticated ? { today: todayIsoDate } : "skip");
-  const activeSession = useQuery(api.pokerSession.getActive, isAuthenticated ? {} : "skip");
-  const sessions = useQuery(api.pokerSession.list, isAuthenticated ? {} : "skip");
+  const auth = usePersistenceAuth();
+  const canUsePersistence = auth.kind === "ready";
+  const weeklyPlan = useQuery(api.weeklyPlan.getCurrent, canUsePersistence ? { today: todayIsoDate } : "skip");
+  const activeSession = useQuery(api.pokerSession.getActive, canUsePersistence ? {} : "skip");
+  const sessions = useQuery(api.pokerSession.list, canUsePersistence ? {} : "skip");
   const events = useQuery(
     api.pokerSession.listEvents,
-    isAuthenticated && activeSession ? { sessionId: activeSession._id } : "skip",
+    canUsePersistence && activeSession ? { sessionId: activeSession._id } : "skip",
   );
   const startSession = useMutation(api.pokerSession.start);
   const addEvent = useMutation(api.pokerSession.addEvent);
@@ -142,7 +145,7 @@ function PersistedPokerSessions() {
   const togglePause = useMutation(api.pokerSession.togglePause);
   const finishSession = useMutation(api.pokerSession.finish);
 
-  if (isLoading || (isAuthenticated && (weeklyPlan === undefined || activeSession === undefined || sessions === undefined))) {
+  if (auth.kind === "loading" || (canUsePersistence && (weeklyPlan === undefined || activeSession === undefined || sessions === undefined))) {
     return (
       <section className="ep-page">
         <div className="wp-demo-banner">A carregar sessões...</div>
@@ -150,8 +153,12 @@ function PersistedPokerSessions() {
     );
   }
 
-  if (!isAuthenticated) {
+  if (auth.kind === "signed-out") {
     return <PokerSessionsDemo banner="Sessão não iniciada. Sessões estão em modo demo/mock até entrares." />;
+  }
+
+  if (auth.kind === "unavailable") {
+    return <PersistenceUnavailable featureName="Sessões" />;
   }
 
   const safeWeeklyPlan = weeklyPlan ?? { currentPlan: null, currentBlocks: [], weekStartDate: todayIsoDate };

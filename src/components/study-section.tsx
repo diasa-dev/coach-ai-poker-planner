@@ -1,12 +1,14 @@
 "use client";
 
 import { BookOpenCheck, Check, GraduationCap, Link2, X } from "lucide-react";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import { PersistenceUnavailable } from "@/components/persistence-unavailable";
 import { getTodayIsoDate } from "@/lib/planning/weekly-plan";
+import { usePersistenceAuth } from "@/lib/persistence-auth";
 import { hasPersistenceConfig } from "@/lib/runtime-config";
 import styles from "./study-section.module.css";
 
@@ -129,15 +131,16 @@ function PersistedStudySection({
 }: {
   selectedWeeklyPlanBlockId?: string;
 }) {
-  const { isAuthenticated, isLoading } = useConvexAuth();
+  const auth = usePersistenceAuth();
+  const canUsePersistence = auth.kind === "ready";
   const studyContext = useQuery(
     api.studySession.getCurrent,
-    isAuthenticated ? { today: todayIsoDate, month: currentMonth } : "skip",
+    canUsePersistence ? { today: todayIsoDate, month: currentMonth } : "skip",
   );
   const createStudySession = useMutation(api.studySession.create);
   const markWeeklyBlockDone = useMutation(api.studySession.markWeeklyBlockDone);
 
-  if (isLoading || (isAuthenticated && studyContext === undefined)) {
+  if (auth.kind === "loading" || (canUsePersistence && studyContext === undefined)) {
     return (
       <section className="ep-page">
         <div className="wp-demo-banner">A carregar registos de estudo...</div>
@@ -145,7 +148,7 @@ function PersistedStudySection({
     );
   }
 
-  if (!isAuthenticated) {
+  if (auth.kind === "signed-out") {
     return (
       <StudyWorkspace
         blockOptions={demoBlocks}
@@ -157,6 +160,10 @@ function PersistedStudySection({
         weeklySummary={demoWeeklySummary}
       />
     );
+  }
+
+  if (auth.kind === "unavailable") {
+    return <PersistenceUnavailable featureName="Estudo" />;
   }
 
   if (!studyContext) {
