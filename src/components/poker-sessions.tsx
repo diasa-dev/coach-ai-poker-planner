@@ -150,8 +150,16 @@ function PersistedPokerSessions() {
     );
   }
 
-  if (!isAuthenticated || !weeklyPlan || !sessions) {
+  if (!isAuthenticated) {
     return <PokerSessionsDemo banner="Sessão não iniciada. Sessões estão em modo demo/mock até entrares." />;
+  }
+
+  if (!weeklyPlan || !sessions) {
+    return (
+      <section className="ep-page">
+        <div className="wp-demo-banner">A carregar sessões...</div>
+      </section>
+    );
   }
 
   const activePlan = weeklyPlan.currentPlan?.status === "active" ? weeklyPlan.currentPlan : null;

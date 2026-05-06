@@ -173,7 +173,7 @@ function PersistedWeeklyPlan() {
     );
   }
 
-  if (!isAuthenticated || !weeklyPlan) {
+  if (!isAuthenticated) {
     return (
       <WeeklyPlanWorkspace
         demoReason="Sessão não iniciada. Estás a ver dados mock; entra para guardar o plano no Convex."
@@ -183,6 +183,14 @@ function PersistedWeeklyPlan() {
         weekRange="Semana demo"
         weekStartDay={1}
       />
+    );
+  }
+
+  if (!weeklyPlan || !monthlyTargets || annualPlan === undefined) {
+    return (
+      <section className="ep-page ep-weekly-page wp-page">
+        <div className="wp-demo-banner">A carregar plano semanal...</div>
+      </section>
     );
   }
 

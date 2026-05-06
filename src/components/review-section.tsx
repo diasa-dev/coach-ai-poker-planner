@@ -325,7 +325,19 @@ function PersistedReviewSection() {
   }, [isAuthenticated, weeklyPlan]);
 
   const sessionReviewContext = useMemo(() => {
-    if (!isAuthenticated || !sessions) return demoSessionReviewContext;
+    if (!isAuthenticated) return demoSessionReviewContext;
+    if (!sessions) {
+      return {
+        pendingReviews: [],
+        reviewedSessions: 0,
+        averageDecisionQuality: 0,
+        averageFinalTilt: 0,
+        averageFinalEnergy: 0,
+        averageFinalFocus: 0,
+        handsToReview: 0,
+        nextActions: [],
+      };
+    }
 
     const weekSessions = weeklyPlan
       ? sessions.filter((session) => isIsoDateInWeek(session.date, weeklyPlan.weekStartDate))

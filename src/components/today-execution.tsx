@@ -180,7 +180,7 @@ function PersistedTodayExecution() {
     );
   }
 
-  if (!isAuthenticated || !weeklyPlan) {
+  if (!isAuthenticated) {
     return (
       <TodayWorkspace
         source="demo"
@@ -192,8 +192,12 @@ function PersistedTodayExecution() {
     );
   }
 
-  if (!preparedDay) {
-    return null;
+  if (!weeklyPlan || !preparedDay || !monthlyTargets || annualPlan === undefined) {
+    return (
+      <section className="ep-page today-page today-print-match">
+        <div className="wp-demo-banner">A carregar plano de hoje...</div>
+      </section>
+    );
   }
 
   const activePlan = weeklyPlan.currentPlan?.status === "active" ? weeklyPlan.currentPlan : null;

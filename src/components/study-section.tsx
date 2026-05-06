@@ -141,7 +141,7 @@ function PersistedStudySection({
     );
   }
 
-  if (!isAuthenticated || !studyContext) {
+  if (!isAuthenticated) {
     return (
       <StudyWorkspace
         blockOptions={demoBlocks}
@@ -152,6 +152,14 @@ function PersistedStudySection({
         selectedWeeklyPlanBlockId={selectedWeeklyPlanBlockId}
         weeklySummary={demoWeeklySummary}
       />
+    );
+  }
+
+  if (!studyContext) {
+    return (
+      <section className="ep-page">
+        <div className="wp-demo-banner">A carregar registos de estudo...</div>
+      </section>
     );
   }
 
