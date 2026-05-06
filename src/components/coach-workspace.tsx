@@ -45,6 +45,7 @@ type CoachContext = {
   handsToReview: number;
   averageDecisionQuality: number;
   averageFinalTilt: number;
+  sessionAttention: string;
   adjustmentNextWeek: string;
   wins: string;
   leaks: string;
@@ -166,6 +167,7 @@ const demoCoachContext: CoachContext = {
   handsToReview: 5,
   averageDecisionQuality: 4,
   averageFinalTilt: 2,
+  sessionAttention: "Reviews pendentes e mãos marcadas pedem um bloco curto de review antes do próximo grind.",
   adjustmentNextWeek: "Fazer review antes da sessão de domingo.",
   wins: "Tilt baixo nas sessões longas.",
   leaks: "Estudo caiu quando a manhã atrasou.",
@@ -230,6 +232,13 @@ function PersistedCoachWorkspace() {
     const reviewStatus = weeklyReview?.status ?? "available";
     const studyTarget = monthlyTargets.find((target) => target.category === "study");
     const studyPaceState = getStudyPaceState(studyTarget?.currentValue ?? 0, studyTarget?.targetValue ?? 0);
+    const handsToReview = sessions.reduce((total, session) => total + session.handsToReview, 0);
+    const averageDecisionQuality = average(reviewedSessions.map((session) => session.decisionQuality));
+    const averageFinalTilt = average(reviewedSessions.map((session) => session.finalTilt));
+    const nextActions = reviewedSessions
+      .map((session) => session.nextAction?.trim())
+      .filter((value): value is string => Boolean(value))
+      .slice(0, 2);
 
     return {
       isDemo: false,
@@ -242,21 +251,30 @@ function PersistedCoachWorkspace() {
       studyAverageQuality: studyContext.weeklySummary.averageQuality,
       studyTopType: studyContext.weeklySummary.topStudyType,
       studyPaceState,
-      sessionsState: recentSessions.length ? `${recentSessions.length} sessões usadas` : "Sem sessões",
+      sessionsState: getSessionsStateCopy({
+        pendingReviews: pendingSessionReviews.length,
+        recentSessions: recentSessions.length,
+        reviewedSessions: reviewedSessions.length,
+      }),
       reviewState: getReviewStateCopy(reviewStatus),
       reviewStatus,
       reviewedSessions: reviewedSessions.length,
       pendingSessionReviews: pendingSessionReviews.length,
-      handsToReview: sessions.reduce((total, session) => total + session.handsToReview, 0),
-      averageDecisionQuality: average(reviewedSessions.map((session) => session.decisionQuality)),
-      averageFinalTilt: average(reviewedSessions.map((session) => session.finalTilt)),
+      handsToReview,
+      averageDecisionQuality,
+      averageFinalTilt,
+      sessionAttention: getSessionAttentionCopy({
+        averageDecisionQuality,
+        averageFinalTilt,
+        handsToReview,
+        nextActions,
+        pendingReviews: pendingSessionReviews.length,
+        reviewedSessions: reviewedSessions.length,
+      }),
       adjustmentNextWeek: weeklyReview?.adjustmentNextWeek ?? "",
       wins: weeklyReview?.wins ?? "",
       leaks: weeklyReview?.leaks ?? "",
-      nextActions: reviewedSessions
-        .map((session) => session.nextAction?.trim())
-        .filter((value): value is string => Boolean(value))
-        .slice(0, 2),
+      nextActions,
     };
   }, [isAuthenticated, isFetching, monthlyTargets, sessions, studyContext, weeklyPlan, weeklyReview]);
 
@@ -332,7 +350,7 @@ function CoachShell({
     ...(context.studyWeeklyMinutes || context.studyMonthlyMinutes
       ? [{ label: "Registo de estudo", state: context.studyLogState }]
       : []),
-    { label: "3 últimas sessões", state: context.sessionsState },
+    { label: "Sessões", state: context.sessionsState },
     { label: "Revisão semanal", state: context.reviewState },
   ];
 
@@ -689,12 +707,18 @@ function CoachShell({
             <ul>
               <li>
                 <CircleDot size={14} aria-hidden="true" />
-                {context.adjustmentNextWeek || "Ainda não há ajuste guardado na revisão semanal."}
+                {context.sessionAttention}
               </li>
               <li>
                 <CircleDot size={14} aria-hidden="true" />
-                {context.leaks || "Sem leaks registados nesta revisão."}
+                {context.adjustmentNextWeek || "Ainda não há ajuste guardado na revisão semanal."}
               </li>
+              {context.nextActions.slice(0, 2).map((action) => (
+                <li key={action}>
+                  <CircleDot size={14} aria-hidden="true" />
+                  {action}
+                </li>
+              ))}
             </ul>
           </section>
 
@@ -833,6 +857,14 @@ function getStudyPaceCopy(paceState: CoachContext["studyPaceState"]) {
 }
 
 function getCoachReply(context: CoachContext) {
+  if (context.pendingSessionReviews > 0 || context.handsToReview >= 5) {
+    return `${context.sessionAttention} Mantém isto como planeamento: reserva review curto ou fecha as reviews pendentes, sem análise técnica de mãos.`;
+  }
+
+  if (context.averageFinalTilt >= 4) {
+    return `O tilt final médio está alto (${formatRating(context.averageFinalTilt)}). Antes de adicionar volume, protege recuperação e reduz complexidade no próximo grind.`;
+  }
+
   if (context.studyPaceState === "below" || context.studyPaceState === "no-logs") {
     return `O registo de estudo mostra ${getStudyPaceShortLabel(context.studyPaceState)}. Em vez de inventar um plano grande, proponho blocos curtos antes das sessões e deixo tudo para confirmação.`;
   }
@@ -935,6 +967,67 @@ function getReviewStateCopy(status: ReviewStatus) {
   if (status === "draft") return "Rascunho";
   if (status === "skipped") return "Saltada";
   return "Em falta";
+}
+
+function getSessionsStateCopy({
+  pendingReviews,
+  recentSessions,
+  reviewedSessions,
+}: {
+  pendingReviews: number;
+  recentSessions: number;
+  reviewedSessions: number;
+}) {
+  if (!recentSessions) return "Sem sessões";
+  if (pendingReviews) return `${pendingReviews} review${pendingReviews === 1 ? "" : "s"} pendente${pendingReviews === 1 ? "" : "s"}`;
+  if (reviewedSessions) return `${formatSessionCount(reviewedSessions)} revista${reviewedSessions === 1 ? "" : "s"}`;
+  return `${formatSessionCount(recentSessions)} recente${recentSessions === 1 ? "" : "s"}`;
+}
+
+function formatSessionCount(count: number) {
+  return `${count} ${count === 1 ? "sessão" : "sessões"}`;
+}
+
+function getSessionAttentionCopy({
+  averageDecisionQuality,
+  averageFinalTilt,
+  handsToReview,
+  nextActions,
+  pendingReviews,
+  reviewedSessions,
+}: {
+  averageDecisionQuality: number;
+  averageFinalTilt: number;
+  handsToReview: number;
+  nextActions: string[];
+  pendingReviews: number;
+  reviewedSessions: number;
+}) {
+  if (pendingReviews > 0) {
+    return `${pendingReviews} review${pendingReviews === 1 ? "" : "s"} de sessão pendente${pendingReviews === 1 ? "" : "s"}: fecha primeiro o contexto antes de aumentar volume.`;
+  }
+
+  if (handsToReview >= 5) {
+    return `${handsToReview} mãos marcadas: reserva review curto e mantém o Coach fora de análise técnica.`;
+  }
+
+  if (averageFinalTilt >= 4) {
+    return `Tilt final médio ${formatRating(averageFinalTilt)}: protege recuperação e simplifica a próxima sessão.`;
+  }
+
+  if (averageDecisionQuality && averageDecisionQuality < 3) {
+    return `Qualidade média ${formatRating(averageDecisionQuality)}: escolhe uma intenção simples para a próxima sessão.`;
+  }
+
+  if (nextActions.length) {
+    return "Há próximas ações guardadas nas sessões revistas; usa-as para orientar a semana.";
+  }
+
+  if (reviewedSessions > 0) {
+    return "Sessões revistas sem alerta forte. Mantém o plano simples e continua a registar sinais.";
+  }
+
+  return "Ainda não há sinais de sessão suficientes. O Coach usa plano, estudo e revisão por agora.";
 }
 
 function getMonthlyGoalsState(targetCount: number) {

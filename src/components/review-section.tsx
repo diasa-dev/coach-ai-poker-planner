@@ -327,8 +327,11 @@ function PersistedReviewSection() {
   const sessionReviewContext = useMemo(() => {
     if (!isAuthenticated || !sessions) return demoSessionReviewContext;
 
-    const reviewed = sessions.filter((session) => session.status === "reviewed");
-    const pending = sessions.filter((session) => session.status === "reviewPending");
+    const weekSessions = weeklyPlan
+      ? sessions.filter((session) => isIsoDateInWeek(session.date, weeklyPlan.weekStartDate))
+      : sessions;
+    const reviewed = weekSessions.filter((session) => session.status === "reviewed");
+    const pending = weekSessions.filter((session) => session.status === "reviewPending");
 
     return {
       pendingReviews: pending.map((session) => ({
@@ -343,13 +346,13 @@ function PersistedReviewSection() {
       averageFinalTilt: average(reviewed.map((session) => session.finalTilt)),
       averageFinalEnergy: average(reviewed.map((session) => session.finalEnergy)),
       averageFinalFocus: average(reviewed.map((session) => session.finalFocus)),
-      handsToReview: sessions.reduce((total, session) => total + session.handsToReview, 0),
+      handsToReview: weekSessions.reduce((total, session) => total + session.handsToReview, 0),
       nextActions: reviewed
         .map((session) => session.nextAction?.trim())
         .filter((value): value is string => Boolean(value))
         .slice(0, 2),
     };
-  }, [isAuthenticated, sessions]);
+  }, [isAuthenticated, sessions, weeklyPlan]);
 
   if (
     isLoading ||
@@ -556,20 +559,30 @@ function ReviewWorkspace({
             {sessionContextOpen ? (
               <div className={styles.pendingList}>
                 <p>Podem melhorar o contexto da revisão semanal, mas não são obrigatórias agora.</p>
-                {sessionReviewContext.pendingReviews.map((session) => (
-                  <article className={styles.pendingRow} key={session.id}>
+                {sessionReviewContext.pendingReviews.length ? (
+                  sessionReviewContext.pendingReviews.map((session) => (
+                    <article className={styles.pendingRow} key={session.id}>
+                      <div>
+                        <span>{session.date}</span>
+                        <strong>{session.focus}</strong>
+                        <small>
+                          {session.meta} · {session.hands} mãos a rever
+                        </small>
+                      </div>
+                      <Link className="ep-button secondary" href="/sessions">
+                        Terminar review
+                      </Link>
+                    </article>
+                  ))
+                ) : (
+                  <article className={styles.pendingRow}>
                     <div>
-                      <span>{session.date}</span>
-                      <strong>{session.focus}</strong>
-                      <small>
-                        {session.meta} · {session.hands} mãos a rever
-                      </small>
+                      <span>Semana atual</span>
+                      <strong>Sem reviews de sessão pendentes.</strong>
+                      <small>Quando terminares uma sessão sem review, ela aparece aqui como contexto.</small>
                     </div>
-                    <Link className="ep-button secondary" href="/sessions">
-                      Terminar review
-                    </Link>
                   </article>
-                ))}
+                )}
               </div>
             ) : null}
           </section>
@@ -644,6 +657,7 @@ function ReviewWorkspace({
 
             <div className={styles.sessionSignalsGrid}>
               <Metric label="Sessões revistas" value={String(sessionReviewContext.reviewedSessions)} />
+              <Metric label="Reviews pendentes" value={String(sessionReviewContext.pendingReviews.length)} />
               <Metric
                 label="Qualidade média"
                 value={sessionReviewContext.averageDecisionQuality ? `${sessionReviewContext.averageDecisionQuality}/5` : "-"}
@@ -668,6 +682,7 @@ function ReviewWorkspace({
               <p>Usa estes sinais só para escolher um ajuste concreto. Não substituem a tua reflexão.</p>
               {sessionReviewContext.nextActions.length ? (
                 <ul>
+                  <li>Próximas ações vindas das sessões:</li>
                   {sessionReviewContext.nextActions.map((action) => (
                     <li key={action}>{action}</li>
                   ))}
@@ -1154,6 +1169,14 @@ function average(values: Array<number | undefined>) {
   const numericValues = values.filter((value): value is number => typeof value === "number");
   if (!numericValues.length) return 0;
   return Math.round((numericValues.reduce((total, value) => total + value, 0) / numericValues.length) * 10) / 10;
+}
+
+function isIsoDateInWeek(date: string, weekStartDate: string) {
+  const value = new Date(`${date}T00:00:00.000Z`).getTime();
+  const start = new Date(`${weekStartDate}T00:00:00.000Z`).getTime();
+  const end = start + 6 * 24 * 60 * 60 * 1000;
+
+  return value >= start && value <= end;
 }
 
 function getCurrentMonth() {
