@@ -200,13 +200,13 @@ AUTH_SMOKE_HEADFUL=1 SMOKE_BASE_URL=http://localhost:3100 npm run smoke:mvp:auth
 
 This smoke covers the shortest persisted MVP loop across Monthly context,
 Weekly Plan, Today, Study, Weekly Review, and Coach. It tolerates existing local
-dev data, reuses an existing valid Study block when available, and applies a
-Coach proposal only when needed to create one. It mutates local/dev data by
-saving the Study monthly target, creating a linked Study log, preparing or
-updating Today, and saving the Weekly Review. If a temporary Coach proposal can
-still be undone, the smoke undoes it; if the undo window has expired, the
-remaining local/dev Weekly Plan mutation is expected and should not be treated
-as a product failure.
+dev data, reuses an existing valid Study block when available, and creates a
+fresh local Study block through the Weekly Plan flow when previous blocks are
+already done. It mutates local/dev data by saving the Study monthly target,
+creating a linked Study log, preparing Today with a fresh smoke commitment, and
+saving the Weekly Review. Repeated runs against the same authenticated local
+profile are expected to pass; stale or previously completed local smoke records
+should be treated as smoke setup data, not product state to fix manually.
 
 Google OAuth can reject Playwright's testing browser as insecure. Treat that as
 an auth-provider limitation, not a product failure. Use email/password in the
