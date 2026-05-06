@@ -359,6 +359,16 @@ export function buildPlanDaysFromStoredBlocks({
   });
 }
 
+export function createEmptyPlanDays({
+  today,
+  weekStartDate,
+}: {
+  today: string;
+  weekStartDate: string;
+}) {
+  return buildPlanDaysFromStoredBlocks({ blocks: [], today, weekStartDate });
+}
+
 export function toStoredPlanBlocks(days: PlanDay[]) {
   return days.flatMap((day, fallbackDayIndex) =>
     day.blocks.map((block, order) => ({

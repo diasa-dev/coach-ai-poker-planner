@@ -737,10 +737,18 @@
 }
 
 .emptyRows {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   color: var(--ep-fg-2);
   padding: 18px;
   font-size: 13px;
   font-weight: 700;
+}
+
+.emptyRows p {
+  margin: 0;
 }
 
 @media (max-width: 1120px) {

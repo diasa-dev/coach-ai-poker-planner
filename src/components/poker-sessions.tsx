@@ -510,6 +510,7 @@ function SessionsWorkspace({
                   openReviewModal(effectivePendingReviewSession);
                 }
               }}
+              onStartSession={() => setModal("start")}
             />
             <aside className={styles.sideStack}>
               <SummaryPanel summary={summary} />
@@ -996,10 +997,12 @@ function ActiveSession({
 function SessionsTable({
   onOpenActive,
   onOpenReview,
+  onStartSession,
   rows,
 }: {
   onOpenActive: () => void;
   onOpenReview: (sessionId: Id<"pokerSessions">) => void;
+  onStartSession: () => void;
   rows: SessionRow[];
 }) {
   return (
@@ -1038,7 +1041,13 @@ function SessionsTable({
           </div>
         ))
       ) : (
-        <div className={styles.emptyRows}>Ainda não há sessões registadas.</div>
+        <div className={styles.emptyRows}>
+          <p>Ainda não há sessões registadas.</p>
+          <button className="ep-button primary" type="button" onClick={onStartSession}>
+            <Play size={14} aria-hidden="true" />
+            Iniciar primeira sessão
+          </button>
+        </div>
       )}
     </article>
   );

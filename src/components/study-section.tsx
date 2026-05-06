@@ -431,7 +431,9 @@ function StudyWorkspace({
                   </div>
                 ))
               ) : (
-                <p className={styles.emptyState}>Ainda não tens registos de estudo.</p>
+                <p className={styles.emptyState}>
+                  Ainda não tens registos de estudo. Regista a primeira sessão quando terminares um bloco ou estudo avulso.
+                </p>
               )}
             </div>
           </article>

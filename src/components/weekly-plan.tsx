@@ -21,6 +21,7 @@ import {
   blockTypes,
   buildPlanDaysFromStoredBlocks,
   createCleanDraftFromDays,
+  createEmptyPlanDays,
   createEmptyBlockDraft,
   createPlanBlock,
   formatWeekRange,
@@ -69,6 +70,7 @@ type WeeklyPlanWorkspaceProps = {
   initialFocus?: string;
   monthlyTargets?: MonthlyTargetContext[];
   initialPlanStatus?: PlanStatus;
+  isFirstUse?: boolean;
   onCopyPreviousWeek?: () => Promise<void>;
   onSavePlan?: (payload: {
     days: PlanDay[];
@@ -190,7 +192,10 @@ function PersistedWeeklyPlan() {
         today: todayIsoDate,
         weekStartDate: weeklyPlan.weekStartDate,
       })
-    : initialPlanDays;
+    : createEmptyPlanDays({
+        today: todayIsoDate,
+        weekStartDate: weeklyPlan.weekStartDate,
+      });
   const workspaceKey = [
     weeklyPlan.weekStartDate,
     weeklyPlan.weekStartDay,
@@ -209,8 +214,9 @@ function PersistedWeeklyPlan() {
       hasPersistence
       hasPreviousPlan={weeklyPlan.hasPreviousPlan}
       initialDays={initialDays}
-      initialFocus={weeklyPlan.currentPlan?.focus ?? initialWeeklyFocus}
+      initialFocus={weeklyPlan.currentPlan?.focus ?? ""}
       initialPlanStatus={weeklyPlan.currentPlan?.status ?? "draft"}
+      isFirstUse={!weeklyPlan.currentPlan}
       monthlyTargets={monthlyTargets ?? []}
       onCopyPreviousWeek={async () => {
         setSaveState("saving");
@@ -263,6 +269,7 @@ function WeeklyPlanWorkspace({
   initialFocus = initialWeeklyFocus,
   monthlyTargets = [],
   initialPlanStatus = "draft",
+  isFirstUse = false,
   onCopyPreviousWeek,
   onSavePlan,
   onWeekStartDayChange,
@@ -438,6 +445,7 @@ function WeeklyPlanWorkspace({
         <PlanModeBanner
           demoReason={demoReason}
           hasPersistence={hasPersistence}
+          isFirstUse={isFirstUse}
           onWeekStartDayChange={handleWeekStartDayChange}
           saveState={saveState}
           weekStartDay={weekStartDay}
@@ -446,6 +454,7 @@ function WeeklyPlanWorkspace({
           <div>
             <span>{weekRange} · {getPlanStatusLabel(planStatus)}</span>
             <h1>Planear semana</h1>
+            {isFirstUse ? <p>Começa por um foco curto e 2 ou 3 blocos para esta semana.</p> : null}
           </div>
           <div className="ep-page-actions">
             <button
@@ -558,6 +567,7 @@ function WeeklyPlanWorkspace({
       <PlanModeBanner
         demoReason={demoReason}
         hasPersistence={hasPersistence}
+        isFirstUse={isFirstUse}
         onWeekStartDayChange={handleWeekStartDayChange}
         saveState={saveState}
         weekStartDay={weekStartDay}
@@ -567,7 +577,13 @@ function WeeklyPlanWorkspace({
           <span>{weekRange} · {getPlanStatusLabel(planStatus)}</span>
           <h1>Plano semanal</h1>
           <p>
-            Foco · <strong>{weeklyFocus}</strong>
+            {weeklyFocus ? (
+              <>
+                Foco · <strong>{weeklyFocus}</strong>
+              </>
+            ) : (
+              "Ainda não há foco semanal definido."
+            )}
           </p>
         </div>
         <div className="ep-page-actions">
@@ -632,6 +648,21 @@ function WeeklyPlanWorkspace({
         </div>
       </div>
 
+      {isFirstUse ? (
+        <section className="wp-monthly-context is-empty" aria-label="Próxima ação do plano semanal">
+          <div>
+            <Target size={16} aria-hidden="true" />
+            <div>
+              <strong>Ainda não tens plano semanal guardado</strong>
+              <span>Cria um foco, adiciona blocos reais e ativa o plano para ligar Hoje, Sessões e Coach.</span>
+            </div>
+          </div>
+          <button className="ep-button primary" type="button" onClick={() => setMode("planning")}>
+            Planear primeira semana
+          </button>
+        </section>
+      ) : null}
+
       <div className="ep-week-list wp-grid" aria-label="Execução do plano semanal">
         {visibleDays.map((day) => (
           <DayRow
@@ -661,12 +692,14 @@ function WeeklyPlanWorkspace({
 function PlanModeBanner({
   demoReason,
   hasPersistence,
+  isFirstUse,
   onWeekStartDayChange,
   saveState,
   weekStartDay,
 }: {
   demoReason?: string;
   hasPersistence: boolean;
+  isFirstUse?: boolean;
   onWeekStartDayChange: (value: string) => void;
   saveState: SaveState;
   weekStartDay: number;
@@ -677,7 +710,9 @@ function PlanModeBanner({
         <strong>{hasPersistence ? "Dados reais ligados" : "Modo demo/mock"}</strong>
         <span>
           {hasPersistence
-            ? "Este plano fica persistido quando guardas draft ou ativar plano."
+            ? isFirstUse
+              ? "Conta ligada. Ainda não há plano semanal guardado nesta semana."
+              : "Este plano fica persistido quando guardas draft ou ativar plano."
             : demoReason}
         </span>
       </div>
