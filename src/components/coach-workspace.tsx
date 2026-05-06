@@ -156,23 +156,52 @@ const demoCoachContext: CoachContext = {
   studyLogState: "1h55 registadas · abaixo do ritmo",
   studyWeeklyMinutes: 115,
   studyMonthlyMinutes: 410,
-  studyAverageQuality: 4,
-  studyTopType: "Solver",
+  studyAverageQuality: 3.8,
+  studyTopType: "Hand review",
   studyPaceState: "below",
-  sessionsState: "3 sessões usadas",
-  reviewState: "Rascunho demo",
-  reviewStatus: "draft",
-  reviewedSessions: 3,
-  pendingSessionReviews: 2,
-  handsToReview: 5,
-  averageDecisionQuality: 4,
-  averageFinalTilt: 2,
+  sessionsState: "1 review pendente",
+  reviewState: "Review disponível",
+  reviewStatus: "available",
+  reviewedSessions: 2,
+  pendingSessionReviews: 1,
+  handsToReview: 6,
+  averageDecisionQuality: 3.5,
+  averageFinalTilt: 2.5,
   sessionAttention: "Reviews pendentes e mãos marcadas pedem um bloco curto de review antes do próximo grind.",
   adjustmentNextWeek: "Fazer review antes da sessão de domingo.",
   wins: "Tilt baixo nas sessões longas.",
   leaks: "Estudo caiu quando a manhã atrasou.",
   nextActions: ["Fazer review antes da sessão de domingo.", "Reduzir mesas se energia ficar em 2/5."],
 };
+
+function getEmptyCoachContext(isFetching = false): CoachContext {
+  const loadingCopy = "A carregar";
+
+  return {
+    isDemo: false,
+    weeklyPlanState: isFetching ? loadingCopy : "Sem plano ativo",
+    weeklyPlanScope: isFetching ? "Plano da semana a carregar" : "Sem plano semanal ativo",
+    monthlyGoalsState: isFetching ? loadingCopy : "Sem objetivos mensais",
+    studyLogState: isFetching ? loadingCopy : "Sem estudo registado",
+    studyWeeklyMinutes: 0,
+    studyMonthlyMinutes: 0,
+    studyAverageQuality: 0,
+    studyPaceState: "no-logs",
+    sessionsState: isFetching ? loadingCopy : "Sem sessões registadas",
+    reviewState: isFetching ? loadingCopy : "Sem revisão disponível",
+    reviewStatus: "available",
+    reviewedSessions: 0,
+    pendingSessionReviews: 0,
+    handsToReview: 0,
+    averageDecisionQuality: 0,
+    averageFinalTilt: 0,
+    sessionAttention: isFetching ? "A carregar sessões." : "Ainda não há sessões para rever.",
+    adjustmentNextWeek: "",
+    wins: "",
+    leaks: "",
+    nextActions: [],
+  };
+}
 
 export function CoachWorkspace() {
   if (!hasPersistenceConfig) {
@@ -213,17 +242,12 @@ function PersistedCoachWorkspace() {
         weeklyReview === undefined));
 
   const context = useMemo<CoachContext>(() => {
-    if (!isAuthenticated || !weeklyPlan || !monthlyTargets || !studyContext || !sessions || weeklyReview === undefined) {
-      return {
-        ...demoCoachContext,
-        isDemo: true,
-        weeklyPlanState: isFetching ? "A carregar" : "Demo",
-        weeklyPlanScope: isFetching ? "Plano da semana a carregar" : "Plano da semana demo",
-        monthlyGoalsState: isFetching ? "A carregar" : "Demo",
-        studyLogState: isFetching ? "A carregar" : demoCoachContext.studyLogState,
-        sessionsState: isFetching ? "A carregar" : "Demo",
-        reviewState: isFetching ? "A carregar" : "Demo",
-      };
+    if (!isAuthenticated) {
+      return demoCoachContext;
+    }
+
+    if (!weeklyPlan || !monthlyTargets || !studyContext || !sessions || weeklyReview === undefined) {
+      return getEmptyCoachContext(isFetching);
     }
 
     const reviewedSessions = sessions.filter((session) => session.status === "reviewed");

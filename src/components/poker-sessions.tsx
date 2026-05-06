@@ -154,24 +154,18 @@ function PersistedPokerSessions() {
     return <PokerSessionsDemo banner="Sessão não iniciada. Sessões estão em modo demo/mock até entrares." />;
   }
 
-  if (!weeklyPlan || !sessions) {
-    return (
-      <section className="ep-page">
-        <div className="wp-demo-banner">A carregar sessões...</div>
-      </section>
-    );
-  }
-
-  const activePlan = weeklyPlan.currentPlan?.status === "active" ? weeklyPlan.currentPlan : null;
+  const safeWeeklyPlan = weeklyPlan ?? { currentPlan: null, currentBlocks: [], weekStartDate: todayIsoDate };
+  const safeSessions = sessions ?? [];
+  const activePlan = safeWeeklyPlan.currentPlan?.status === "active" ? safeWeeklyPlan.currentPlan : null;
   const days = activePlan
     ? buildPlanDaysFromStoredBlocks({
-        blocks: weeklyPlan.currentBlocks,
+        blocks: safeWeeklyPlan.currentBlocks,
         today: todayIsoDate,
-        weekStartDate: weeklyPlan.weekStartDate,
+        weekStartDate: safeWeeklyPlan.weekStartDate,
       })
     : [];
   const grindBlocks = days.find((day) => day.isToday)?.blocks.filter((block) => block.type === "Grind") ?? [];
-  const sessionRows = sessions.map((session) => ({
+  const sessionRows = safeSessions.map((session) => ({
     _id: session._id,
     date: session.date === todayIsoDate ? "Hoje" : formatShortDate(session.startedAt),
     focus: session.sessionFocus,
@@ -182,7 +176,7 @@ function PersistedPokerSessions() {
     hands: session.handsToReview,
     status: session.status as SessionStatus,
   }));
-  const pendingReviewSession = sessions.find((session) => session.status === "reviewPending") ?? null;
+  const pendingReviewSession = safeSessions.find((session) => session.status === "reviewPending") ?? null;
 
   return (
     <SessionsWorkspace

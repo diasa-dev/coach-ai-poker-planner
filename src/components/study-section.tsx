@@ -97,6 +97,10 @@ const demoMonthlySummary = {
   averageQuality: 4,
   topStudyType: "Hand review",
 };
+const emptyStudySummary: StudySummary = {
+  minutes: 0,
+  averageQuality: 0,
+};
 
 export function StudySection({
   selectedWeeklyPlanBlockId,
@@ -157,9 +161,18 @@ function PersistedStudySection({
 
   if (!studyContext) {
     return (
-      <section className="ep-page">
-        <div className="wp-demo-banner">A carregar registos de estudo...</div>
-      </section>
+      <StudyWorkspace
+        blockOptions={[]}
+        hasPersistence
+        initialLogs={[]}
+        monthlySummary={emptyStudySummary}
+        onSaveLog={async (payload) => {
+          await createStudySession(payload);
+        }}
+        selectedWeeklyPlanBlockId={selectedWeeklyPlanBlockId}
+        weekLabel="Semana atual"
+        weeklySummary={emptyStudySummary}
+      />
     );
   }
 
@@ -199,7 +212,7 @@ function StudyWorkspace({
   onMarkWeeklyBlockDone,
   onSaveLog,
   selectedWeeklyPlanBlockId,
-  weekLabel = "Semana demo",
+  weekLabel = "Semana atual",
   weeklySummary,
 }: {
   blockOptions: StudyBlockOption[];

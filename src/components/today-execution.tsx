@@ -192,24 +192,18 @@ function PersistedTodayExecution() {
     );
   }
 
-  if (!weeklyPlan || !preparedDay || !monthlyTargets || annualPlan === undefined) {
-    return (
-      <section className="ep-page today-page today-print-match">
-        <div className="wp-demo-banner">A carregar plano de hoje...</div>
-      </section>
-    );
-  }
-
-  const activePlan = weeklyPlan.currentPlan?.status === "active" ? weeklyPlan.currentPlan : null;
+  const safeWeeklyPlan = weeklyPlan ?? { currentPlan: null, currentBlocks: [], weekStartDate: todayIsoDate };
+  const safePreparedDay = preparedDay ?? { dailyPlan: null, commitments: [] };
+  const activePlan = safeWeeklyPlan.currentPlan?.status === "active" ? safeWeeklyPlan.currentPlan : null;
   const activeDays = activePlan
     ? buildPlanDaysFromStoredBlocks({
-        blocks: weeklyPlan.currentBlocks,
+        blocks: safeWeeklyPlan.currentBlocks,
         today: todayIsoDate,
-        weekStartDate: weeklyPlan.weekStartDate,
+        weekStartDate: safeWeeklyPlan.weekStartDate,
       })
     : [];
   const todayBlocks = activeDays.find((day) => day.isToday)?.blocks ?? [];
-  const preparedCommitments = preparedDay.commitments.map((commitment) => ({
+  const preparedCommitments = safePreparedDay.commitments.map((commitment) => ({
     id: commitment._id,
     persistedId: commitment._id,
     sourceWeeklyPlanBlockId: commitment.sourceWeeklyPlanBlockId,
@@ -223,15 +217,15 @@ function PersistedTodayExecution() {
 
   return (
     <TodayWorkspace
-      key={`${weeklyPlan.weekStartDate}:${activePlan?._id ?? "no-active"}:${activePlan?.updatedAt ?? 0}:${todayBlocks.length}:${preparedDay.dailyPlan?._id ?? "unprepared"}:${preparedDay.dailyPlan?.updatedAt ?? 0}:${preparedCommitments.length}:${currentMonthlyTargets.map((target) => `${target.category}:${target.updatedAt}:${target.currentValue ?? 0}`).join("|")}:${annualPlan?._id ?? "no-annual-plan"}:${annualPlan?.updatedAt ?? 0}`}
+      key={`${safeWeeklyPlan.weekStartDate}:${activePlan?._id ?? "no-active"}:${activePlan?.updatedAt ?? 0}:${todayBlocks.length}:${safePreparedDay.dailyPlan?._id ?? "unprepared"}:${safePreparedDay.dailyPlan?.updatedAt ?? 0}:${preparedCommitments.length}:${currentMonthlyTargets.map((target) => `${target.category}:${target.updatedAt}:${target.currentValue ?? 0}`).join("|")}:${annualPlan?._id ?? "no-annual-plan"}:${annualPlan?.updatedAt ?? 0}`}
       annualPlan={annualPlan ?? null}
-      dailyPlanStatus={preparedDay.dailyPlan?.status}
+      dailyPlanStatus={safePreparedDay.dailyPlan?.status}
       initialCommitments={preparedCommitments}
       monthlyTargets={currentMonthlyTargets}
       onCloseDay={
-        preparedDay.dailyPlan
+        safePreparedDay.dailyPlan
           ? async () => {
-              await closePreparedDay({ id: preparedDay.dailyPlan._id });
+              await closePreparedDay({ id: safePreparedDay.dailyPlan._id });
             }
           : undefined
       }
@@ -278,7 +272,7 @@ function PersistedTodayExecution() {
       }
       todayBlocks={activePlan ? todayBlocks : []}
       weeklyFocus={activePlan?.focus ?? "Sem plano semanal ativo."}
-      weekLabel={activePlan ? formatWeekRange(weeklyPlan.weekStartDate) : "Sem plano ativo"}
+      weekLabel={activePlan ? formatWeekRange(safeWeeklyPlan.weekStartDate) : "Sem plano ativo"}
     />
   );
 }

@@ -39,7 +39,7 @@ const navItems = [
 ];
 
 function AuthenticatedUplineaShell({ children }: { children: ReactNode }) {
-  const { isLoaded, isSignedIn } = useUser();
+  const { isLoaded, isSignedIn, user } = useUser();
 
   if (!isLoaded) {
     return (
@@ -53,7 +53,24 @@ function AuthenticatedUplineaShell({ children }: { children: ReactNode }) {
     return <LoginScreen />;
   }
 
-  return <UplineaShellFrame>{children}</UplineaShellFrame>;
+  const email = user.primaryEmailAddress?.emailAddress;
+  const displayName = user.firstName ?? email ?? "Conta Uplinea";
+  const initials = getProfileInitials(user.firstName, email);
+
+  return (
+    <UplineaShellFrame profile={{ displayName, initials, subtitle: "Conta ativa" }}>
+      {children}
+    </UplineaShellFrame>
+  );
+}
+
+function getProfileInitials(name?: string | null, email?: string | null) {
+  const source = name?.trim() || email?.split("@")[0] || "Uplinea";
+  const parts = source.split(/[\s._-]+/).filter(Boolean);
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "UP";
 }
 
 function isActivePath(pathname: string, href: string) {
@@ -69,7 +86,13 @@ export function UplineaShell({ children }: { children: ReactNode }) {
   return <UplineaShellFrame>{children}</UplineaShellFrame>;
 }
 
-function UplineaShellFrame({ children }: { children: ReactNode }) {
+function UplineaShellFrame({
+  children,
+  profile = { displayName: "Modo local", initials: "UP", subtitle: "Demo sem sessão" },
+}: {
+  children: ReactNode;
+  profile?: { displayName: string; initials: string; subtitle: string };
+}) {
   const pathname = usePathname();
   const currentItem =
     navItems.find((item) => isActivePath(pathname, item.href)) ??
@@ -122,10 +145,10 @@ function UplineaShellFrame({ children }: { children: ReactNode }) {
         </Link>
 
         <div className="ep-profile" aria-label="Perfil">
-          <span>JM</span>
+          <span>{profile.initials}</span>
           <div>
-            <strong>João M.</strong>
-            <small>Pro · MTT</small>
+            <strong>{profile.displayName}</strong>
+            <small>{profile.subtitle}</small>
           </div>
         </div>
       </aside>
