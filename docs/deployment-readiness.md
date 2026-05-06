@@ -1,22 +1,30 @@
 # Deployment Readiness
 
-This document tracks the production or staging readiness checks for DIA-32.
-It is intentionally configuration-focused and should not pick a Vercel project
-or production URL by approximation.
+This document tracks production readiness for the Uplinea deployment. It is
+configuration-focused and should not store secret values.
 
 ## Current Status
 
-- DIA-36 is merged and the authenticated MVP smoke is idempotent locally.
-- The repository is not currently linked to a Vercel project in local checkout.
-- No confirmed Uplinea production or staging URL is documented in the repo.
-- Production or staging smoke is blocked until the target Vercel project and URL
-  are confirmed.
-- Convex production currently resolves to `https://amicable-ladybug-752.convex.cloud`,
-  but `npx convex function-spec --prod` reports zero deployed functions.
+- GitHub `main` is connected to the Vercel project
+  `coach-ai-poker-planner`.
+- Confirmed production URL:
+  `https://coach-ai-poker-planner.vercel.app`.
+- Confirmed Clerk issuer:
+  `https://hip-goshawk-22.clerk.accounts.dev`.
+- Confirmed Convex URL:
+  `https://insightful-sparrow-614.convex.cloud`.
+- Confirmed Convex deployment identifier:
+  `dev:insightful-sparrow-614`.
+- Production was reconfigured from a clean Clerk + Convex stack on
+  2026-05-06.
+- The post-reconfiguration production smoke passed manually: the site returned
+  HTTP 200, Clerk loaded without the previous publishable-key 500, authenticated
+  pages loaded, and signed-in pages no longer showed demo/mock fixtures or the
+  "Dados reais indisponiveis" fallback.
 
 ## Required Deployment Inputs
 
-Before a real production or staging validation, confirm:
+Before changing production configuration again, confirm:
 
 - Target Vercel project for Uplinea.
 - Target production or staging URL.
@@ -24,8 +32,8 @@ Before a real production or staging validation, confirm:
 - Clerk instance intended for that environment.
 - Convex deployment intended for that environment.
 - Test account and sign-in method safe for smoke validation.
-
-Do not run production or staging smoke until those inputs are explicit.
+- Any deploy keys or secret keys have not been pasted into chat, tickets, or
+  docs. Rotate them immediately if exposed.
 
 ## Required Environment Variables
 
@@ -38,6 +46,7 @@ CLERK_SECRET_KEY=
 CLERK_JWT_ISSUER_DOMAIN=
 NEXT_PUBLIC_CONVEX_URL=
 CONVEX_DEPLOYMENT=
+CONVEX_DEPLOY_KEY=
 ```
 
 The auth-disabled variables must be empty or disabled in real deployed
@@ -48,8 +57,8 @@ NEXT_PUBLIC_UPLINEA_DISABLE_AUTH=
 UPLINEA_DISABLE_AUTH=
 ```
 
-`OPENAI_API_KEY` is listed in `.env.example`, but current MVP readiness for
-DIA-32 is focused on Clerk, Convex, and route/auth deployment behavior.
+`CONVEX_DEPLOY_KEY`, `CLERK_SECRET_KEY`, and `OPENAI_API_KEY` are secrets and
+must never be committed or pasted into chat.
 
 ## Clerk Readiness Checklist
 
@@ -58,6 +67,7 @@ DIA-32 is focused on Clerk, Convex, and route/auth deployment behavior.
 - `CLERK_JWT_ISSUER_DOMAIN` matches the issuer configured in Convex.
 - The deployed URL is allowed by Clerk for sign-in, callback, and post-auth
   redirects.
+- Clerk has a Convex JWT template/integration named `convex`.
 - Login works without provider-origin loops.
 - Reload preserves the authenticated session.
 - Logout returns the app to a signed-out state.
@@ -68,14 +78,13 @@ DIA-32 is focused on Clerk, Convex, and route/auth deployment behavior.
 - `NEXT_PUBLIC_CONVEX_URL` points to the same Convex deployment being validated.
 - `CONVEX_DEPLOYMENT` identifies that deployment for builds and CLI workflows.
 - Convex environment includes `CLERK_JWT_ISSUER_DOMAIN`.
-- `npx convex function-spec --prod` or the target deployment equivalent shows
-  the expected public functions.
+- Deploy `convex/auth.config.ts` and functions to the same deployment used by
+  `NEXT_PUBLIC_CONVEX_URL`.
+- Convex Authentication shows:
+  - Domain: `https://hip-goshawk-22.clerk.accounts.dev`
+  - Application ID: `convex`
 - The deployed frontend does not call functions that are missing from the
   target Convex deployment.
-
-Current blocker: production Convex function metadata currently returns an empty
-function list. Deploy/configure Convex production before treating production
-smoke failures as product bugs.
 
 ## Vercel Readiness Checklist
 
@@ -86,11 +95,11 @@ smoke failures as product bugs.
 - The latest deployment was built from the intended GitHub `main` commit.
 - The deployment exposes the expected URL.
 - Vercel deployment protection, if enabled, is accounted for before smoke.
-- Build logs have no blocking Clerk, Convex, or Next.js runtime configuration
+- Runtime logs have no blocking Clerk, Convex, or Next.js runtime configuration
   errors.
-
-Current blocker: the local checkout is not linked to a Vercel project and no
-confirmed Uplinea deployment URL is available.
+- If production returns HTTP 500, check Vercel runtime logs first. On
+  2026-05-06, the relevant failure was `Publishable key not valid`, caused by
+  an invalid `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` value in Vercel Production.
 
 ## Local Validation
 
@@ -123,7 +132,8 @@ confirmed:
    - `/review`
    - `/coach`
    - `/sessions`
-6. Confirm no blocking runtime error or missing Convex function error appears.
+6. Confirm no blocking runtime error, demo/mock fallback, signed-in persistence
+   fallback, or missing Convex function error appears.
 7. Log out and confirm signed-out UI returns.
 
 If any production or staging smoke fails, classify it before retrying:
@@ -132,8 +142,8 @@ If any production or staging smoke fails, classify it before retrying:
 - Deployment/config issue: missing or mismatched Vercel, Clerk, or Convex setup.
 - Test issue: smoke account, browser, selector, or deployment-protection issue.
 
-## DIA-32 Decision
+## Current Decision
 
-DIA-32 should remain In Review while the documentation and local validation are
-complete but production/staging validation is blocked by missing deployment
-target information and an unconfigured Convex production function set.
+The current production configuration is considered unblocked. Future auth,
+provider, or deployment changes should repeat the production smoke plan above
+before closing the slice.
