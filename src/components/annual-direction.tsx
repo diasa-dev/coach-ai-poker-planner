@@ -20,7 +20,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
-import { useMemo, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import { PersistenceUnavailable } from "@/components/persistence-unavailable";
 import { usePersistenceAuth } from "@/lib/persistence-auth";
@@ -91,6 +92,58 @@ const emptyPlan: AnnualPlanForm = {
   decisionRule: "",
 };
 
+const mainDirectionExamples = [
+  "Construir uma rotina estável de MTTs sem sacrificar energia e estudo.",
+  "Jogar com mais consistência, menos impulsividade e melhor review.",
+  "Tornar-me um jogador mais sólido, disciplinado e preparado.",
+  "Priorizar qualidade de decisão, energia e execução semanal.",
+];
+
+const priorityExamples = [
+  "Melhorar a qualidade de decisão em fases finais.",
+  "Estudar ICM 2x por semana.",
+  "Proteger energia antes de sessões importantes.",
+  "Rever torneios-chave todas as semanas.",
+  "Reduzir autopilot em late game.",
+  "Manter rotina de estudo mesmo em good run.",
+];
+
+const nonNegotiableExamples = [
+  "Não jogar sessões longas com sono fraco.",
+  "Não aumentar volume para compensar semanas más.",
+  "Não saltar review depois de sessões importantes.",
+  "Não jogar sem um plano mínimo para o dia.",
+  "Não tomar decisões de calendário em tilt.",
+  "Não misturar estudo profundo com grind no mesmo bloco.",
+];
+
+const avoidRepeatingExamples = [
+  "Compensar semanas fracas com volume irrealista.",
+  "Jogar cansado só para bater volume.",
+  "Adiar estudo até aparecer uma downswing.",
+  "Mudar o plano semanal demasiadas vezes.",
+  "Ignorar energia/sono antes de sessões grandes.",
+  "Fazer review só quando os resultados são maus.",
+];
+
+const decisionRuleExamples = [
+  "Se estiver cansado, reduzo volume antes de sacrificar review.",
+  "Se tiver pouco tempo, priorizo qualidade de spots em vez de quantidade.",
+  "Se perder clareza emocional, paro antes de abrir mais torneios.",
+  "Se a semana descarrilar, volto ao plano mínimo em vez de tentar compensar tudo.",
+  "Se uma decisão não serve a direção anual, não entra no plano semanal.",
+  "Se grind e estudo entram em conflito, protejo pelo menos um bloco semanal de estudo.",
+];
+
+const operatingMetricExamples = [
+  "Dias de grind por mês",
+  "Dias de estudo por mês",
+  "Volume de torneios por mês",
+  "Horas de review por mês",
+  "Sessões de treino/coaching por mês",
+  "Dias off reais por mês",
+];
+
 const operatingTargetPresets: OperatingTargetDraft[] = [
   {
     metricKey: "grind_days_monthly",
@@ -102,8 +155,17 @@ const operatingTargetPresets: OperatingTargetDraft[] = [
     effectiveFrom: "",
   },
   {
+    metricKey: "study_days_monthly",
+    label: "Dias de estudo por mês",
+    category: "study",
+    unit: "dias",
+    cadence: "monthly",
+    targetValue: 8,
+    effectiveFrom: "",
+  },
+  {
     metricKey: "tournaments_monthly",
-    label: "Torneios por mês",
+    label: "Volume de torneios por mês",
     category: "grind",
     unit: "torneios",
     cadence: "monthly",
@@ -111,30 +173,30 @@ const operatingTargetPresets: OperatingTargetDraft[] = [
     effectiveFrom: "",
   },
   {
-    metricKey: "study_hours_weekly",
-    label: "Horas de estudo por semana",
-    category: "study",
+    metricKey: "review_hours_monthly",
+    label: "Horas de review por mês",
+    category: "review",
     unit: "horas",
-    cadence: "weekly",
-    targetValue: 6,
+    cadence: "monthly",
+    targetValue: 10,
     effectiveFrom: "",
   },
   {
-    metricKey: "reviews_weekly",
-    label: "Reviews por semana",
-    category: "review",
-    unit: "reviews",
-    cadence: "weekly",
+    metricKey: "coaching_sessions_monthly",
+    label: "Sessões de treino/coaching por mês",
+    category: "study",
+    unit: "sessões",
+    cadence: "monthly",
     targetValue: 2,
     effectiveFrom: "",
   },
   {
-    metricKey: "sport_sessions_weekly",
-    label: "Sessões de sport por semana",
-    category: "sport",
-    unit: "sessões",
-    cadence: "weekly",
-    targetValue: 3,
+    metricKey: "real_off_days_monthly",
+    label: "Dias off reais por mês",
+    category: "recovery",
+    unit: "dias",
+    cadence: "monthly",
+    targetValue: 4,
     effectiveFrom: "",
   },
   {
@@ -169,6 +231,26 @@ function normalizePlan(plan: AnnualPlanForm): AnnualPlanForm {
     nonNegotiables: plan.nonNegotiables.map((rule) => rule.trim()).filter(Boolean),
     avoidRepeating: plan.avoidRepeating.trim(),
     decisionRule: plan.decisionRule.trim(),
+  };
+}
+
+function getSuggestion(examples: string[], existing: string[]) {
+  const normalized = new Set(existing.map((item) => item.trim()).filter(Boolean));
+
+  return examples.find((example) => !normalized.has(example)) ?? examples[existing.length % examples.length] ?? "";
+}
+
+function getDecisionRules(plan: AnnualPlanForm) {
+  return plan.decisionRule
+    .split("\n")
+    .map((rule) => rule.trim())
+    .filter(Boolean);
+}
+
+function setDecisionRules(plan: AnnualPlanForm, rules: string[]): AnnualPlanForm {
+  return {
+    ...plan,
+    decisionRule: rules.map((rule) => rule.trim()).filter(Boolean).join("\n"),
   };
 }
 
@@ -355,6 +437,7 @@ function AnnualDirectionWorkspace({
   saveState = "idle",
   year,
 }: AnnualDirectionWorkspaceProps) {
+  const openedSetupFromUrl = useRef(false);
   const initialFormPlan = initialPlan ?? emptyPlan;
   const [plan, setPlan] = useState<AnnualPlanForm>(initialFormPlan);
   const [draft, setDraft] = useState<AnnualPlanForm>(initialFormPlan);
@@ -363,6 +446,8 @@ function AnnualDirectionWorkspace({
   const [operatingDraft, setOperatingDraft] = useState<OperatingTargetDraft | null>(null);
   const [showEffectiveFrom, setShowEffectiveFrom] = useState(false);
   const [mode, setMode] = useState<"read" | "edit" | "empty">(initialPlan ? "read" : "empty");
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardStep, setWizardStep] = useState(0);
   const [localSaveState, setLocalSaveState] = useState<SaveState>(saveState);
   const [localOperatingSaveState, setLocalOperatingSaveState] =
     useState<SaveState>(operatingSaveState);
@@ -377,6 +462,27 @@ function AnnualDirectionWorkspace({
     () => getActiveTargets(operatingTargets),
     [operatingTargets],
   );
+
+  useEffect(() => {
+    if (openedSetupFromUrl.current) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const openSetupOnMount = params.get("setup") === "annual";
+
+    if (!openSetupOnMount) return;
+
+    openedSetupFromUrl.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+
+    const frame = window.requestAnimationFrame(() => {
+      setDraft(hasSavedPlan ? plan : emptyPlan);
+      setWizardStep(0);
+      setWizardOpen(true);
+      setLocalSaveState("dirty");
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [hasSavedPlan, plan]);
 
   const validationMessage = useMemo(() => {
     const normalized = normalizePlan(draft);
@@ -406,13 +512,15 @@ function AnnualDirectionWorkspace({
 
   const startEditing = () => {
     setDraft(hasSavedPlan ? plan : emptyPlan);
-    setMode("edit");
+    setWizardStep(0);
+    setWizardOpen(true);
     setLocalSaveState("dirty");
   };
 
   const cancelEditing = () => {
     setDraft(plan);
-    setMode(hasSavedPlan ? "read" : "empty");
+    setWizardOpen(false);
+    setWizardStep(0);
     setLocalSaveState("idle");
   };
 
@@ -437,6 +545,8 @@ function AnnualDirectionWorkspace({
     setPlan(normalized);
     setDraft(normalized);
     setMode("read");
+    setWizardOpen(false);
+    setWizardStep(0);
     setLocalSaveState("saved");
   };
 
@@ -456,7 +566,16 @@ function AnnualDirectionWorkspace({
 
   const addPriority = () => {
     if (draft.priorities.length >= 4) return;
-    setDraft((current) => ({ ...current, priorities: [...current.priorities, ""] }));
+    setDraft((current) => ({
+      ...current,
+      priorities: [
+        ...current.priorities,
+        getSuggestion(
+          priorityExamples,
+          current.priorities.map((priority, index) => priority || priorityExamples[index] || ""),
+        ),
+      ],
+    }));
     markDirty();
   };
 
@@ -480,7 +599,13 @@ function AnnualDirectionWorkspace({
   };
 
   const addNonNegotiable = () => {
-    setDraft((current) => ({ ...current, nonNegotiables: [...current.nonNegotiables, ""] }));
+    setDraft((current) => ({
+      ...current,
+      nonNegotiables: [
+        ...current.nonNegotiables,
+        getSuggestion(nonNegotiableExamples, current.nonNegotiables),
+      ],
+    }));
     markDirty();
   };
 
@@ -492,8 +617,16 @@ function AnnualDirectionWorkspace({
     markDirty();
   };
 
-  const startOperatingTarget = (metricKey = operatingTargetPresets[0].metricKey) => {
-    setOperatingDraft(createDraftFromPreset(metricKey, getTodayIsoDate()));
+  const startOperatingTarget = (metricKey?: string) => {
+    const activeMetricKeys = new Set(getActiveTargets(operatingTargets).map((target) => target.metricKey));
+    const nextMetricKey =
+      metricKey ??
+      operatingTargetPresets.find(
+        (preset) => preset.metricKey !== "custom" && !activeMetricKeys.has(preset.metricKey),
+      )?.metricKey ??
+      "custom";
+
+    setOperatingDraft(createDraftFromPreset(nextMetricKey, getTodayIsoDate()));
     setShowEffectiveFrom(false);
     setLocalOperatingSaveState("dirty");
   };
@@ -611,6 +744,10 @@ function AnnualDirectionWorkspace({
               <span>Padrão a evitar</span>
               <span>Regra de decisão</span>
             </div>
+            <button className="ep-button primary" type="button" onClick={startEditing}>
+              <Compass size={14} aria-hidden="true" />
+              Definir direção
+            </button>
           </div>
         </article>
       ) : (
@@ -1121,6 +1258,639 @@ function AnnualDirectionWorkspace({
             </article>
           </aside>
         </div>
+      )}
+
+      {wizardOpen ? (
+        <AnnualDirectionWizard
+          activeOperatingTargets={activeOperatingTargets}
+          draft={draft}
+          effectiveOperatingSaveState={effectiveOperatingSaveState}
+          effectiveSaveState={effectiveSaveState}
+          operatingDraft={operatingDraft}
+          operatingTargets={operatingTargets}
+          operatingValidationMessage={operatingValidationMessage}
+          showEffectiveFrom={showEffectiveFrom}
+          step={wizardStep}
+          validationMessage={validationMessage}
+          year={year}
+          onAddNonNegotiable={addNonNegotiable}
+          onAddPriority={addPriority}
+          onCancel={cancelEditing}
+          onCancelOperatingTarget={cancelOperatingTarget}
+          onEditOperatingTarget={editOperatingTarget}
+          onRemoveNonNegotiable={removeNonNegotiable}
+          onRemovePriority={removePriority}
+          onSave={saveDirection}
+          onSaveOperatingTarget={saveOperatingTargetDraft}
+          onSetDraft={(nextDraft) => {
+            setDraft(nextDraft);
+            markDirty();
+          }}
+          onSetOperatingDraft={setOperatingDraft}
+          onSetShowEffectiveFrom={setShowEffectiveFrom}
+          onStartOperatingTarget={startOperatingTarget}
+          onStepChange={setWizardStep}
+          onUpdateNonNegotiable={updateNonNegotiable}
+          onUpdatePriority={updatePriority}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function AnnualDirectionWizard({
+  activeOperatingTargets,
+  draft,
+  effectiveOperatingSaveState,
+  effectiveSaveState,
+  operatingDraft,
+  operatingTargets,
+  operatingValidationMessage,
+  showEffectiveFrom,
+  step,
+  validationMessage,
+  year,
+  onAddNonNegotiable,
+  onAddPriority,
+  onCancel,
+  onCancelOperatingTarget,
+  onEditOperatingTarget,
+  onRemoveNonNegotiable,
+  onRemovePriority,
+  onSave,
+  onSaveOperatingTarget,
+  onSetDraft,
+  onSetOperatingDraft,
+  onSetShowEffectiveFrom,
+  onStartOperatingTarget,
+  onStepChange,
+  onUpdateNonNegotiable,
+  onUpdatePriority,
+}: {
+  activeOperatingTargets: OperatingTarget[];
+  draft: AnnualPlanForm;
+  effectiveOperatingSaveState: SaveState;
+  effectiveSaveState: SaveState;
+  operatingDraft: OperatingTargetDraft | null;
+  operatingTargets: OperatingTarget[];
+  operatingValidationMessage: string | null;
+  showEffectiveFrom: boolean;
+  step: number;
+  validationMessage: string | null;
+  year: number;
+  onAddNonNegotiable: () => void;
+  onAddPriority: () => void;
+  onCancel: () => void;
+  onCancelOperatingTarget: () => void;
+  onEditOperatingTarget: (target: OperatingTarget) => void;
+  onRemoveNonNegotiable: (index: number) => void;
+  onRemovePriority: (index: number) => void;
+  onSave: () => Promise<void>;
+  onSaveOperatingTarget: () => Promise<void>;
+  onSetDraft: (draft: AnnualPlanForm) => void;
+  onSetOperatingDraft: Dispatch<SetStateAction<OperatingTargetDraft | null>>;
+  onSetShowEffectiveFrom: Dispatch<SetStateAction<boolean>>;
+  onStartOperatingTarget: (metricKey?: string) => void;
+  onStepChange: Dispatch<SetStateAction<number>>;
+  onUpdateNonNegotiable: (index: number, value: string) => void;
+  onUpdatePriority: (index: number, value: string) => void;
+}) {
+  const steps = [
+    "Direção",
+    "Prioridades",
+    "Padrões",
+    "Métricas",
+    "Revisão",
+  ];
+  const decisionRules = getDecisionRules(draft);
+  const canContinue = step !== 0 || Boolean(draft.primaryDirection.trim());
+
+  function updateDecisionRule(index: number, value: string) {
+    const nextRules = decisionRules.map((rule, ruleIndex) =>
+      ruleIndex === index ? value : rule,
+    );
+    onSetDraft(setDecisionRules(draft, nextRules));
+  }
+
+  function addDecisionRule() {
+    onSetDraft(
+      setDecisionRules(draft, [
+        ...decisionRules,
+        getSuggestion(
+          decisionRuleExamples,
+          decisionRules.map((rule, index) => rule || decisionRuleExamples[index] || ""),
+        ),
+      ]),
+    );
+  }
+
+  function removeDecisionRule(index: number) {
+    onSetDraft(setDecisionRules(draft, decisionRules.filter((_, ruleIndex) => ruleIndex !== index)));
+  }
+
+  async function continueOrSave() {
+    if (step === 0 && !draft.primaryDirection.trim()) return;
+    if (step < steps.length - 1) {
+      onStepChange((current) => Math.min(current + 1, steps.length - 1));
+      return;
+    }
+
+    await onSave();
+  }
+
+  return (
+    <div className={styles.modalLayer} role="presentation">
+      <button className={styles.modalScrim} type="button" aria-label="Fechar" onClick={onCancel} />
+      <section
+        aria-labelledby="annual-direction-wizard-title"
+        aria-modal="true"
+        className={styles.modal}
+        role="dialog"
+      >
+        <header className={styles.modalHeader}>
+          <div>
+            <span>Direção anual · passo {step + 1} de {steps.length}</span>
+            <h2 id="annual-direction-wizard-title">{steps[step]}</h2>
+          </div>
+          <button className={styles.iconButton} type="button" aria-label="Fechar" onClick={onCancel}>
+            <X size={16} aria-hidden="true" />
+          </button>
+        </header>
+
+        <div className={styles.stepper} aria-label="Progresso">
+          {steps.map((label, index) => (
+            <button
+              className={index === step ? styles.activeStep : undefined}
+              key={label}
+              type="button"
+              onClick={() => {
+                if (index === 0 || draft.primaryDirection.trim()) onStepChange(index);
+              }}
+            >
+              <span>{index + 1}</span>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className={styles.modalBody}>
+          {step === 0 ? (
+            <div className={styles.wizardStack}>
+              <div className={styles.wizardIntro}>
+                <h3>O que queres construir este ano?</h3>
+                <p>Escreve uma frase curta que ajude a tomar decisões difíceis.</p>
+              </div>
+              <label className={`${styles.field} ${styles.primaryField}`}>
+                <span>Direção principal</span>
+                <textarea
+                  autoFocus
+                  rows={4}
+                  value={draft.primaryDirection}
+                  onChange={(event) => onSetDraft({ ...draft, primaryDirection: event.target.value })}
+                  placeholder={mainDirectionExamples[0]}
+                />
+              </label>
+              <CoachHint examples={mainDirectionExamples} label="Pedir ideias ao Coach" />
+              {!draft.primaryDirection.trim() && effectiveSaveState === "error" ? (
+                <p className={styles.errorText}>A direção principal é obrigatória.</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {step === 1 ? (
+            <div className={styles.wizardStack}>
+              <div className={styles.wizardIntro}>
+                <h3>Onde vai a atenção e que limites protegem o ano?</h3>
+                <p>Mantém 2 a 4 prioridades. Os não-negociáveis protegem energia, estudo e decisões sob pressão.</p>
+              </div>
+              <WizardRows
+                addLabel="Adicionar prioridade"
+                countLabel={`${draft.priorities.filter(Boolean).length}/4`}
+                items={draft.priorities}
+                placeholders={priorityExamples}
+                removeDisabled={draft.priorities.length <= 2}
+                title="Prioridades"
+                onAdd={onAddPriority}
+                onRemove={onRemovePriority}
+                onUpdate={onUpdatePriority}
+              />
+              <WizardRows
+                addLabel="Adicionar não-negociável"
+                icon="check"
+                items={draft.nonNegotiables}
+                placeholders={nonNegotiableExamples}
+                title="Não-negociáveis"
+                onAdd={onAddNonNegotiable}
+                onRemove={onRemoveNonNegotiable}
+                onUpdate={onUpdateNonNegotiable}
+              />
+            </div>
+          ) : null}
+
+          {step === 2 ? (
+            <div className={styles.wizardStack}>
+              <div className={styles.wizardIntro}>
+                <h3>Que padrões e trade-offs precisam de ficar explícitos?</h3>
+                <p>Isto torna a direção prática quando houver cansaço, tilt, pouco tempo ou pressão por volume.</p>
+              </div>
+              <label className={styles.field}>
+                <span>O que não repetir este ano</span>
+                <textarea
+                  rows={3}
+                  value={draft.avoidRepeating}
+                  onChange={(event) => onSetDraft({ ...draft, avoidRepeating: event.target.value })}
+                  placeholder={avoidRepeatingExamples[0]}
+                />
+              </label>
+              <CoachHint examples={avoidRepeatingExamples} label="Sugerir exemplos" />
+              <WizardRows
+                addLabel="Adicionar regra"
+                icon="rule"
+                items={decisionRules}
+                placeholders={decisionRuleExamples}
+                title="Regras de decisão"
+                onAdd={addDecisionRule}
+                onRemove={removeDecisionRule}
+                onUpdate={updateDecisionRule}
+              />
+            </div>
+          ) : null}
+
+          {step === 3 ? (
+            <div className={styles.wizardStack}>
+              <div className={styles.wizardIntro}>
+                <h3>Que métricas tornam a direção visível?</h3>
+                <p>Escolhe ritmos simples. Podes adicionar várias métricas agora e ajustá-las mais tarde.</p>
+              </div>
+              <CoachHint examples={operatingMetricExamples} label="Sugerir exemplos" />
+              <OperatingTargetsEditor
+                activeOperatingTargets={activeOperatingTargets}
+                effectiveOperatingSaveState={effectiveOperatingSaveState}
+                operatingDraft={operatingDraft}
+                operatingTargets={operatingTargets}
+                operatingValidationMessage={operatingValidationMessage}
+                showEffectiveFrom={showEffectiveFrom}
+                onCancelOperatingTarget={onCancelOperatingTarget}
+                onEditOperatingTarget={onEditOperatingTarget}
+                onSaveOperatingTarget={onSaveOperatingTarget}
+                onSetOperatingDraft={onSetOperatingDraft}
+                onSetShowEffectiveFrom={onSetShowEffectiveFrom}
+                onStartOperatingTarget={onStartOperatingTarget}
+              />
+            </div>
+          ) : null}
+
+          {step === 4 ? (
+            <div className={styles.reviewGrid}>
+              <section className={styles.reviewHero}>
+                <span>Direção anual {year}</span>
+                <strong>{draft.primaryDirection || "Direção por definir"}</strong>
+              </section>
+              <PreviewList title="Prioridades" items={draft.priorities} />
+              <PreviewList title="Não-negociáveis" items={draft.nonNegotiables} empty="Sem limites definidos." />
+              <PreviewList title="O que não repetir" items={draft.avoidRepeating ? [draft.avoidRepeating] : []} empty="Sem padrão definido." />
+              <PreviewList title="Regras de decisão" items={decisionRules} empty="Sem regras definidas." />
+              <PreviewList
+                title="Métricas"
+                items={activeOperatingTargets.map(
+                  (target) => `${target.label}: ${target.targetValue} ${target.unit} ${cadenceLabels[target.cadence]}`,
+                )}
+                empty="Sem métricas anuais definidas."
+              />
+            </div>
+          ) : null}
+        </div>
+
+        {effectiveSaveState === "error" && validationMessage ? (
+          <p className={styles.modalError}>{validationMessage}</p>
+        ) : null}
+
+        <footer className={styles.modalFooter}>
+          <button className="ep-button secondary" type="button" onClick={onCancel}>
+            Cancelar
+          </button>
+          {step > 0 ? (
+            <button className="ep-button secondary" type="button" onClick={() => onStepChange((current) => current - 1)}>
+              Voltar
+            </button>
+          ) : null}
+          <button
+            className="ep-button primary"
+            disabled={effectiveSaveState === "saving" || !canContinue}
+            type="button"
+            onClick={continueOrSave}
+          >
+            {step === steps.length - 1 ? (
+              <>
+                <Save size={14} aria-hidden="true" />
+                {effectiveSaveState === "saving" ? "A guardar..." : "Guardar direção"}
+              </>
+            ) : (
+              <>
+                Continuar
+                <ArrowRight size={14} aria-hidden="true" />
+              </>
+            )}
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+function CoachHint({ examples, label }: { examples: string[]; label: string }) {
+  return (
+    <details className={styles.coachHint}>
+      <summary>
+        <Sparkles size={14} aria-hidden="true" />
+        {label}
+      </summary>
+      <div>
+        {examples.slice(0, 4).map((example) => (
+          <p key={example}>{example}</p>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function WizardRows({
+  addLabel,
+  countLabel,
+  icon,
+  items,
+  placeholders,
+  removeDisabled = false,
+  title,
+  onAdd,
+  onRemove,
+  onUpdate,
+}: {
+  addLabel: string;
+  countLabel?: string;
+  icon?: "check" | "rule";
+  items: string[];
+  placeholders: string[];
+  removeDisabled?: boolean;
+  title: string;
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+  onUpdate: (index: number, value: string) => void;
+}) {
+  return (
+    <section className={styles.wizardRows}>
+      <header>
+        <strong>{title}</strong>
+        {countLabel ? <span>{countLabel}</span> : null}
+      </header>
+      <div className={styles.list}>
+        {items.length ? (
+          items.map((item, index) => (
+            <div className={styles.row} key={`${title}-${index}`}>
+              <span>{icon === "check" ? <Check size={13} aria-hidden="true" /> : icon === "rule" ? <Lightbulb size={13} aria-hidden="true" /> : index + 1}</span>
+              <input
+                value={item}
+                onChange={(event) => onUpdate(index, event.target.value)}
+                placeholder={placeholders[index % placeholders.length]}
+              />
+              <button
+                aria-label="Remover"
+                disabled={removeDisabled}
+                type="button"
+                onClick={() => onRemove(index)}
+              >
+                <Trash2 size={14} aria-hidden="true" />
+              </button>
+            </div>
+          ))
+        ) : (
+          <p className={styles.quietText}>Ainda sem itens.</p>
+        )}
+      </div>
+      <button className={styles.addButton} type="button" onClick={onAdd}>
+        <Plus size={14} aria-hidden="true" />
+        {addLabel}
+      </button>
+    </section>
+  );
+}
+
+function PreviewList({ title, items, empty = "Sem itens." }: { title: string; items: string[]; empty?: string }) {
+  const visibleItems = items.map((item) => item.trim()).filter(Boolean);
+
+  return (
+    <section className={styles.previewSection}>
+      <span>{title}</span>
+      {visibleItems.length ? (
+        <ul>
+          {visibleItems.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      ) : (
+        <p>{empty}</p>
+      )}
+    </section>
+  );
+}
+
+function OperatingTargetsEditor({
+  activeOperatingTargets,
+  effectiveOperatingSaveState,
+  operatingDraft,
+  operatingTargets,
+  operatingValidationMessage,
+  showEffectiveFrom,
+  onCancelOperatingTarget,
+  onEditOperatingTarget,
+  onSaveOperatingTarget,
+  onSetOperatingDraft,
+  onSetShowEffectiveFrom,
+  onStartOperatingTarget,
+}: {
+  activeOperatingTargets: OperatingTarget[];
+  effectiveOperatingSaveState: SaveState;
+  operatingDraft: OperatingTargetDraft | null;
+  operatingTargets: OperatingTarget[];
+  operatingValidationMessage: string | null;
+  showEffectiveFrom: boolean;
+  onCancelOperatingTarget: () => void;
+  onEditOperatingTarget: (target: OperatingTarget) => void;
+  onSaveOperatingTarget: () => Promise<void>;
+  onSetOperatingDraft: Dispatch<SetStateAction<OperatingTargetDraft | null>>;
+  onSetShowEffectiveFrom: Dispatch<SetStateAction<boolean>>;
+  onStartOperatingTarget: (metricKey?: string) => void;
+}) {
+  return (
+    <section className={styles.metricsStep}>
+      {activeOperatingTargets.length ? (
+        <div className={styles.operatingList}>
+          {activeOperatingTargets.map((target) => {
+            const Icon = getOperatingTargetIcon(target.category);
+            const history = getInactiveVersions(operatingTargets, target.metricKey);
+
+            return (
+              <div className={styles.operatingItem} key={target.metricKey}>
+                <div className={styles.operatingMain}>
+                  <span className={styles.operatingIcon}>
+                    <Icon size={15} aria-hidden="true" />
+                  </span>
+                  <div>
+                    <strong>{target.label}</strong>
+                    <small>
+                      {target.targetValue} {target.unit} {cadenceLabels[target.cadence]} desde{" "}
+                      {formatDateLabel(target.effectiveFrom)}
+                    </small>
+                  </div>
+                </div>
+                <span className={styles.categoryTag}>{categoryLabels[target.category]}</span>
+                <button className={styles.textButton} type="button" onClick={() => onEditOperatingTarget(target)}>
+                  Ajustar
+                </button>
+                {history.length ? (
+                  <details className={styles.historyDetails}>
+                    <summary>Histórico</summary>
+                    <ul>
+                      {history.map((version) => (
+                        <li key={`${version.metricKey}-${version.effectiveFrom}-${version.updatedAt}`}>
+                          {version.targetValue} {version.unit} {cadenceLabels[version.cadence]} desde{" "}
+                          {formatDateLabel(version.effectiveFrom)}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className={styles.operatingEmpty}>
+          <Gauge size={18} aria-hidden="true" />
+          <p>Adiciona métricas base como grind, estudo, reviews, coaching ou dias off.</p>
+        </div>
+      )}
+
+      {operatingDraft ? (
+        <div className={styles.operatingForm}>
+          <div className={styles.formGrid}>
+            <label>
+              Métrica
+              <select
+                value={
+                  operatingTargetPresets.some((preset) => preset.metricKey === operatingDraft.metricKey)
+                    ? operatingDraft.metricKey
+                    : "custom"
+                }
+                onChange={(event) => onStartOperatingTarget(event.target.value)}
+              >
+                {operatingTargetPresets.map((preset) => (
+                  <option key={preset.metricKey} value={preset.metricKey}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Nome
+              <input
+                value={operatingDraft.label}
+                onChange={(event) =>
+                  onSetOperatingDraft((current) => current ? { ...current, label: event.target.value } : current)
+                }
+                placeholder="Exemplo: Dias de grind por mês"
+              />
+            </label>
+            <label>
+              Valor
+              <input
+                min="1"
+                type="number"
+                value={operatingDraft.targetValue}
+                onChange={(event) =>
+                  onSetOperatingDraft((current) => current ? { ...current, targetValue: Number(event.target.value) } : current)
+                }
+              />
+            </label>
+            <label>
+              Unidade
+              <input
+                value={operatingDraft.unit}
+                onChange={(event) =>
+                  onSetOperatingDraft((current) => current ? { ...current, unit: event.target.value } : current)
+                }
+                placeholder="dias, torneios, reviews..."
+              />
+            </label>
+            <label>
+              Cadência
+              <select
+                value={operatingDraft.cadence}
+                onChange={(event) =>
+                  onSetOperatingDraft((current) =>
+                    current ? { ...current, cadence: event.target.value as OperatingTargetCadence } : current,
+                  )
+                }
+              >
+                <option value="monthly">por mês</option>
+                <option value="weekly">por semana</option>
+              </select>
+            </label>
+            <label>
+              Categoria
+              <select
+                value={operatingDraft.category}
+                onChange={(event) =>
+                  onSetOperatingDraft((current) =>
+                    current ? { ...current, category: event.target.value as OperatingTargetCategory } : current,
+                  )
+                }
+              >
+                {Object.entries(categoryLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <button className={styles.textButton} type="button" onClick={() => onSetShowEffectiveFrom((value) => !value)}>
+            {showEffectiveFrom ? "Ocultar data de início" : "Alterar data de início"}
+          </button>
+          {showEffectiveFrom ? (
+            <label className={styles.dateField}>
+              Aplicável desde
+              <input
+                type="date"
+                value={operatingDraft.effectiveFrom}
+                onChange={(event) =>
+                  onSetOperatingDraft((current) => current ? { ...current, effectiveFrom: event.target.value } : current)
+                }
+              />
+            </label>
+          ) : (
+            <p className={styles.quietText}>Aplicável desde {formatDateLabel(operatingDraft.effectiveFrom)}.</p>
+          )}
+          {effectiveOperatingSaveState === "error" ? (
+            <p className={styles.errorText}>
+              {operatingValidationMessage ?? "Não foi possível guardar esta métrica."}
+            </p>
+          ) : null}
+          <div className={styles.operatingActions}>
+            <button className="ep-button secondary" type="button" onClick={onCancelOperatingTarget}>
+              Cancelar métrica
+            </button>
+            <button className="ep-button primary" type="button" onClick={onSaveOperatingTarget}>
+              <Save size={14} aria-hidden="true" />
+              Guardar métrica
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button className={styles.addButton} type="button" onClick={() => onStartOperatingTarget()}>
+          <Plus size={14} aria-hidden="true" />
+          Adicionar métrica
+        </button>
       )}
     </section>
   );

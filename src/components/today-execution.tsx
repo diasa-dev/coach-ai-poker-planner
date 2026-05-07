@@ -354,6 +354,10 @@ function TodayWorkspace({
   );
   const completedCommitments = commitments.filter((commitment) => commitment.status === "done").length;
   const doneBlocks = displayedTodayBlocks.filter((block) => block.status === "Feito").length;
+  const shouldStartWithAnnualDirection = source === "no-active-plan" && !annualPlan;
+  const headerContext = shouldStartWithAnnualDirection
+    ? "Próximo passo · Direção anual"
+    : `Foco da semana · ${weeklyFocus}`;
 
   async function updateCommitment(id: string, status: CommitmentStatus) {
     const currentCommitment = commitments.find((item) => item.id === id);
@@ -422,24 +426,39 @@ function TodayWorkspace({
 
   return (
     <section className="ep-page today-page today-print-match">
-      {source === "active" ? null : <TodayModeBanner message={sourceMessage} source={source} />}
+      {source === "active" ? null : (
+        <TodayModeBanner
+          annualDirectionMissing={!annualPlan}
+          message={sourceMessage}
+          source={source}
+        />
+      )}
       <div className="ep-page-header today-head">
         <div>
           <span>{getTodayHeaderLabel(weekLabel)}</span>
           <h1>{greetingName ? `Bom dia, ${greetingName}.` : "Bom dia."}</h1>
           <p>
-            Foco da semana · <strong>{weeklyFocus}</strong>
+            <strong>{headerContext}</strong>
           </p>
         </div>
         <div className="today-head-actions">
-          <Link className="ep-button secondary" href="/weekly">
-            <Edit3 size={14} aria-hidden="true" />
-            Editar foco
-          </Link>
-          <button className="ep-button primary" type="button" onClick={() => setPrepareOpen(true)}>
-            <Check size={14} aria-hidden="true" />
-            {dailyPlanStatus === "closed" ? "Editar dia" : "Preparar dia"}
-          </button>
+          {shouldStartWithAnnualDirection ? (
+            <Link className="ep-button primary" href="/annual?setup=annual">
+              <Target size={14} aria-hidden="true" />
+              Definir direção anual
+            </Link>
+          ) : (
+            <>
+              <Link className="ep-button secondary" href="/weekly">
+                <Edit3 size={14} aria-hidden="true" />
+                Editar foco
+              </Link>
+              <button className="ep-button primary" type="button" onClick={() => setPrepareOpen(true)}>
+                <Check size={14} aria-hidden="true" />
+                {dailyPlanStatus === "closed" ? "Editar dia" : "Preparar dia"}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -449,13 +468,19 @@ function TodayWorkspace({
             commitments={commitments}
             completed={completedCommitments}
             dailyPlanStatus={dailyPlanStatus}
+            strategicSetupMissing={shouldStartWithAnnualDirection}
             onPrepare={() => setPrepareOpen(true)}
             onReasonChange={updateReason}
             onStatusChange={updateCommitment}
             updatingCommitmentIds={updatingCommitmentIds}
           />
-          <PlannedBlocksCard blocks={displayedTodayBlocks} doneBlocks={doneBlocks} source={source} />
-          <AttentionCard source={source} />
+          <PlannedBlocksCard
+            blocks={displayedTodayBlocks}
+            doneBlocks={doneBlocks}
+            source={source}
+            strategicSetupMissing={shouldStartWithAnnualDirection}
+          />
+          <AttentionCard source={source} strategicSetupMissing={shouldStartWithAnnualDirection} />
         </main>
 
         <aside className="today-side">
@@ -495,7 +520,36 @@ function TodayWorkspace({
   );
 }
 
-function TodayModeBanner({ message, source }: { message: string; source: TodaySource }) {
+function TodayModeBanner({
+  annualDirectionMissing,
+  message,
+  source,
+}: {
+  annualDirectionMissing?: boolean;
+  message: string;
+  source: TodaySource;
+}) {
+  if (annualDirectionMissing && source === "no-active-plan") {
+    return (
+      <div className="wp-demo-banner">
+        <div>
+          <strong>Começa pela direção anual</strong>
+          <span>
+            Ainda não definiste o contexto estratégico do ano. Antes de criares objetivos
+            mensais ou um plano semanal, define a direção que vai guiar as decisões.
+          </span>
+          <small>
+            Depois da Direção anual, podes transformá-la em objetivos mensais e num plano
+            semanal.
+          </small>
+        </div>
+        <Link className="ep-button primary" href="/annual?setup=annual">
+          Definir direção anual
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className={source === "active" ? "wp-demo-banner is-real" : "wp-demo-banner"}>
       <div>
@@ -556,6 +610,7 @@ function CommitmentsCard({
   commitments,
   completed,
   dailyPlanStatus,
+  strategicSetupMissing,
   onPrepare,
   onReasonChange,
   onStatusChange,
@@ -564,6 +619,7 @@ function CommitmentsCard({
   commitments: Commitment[];
   completed: number;
   dailyPlanStatus?: "prepared" | "closed";
+  strategicSetupMissing?: boolean;
   onPrepare: () => void;
   onReasonChange: (id: string, reason: string) => void;
   onStatusChange: (id: string, status: CommitmentStatus) => void;
@@ -578,7 +634,9 @@ function CommitmentsCard({
           <span className="today-card-icon">⊙</span>
           <h2>Compromissos de hoje</h2>
         </div>
-        {isPrepared ? (
+        {strategicSetupMissing ? (
+          <em>à espera da direção</em>
+        ) : isPrepared ? (
           <small>
             {dailyPlanStatus === "closed" ? "Fechado" : `${completed} / ${commitments.length} feitos`}
           </small>
@@ -586,7 +644,25 @@ function CommitmentsCard({
           <em>Por preparar</em>
         )}
       </header>
-      {isPrepared ? (
+      {strategicSetupMissing ? (
+        <div className="today-prepare-empty">
+          <div className="today-prepare-visual" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+          <p>Antes de preparares o dia, define a direção anual que vai dar critério aos objetivos mensais, plano semanal e execução.</p>
+          <Link className="ep-button primary" href="/annual?setup=annual">
+            <Target size={14} aria-hidden="true" />
+            Definir direção anual
+          </Link>
+        </div>
+      ) : isPrepared ? (
         <>
           <p>Escolhidos esta manhã. O que ficar por fazer ao final do dia entra na revisão de amanhã.</p>
           <div className="today-commitment-list">
@@ -673,10 +749,12 @@ function PlannedBlocksCard({
   blocks,
   doneBlocks,
   source,
+  strategicSetupMissing,
 }: {
   blocks: PlanBlock[];
   doneBlocks: number;
   source: TodaySource;
+  strategicSetupMissing?: boolean;
 }) {
   return (
     <article className="today-panel today-blocks-card">
@@ -716,7 +794,9 @@ function PlannedBlocksCard({
           ))
         ) : (
           <div className="today-empty-blocks">
-            {source === "no-active-plan"
+            {strategicSetupMissing
+              ? "Define primeiro a direção anual. Depois faz sentido transformar essa direção em objetivos mensais e plano semanal."
+              : source === "no-active-plan"
               ? "Ativa um plano semanal para veres aqui os blocos planeados de hoje."
               : "Não há blocos planeados para hoje."}
           </div>
@@ -726,9 +806,28 @@ function PlannedBlocksCard({
   );
 }
 
-function AttentionCard({ source }: { source: TodaySource }) {
+function AttentionCard({
+  source,
+  strategicSetupMissing,
+}: {
+  source: TodaySource;
+  strategicSetupMissing?: boolean;
+}) {
   const items =
-    source === "demo"
+    strategicSetupMissing
+      ? [
+          {
+            title: "Direção anual em falta",
+            detail: "Sem este contexto, o Today ainda não sabe que tipo de decisões deve proteger.",
+            action: "Definir",
+          },
+          {
+            title: "Objetivos mensais vêm depois",
+            detail: "Depois da direção anual, transforma-a em ritmo mensal antes do plano semanal.",
+            action: "Depois",
+          },
+        ]
+      : source === "demo"
       ? [
           { title: "Estudo abaixo do ritmo", detail: "3h15 de 5h previstas — adiciona 45 min antes da próxima sessão", action: "Resolver" },
           { title: "3 mãos pendentes para rever", detail: "Marcadas na sessão de ontem (ICM, bluff catch, river difícil)", action: "Rever" },
@@ -756,7 +855,11 @@ function AttentionCard({ source }: { source: TodaySource }) {
               <strong>{item.title}</strong>
               <p>{item.detail}</p>
             </div>
-            <button type="button">{item.action}</button>
+            {strategicSetupMissing && item.action === "Definir" ? (
+              <Link href="/annual?setup=annual">{item.action}</Link>
+            ) : (
+              <button type="button">{item.action}</button>
+            )}
           </div>
         ))}
       </div>
@@ -779,7 +882,7 @@ function AnnualContextCard({ annualPlan }: { annualPlan: AnnualPlanContext | nul
       ) : (
         <div className="today-annual-empty">
           <p>Sem direção anual, o Hoje tem menos critério estratégico.</p>
-          <Link className="ep-button secondary" href="/annual">
+          <Link className="ep-button secondary" href="/annual?setup=annual">
             Definir direção
           </Link>
         </div>

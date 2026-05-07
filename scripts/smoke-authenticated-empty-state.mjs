@@ -23,7 +23,7 @@ const forbiddenStrings = [
 const routes = ["/", "/weekly", "/monthly", "/annual", "/sessions", "/study", "/review", "/coach"];
 
 const expectedEmptyStateCopy = new Map([
-  ["/", ["Sem plano semanal ativo"]],
+  ["/", ["Começa pela direção anual", "Definir direção anual"]],
   ["/weekly", ["Planear semana", "Dados reais ligados"]],
   ["/monthly", ["Ainda não tens objetivos para este mês.", "Sem direção anual"]],
   ["/annual", ["Ainda não definiste a direção anual.", "Definir direção"]],
@@ -91,7 +91,8 @@ async function gotoSettled(page, route) {
   assertExpectedEmptyState(bodyText, route);
 }
 
-const { browser, context, page } = await launchAuthenticatedSmokeContext(authSmokeConfig);
+const context = await launchAuthenticatedSmokeContext(authSmokeConfig);
+const page = context.pages()[0] ?? await context.newPage();
 
 try {
   await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded", timeout: 20_000 });
@@ -105,5 +106,4 @@ try {
   console.log("Authenticated empty-state smoke passed.");
 } finally {
   await context.close();
-  await browser.close();
 }

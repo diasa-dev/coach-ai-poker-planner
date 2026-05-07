@@ -73,7 +73,12 @@ export async function launchAuthenticatedSmokeContext(config) {
 }
 
 export function hasAuthenticatedPlanContext(bodyText) {
-  return bodyText.includes("Plano semanal\nAtivo") || bodyText.includes("Plano semanal\nSem plano ativo");
+  return (
+    bodyText.includes("Conta ativa") ||
+    bodyText.includes("Sessão ativa") ||
+    bodyText.includes("Plano semanal\nAtivo") ||
+    bodyText.includes("Plano semanal\nSem plano ativo")
+  );
 }
 
 export function isUnauthenticatedBody(bodyText) {
