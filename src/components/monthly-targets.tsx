@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
+import type { Dispatch, SetStateAction } from "react";
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { api } from "../../convex/_generated/api";
@@ -33,6 +34,7 @@ type AnnualPlanContext = {
   primaryDirection: string;
   priorities: string[];
   nonNegotiables: string[];
+  decisionRule?: string;
 };
 
 type OperatingTargetContext = {
@@ -55,6 +57,10 @@ type MonthlyTargetRecord = {
 };
 
 type TargetDraft = MonthlyTargetRecord;
+
+type SuggestedMonthlyTarget = TargetDraft & {
+  sourceLabel: string;
+};
 
 type TargetRow = {
   id: CategoryId;
@@ -161,6 +167,15 @@ function getMonthDay(month: string) {
   return new Date().getDate();
 }
 
+function getRemainingMonthRatio(month: string) {
+  const daysInMonth = getDaysInMonth(month);
+  const day = getMonthDay(month);
+
+  if (month !== getCurrentMonth() || day <= 1) return 1;
+
+  return Math.max(1 / daysInMonth, (daysInMonth - day + 1) / daysInMonth);
+}
+
 function formatMonthHeader(month: string) {
   const [year, monthIndex] = month.split("-").map(Number);
   const date = new Date(year, monthIndex - 1, 1);
@@ -188,6 +203,12 @@ function formatValue(value: number, unit: string) {
   if (unit === "horas") return `${value}h`;
   if (unit === "minutos") return `${value}m`;
   return `${value} ${unit}`;
+}
+
+function getWholeTargetValue(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return 1;
+
+  return Math.max(1, Math.ceil(value));
 }
 
 function buildRows(targets: MonthlyTargetRecord[]): TargetRow[] {
@@ -228,6 +249,79 @@ function getOperatingContextLabel(target: OperatingTargetContext, daysInMonth: n
 
   const monthlyEquivalent = Math.round(((target.targetValue * daysInMonth) / 7) * 10) / 10;
   return `${target.targetValue} ${target.unit}/semana · ≈ ${monthlyEquivalent} ${target.unit}/mês`;
+}
+
+function getMonthlyEquivalentValue(target: OperatingTargetContext, month: string) {
+  const daysInMonth = getDaysInMonth(month);
+  const remainingRatio = getRemainingMonthRatio(month);
+  const monthlyValue =
+    target.cadence === "monthly"
+      ? target.targetValue * remainingRatio
+      : (target.targetValue * daysInMonth * remainingRatio) / 7;
+
+  return getWholeTargetValue(monthlyValue);
+}
+
+function buildSuggestedMonthlyTargets(
+  operatingTargets: OperatingTargetContext[],
+  month: string,
+): SuggestedMonthlyTarget[] {
+  const suggestions = new Map<CategoryId, SuggestedMonthlyTarget>();
+
+  for (const target of operatingTargets) {
+    if (!target.active) continue;
+
+    const monthlyValue = getMonthlyEquivalentValue(target, month);
+    const category = target.category as CategoryId;
+
+    if (!categoryOrder.includes(category)) continue;
+
+    if (category === "grind" && target.unit === "torneios") {
+      const existing = suggestions.get("grind") ?? {
+        category: "grind" as const,
+        primaryUnit: "sessões",
+        targetValue: 1,
+        sourceLabel: target.label,
+      };
+
+      suggestions.set("grind", {
+        ...existing,
+        optionalSecondaryUnit: "torneios",
+        optionalSecondaryTargetValue: monthlyValue,
+        sourceLabel: existing.sourceLabel.includes(target.label)
+          ? existing.sourceLabel
+          : `${existing.sourceLabel} + ${target.label}`,
+      });
+      continue;
+    }
+
+    const unit = normalizeMonthlyUnit(category, target.unit);
+    if (!unit) continue;
+
+    suggestions.set(category, {
+      category,
+      primaryUnit: unit,
+      targetValue: monthlyValue,
+      sourceLabel: target.label,
+      optionalSecondaryUnit: suggestions.get(category)?.optionalSecondaryUnit,
+      optionalSecondaryTargetValue: suggestions.get(category)?.optionalSecondaryTargetValue,
+    });
+  }
+
+  return categoryOrder.flatMap((category) => {
+    const suggestion = suggestions.get(category);
+    return suggestion ? [suggestion] : [];
+  });
+}
+
+function normalizeMonthlyUnit(category: CategoryId, unit: string) {
+  if (category === "grind" && (unit === "dias" || unit === "sessões")) return "sessões";
+  if (unitOptions[category].includes(unit)) return unit;
+  if (category === "study" && unit === "horas") return "horas";
+  if (category === "review" && unit === "reviews") return "horas";
+  if (category === "sport" && unit === "dias") return "sessões";
+
+  return null;
 }
 
 export function MonthlyTargets() {
@@ -337,6 +431,239 @@ function PersistedMonthlyTargets({ month }: { month: string }) {
   );
 }
 
+function MonthlySetupWizard({
+  annualPlan,
+  initialSuggestions,
+  month,
+  saveState,
+  step,
+  onCancel,
+  onSave,
+  onStepChange,
+}: {
+  annualPlan: AnnualPlanContext | null;
+  initialSuggestions: SuggestedMonthlyTarget[];
+  month: string;
+  saveState: SaveState;
+  step: number;
+  onCancel: () => void;
+  onSave: (targets: SuggestedMonthlyTarget[]) => Promise<void>;
+  onStepChange: Dispatch<SetStateAction<number>>;
+}) {
+  const [suggestions, setSuggestions] = useState<SuggestedMonthlyTarget[]>(initialSuggestions);
+  const steps = ["Contexto", "Objetivos", "Revisão"];
+
+  function updateSuggestion(index: number, patch: Partial<SuggestedMonthlyTarget>) {
+    setSuggestions((current) =>
+      current.map((target, targetIndex) =>
+        targetIndex === index
+          ? {
+              ...target,
+              ...patch,
+            }
+          : target,
+      ),
+    );
+  }
+
+  async function continueOrSave() {
+    if (step < steps.length - 1) {
+      onStepChange((current) => Math.min(current + 1, steps.length - 1));
+      return;
+    }
+
+    await onSave(suggestions);
+  }
+
+  return (
+    <div className={styles.modalLayer} role="presentation">
+      <button className={styles.modalScrim} type="button" aria-label="Fechar" onClick={onCancel} />
+      <section
+        aria-labelledby="monthly-setup-title"
+        aria-modal="true"
+        className={styles.modal}
+        role="dialog"
+      >
+        <header className={styles.modalHeader}>
+          <div>
+            <span>Objetivos mensais · passo {step + 1} de {steps.length}</span>
+            <h2 id="monthly-setup-title">{steps[step]}</h2>
+          </div>
+          <button className={styles.iconOnlyButton} type="button" aria-label="Fechar" onClick={onCancel}>
+            <X size={16} aria-hidden="true" />
+          </button>
+        </header>
+
+        <div className={styles.stepper} aria-label="Progresso">
+          {steps.map((label, index) => (
+            <button
+              className={index === step ? styles.activeStep : undefined}
+              key={label}
+              type="button"
+              onClick={() => onStepChange(index)}
+            >
+              <span>{index + 1}</span>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className={styles.modalBody}>
+          {step === 0 ? (
+            <div className={styles.wizardStack}>
+              <div className={styles.wizardIntro}>
+                <h3>Este mês deve servir a direção anual.</h3>
+                <p>Usa isto como critério antes de aceitar ou ajustar as metas sugeridas.</p>
+              </div>
+              <section className={styles.contextReview}>
+                <span>Direção anual</span>
+                <strong>{annualPlan?.primaryDirection ?? "Sem direção anual definida."}</strong>
+                {annualPlan?.priorities.length ? (
+                  <div className={styles.priorityList}>
+                    {annualPlan.priorities.map((priority) => (
+                      <span key={priority}>{priority}</span>
+                    ))}
+                  </div>
+                ) : null}
+                {annualPlan?.nonNegotiables.length ? (
+                  <small>Não-negociáveis: {annualPlan.nonNegotiables.join(" · ")}</small>
+                ) : null}
+                {annualPlan?.decisionRule ? (
+                  <small>Regra: {annualPlan.decisionRule}</small>
+                ) : null}
+              </section>
+            </div>
+          ) : null}
+
+          {step === 1 ? (
+            <div className={styles.wizardStack}>
+              <div className={styles.wizardIntro}>
+                <h3>Objetivos sugeridos para {formatMonthHeader(month).split(" · ")[0]}</h3>
+                <p>Valores inteiros, derivados dos ritmos anuais ativos. Ajusta antes de confirmar.</p>
+              </div>
+              {suggestions.length ? (
+                <div className={styles.suggestionList}>
+                  {suggestions.map((target, index) => (
+                    <div className={styles.suggestionItem} key={`${target.category}:${target.sourceLabel}`}>
+                      <div>
+                        <span>{categoryConfig[target.category].label}</span>
+                        <strong>{target.sourceLabel}</strong>
+                      </div>
+                      <label>
+                        Unidade
+                        <select
+                          value={target.primaryUnit}
+                          onChange={(event) => updateSuggestion(index, { primaryUnit: event.target.value })}
+                        >
+                          {unitOptions[target.category].map((unit) => (
+                            <option key={unit} value={unit}>
+                              {unit}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Meta
+                        <input
+                          min="1"
+                          type="number"
+                          value={target.targetValue}
+                          onChange={(event) =>
+                            updateSuggestion(index, {
+                              targetValue: getWholeTargetValue(Number(event.target.value)),
+                            })
+                          }
+                        />
+                      </label>
+                      {target.optionalSecondaryUnit ? (
+                        <label>
+                          {target.optionalSecondaryUnit}
+                          <input
+                            min="1"
+                            type="number"
+                            value={target.optionalSecondaryTargetValue ?? 1}
+                            onChange={(event) =>
+                              updateSuggestion(index, {
+                                optionalSecondaryTargetValue: getWholeTargetValue(Number(event.target.value)),
+                              })
+                            }
+                          />
+                        </label>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className={styles.wizardEmpty}>
+                  <Gauge size={18} aria-hidden="true" />
+                  <p>Não há métricas anuais ativas que mapeiem diretamente para Grind, Estudo, Review ou Sport.</p>
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {step === 2 ? (
+            <div className={styles.reviewGrid}>
+              {suggestions.length ? (
+                suggestions.map((target) => (
+                  <section className={styles.reviewCard} key={target.category}>
+                    <span>{categoryConfig[target.category].label}</span>
+                    <strong>{formatValue(target.targetValue, target.primaryUnit)}</strong>
+                    {target.optionalSecondaryUnit && target.optionalSecondaryTargetValue ? (
+                      <small>
+                        + {target.optionalSecondaryTargetValue} {target.optionalSecondaryUnit}
+                      </small>
+                    ) : null}
+                    <p>{target.sourceLabel}</p>
+                  </section>
+                ))
+              ) : (
+                <section className={styles.reviewCard}>
+                  <span>Sem sugestões</span>
+                  <strong>Adiciona métricas anuais primeiro.</strong>
+                </section>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        {saveState === "error" ? (
+          <p className={styles.modalError}>Não foi possível guardar estes objetivos. Confirma as metas.</p>
+        ) : null}
+
+        <footer className={styles.modalFooter}>
+          <button className="ep-button secondary" type="button" onClick={onCancel}>
+            Cancelar
+          </button>
+          {step > 0 ? (
+            <button className="ep-button secondary" type="button" onClick={() => onStepChange((current) => current - 1)}>
+              Voltar
+            </button>
+          ) : null}
+          <button
+            className="ep-button primary"
+            disabled={saveState === "saving" || (step === steps.length - 1 && !suggestions.length)}
+            type="button"
+            onClick={continueOrSave}
+          >
+            {step === steps.length - 1 ? (
+              <>
+                <Save size={14} aria-hidden="true" />
+                {saveState === "saving" ? "A guardar..." : "Confirmar objetivos"}
+              </>
+            ) : (
+              <>
+                Continuar
+                <ArrowRight size={14} aria-hidden="true" />
+              </>
+            )}
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
 function MonthlyTargetsWorkspace({
   annualPlan,
   demoReason,
@@ -352,11 +679,17 @@ function MonthlyTargetsWorkspace({
   const [editingId, setEditingId] = useState<CategoryId | null>(null);
   const [showAnnualDirection, setShowAnnualDirection] = useState(true);
   const [draft, setDraft] = useState<TargetDraft | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardStep, setWizardStep] = useState(0);
   const [localSaveState, setLocalSaveState] = useState<SaveState>(saveState);
   const targetRows = useMemo(() => buildRows(targets), [targets]);
   const hasTargets = targets.length > 0;
   const activeOperatingTargets = initialOperatingTargets.filter(
     (target) => target.active && categoryOrder.includes(target.category as CategoryId),
+  );
+  const suggestedTargets = useMemo(
+    () => buildSuggestedMonthlyTargets(activeOperatingTargets, month),
+    [activeOperatingTargets, month],
   );
 
   const paceSummary = useMemo(
@@ -367,6 +700,15 @@ function MonthlyTargetsWorkspace({
       })),
     [month, targetRows],
   );
+  const summaryRows = hasTargets
+    ? paceSummary.map((target) => ({
+        ...target,
+        paceLabel: paceLabels[target.pace],
+      }))
+    : buildRows(suggestedTargets).map((target) => ({
+        ...target,
+        paceLabel: target.targetValue ? "Sugerido" : "Sem meta mensal",
+      }));
 
   const editingTarget = targetRows.find((target) => target.id === editingId) ?? null;
   const categoryOperatingTargets = activeOperatingTargets.filter(
@@ -376,6 +718,12 @@ function MonthlyTargetsWorkspace({
   const startEditing = (target: TargetRow) => {
     setEditingId(target.id);
     setDraft(targetToDraft(target));
+    setLocalSaveState("idle");
+  };
+
+  const startMonthlyWizard = () => {
+    setWizardStep(0);
+    setWizardOpen(true);
     setLocalSaveState("idle");
   };
 
@@ -446,6 +794,56 @@ function MonthlyTargetsWorkspace({
     }
   };
 
+  const saveWizardTargets = async (nextTargets: SuggestedMonthlyTarget[]) => {
+    const payloads = nextTargets
+      .filter((target) => target.targetValue > 0)
+      .map((target) => ({
+        category: target.category,
+        primaryUnit: target.primaryUnit,
+        targetValue: getWholeTargetValue(target.targetValue),
+        optionalSecondaryUnit: target.category === "grind" ? target.optionalSecondaryUnit : undefined,
+        optionalSecondaryTargetValue:
+          target.category === "grind" && target.optionalSecondaryUnit
+            ? getWholeTargetValue(target.optionalSecondaryTargetValue ?? 0)
+            : undefined,
+      }));
+
+    if (!payloads.length) {
+      setLocalSaveState("error");
+      return;
+    }
+
+    setLocalSaveState("saving");
+
+    try {
+      if (hasPersistence) {
+        for (const payload of payloads) {
+          await onSaveCategory?.(payload);
+        }
+      }
+
+      setTargets((current) => {
+        const next = [...current];
+
+        for (const payload of payloads) {
+          const index = next.findIndex((target) => target.category === payload.category);
+          if (index >= 0) {
+            next[index] = payload;
+          } else {
+            next.push(payload);
+          }
+        }
+
+        return next;
+      });
+      setWizardOpen(false);
+      setWizardStep(0);
+      setLocalSaveState("saved");
+    } catch {
+      setLocalSaveState("error");
+    }
+  };
+
   return (
     <section className="ep-page">
       {demoReason ? <div className={styles.demoBanner}>{demoReason}</div> : null}
@@ -460,9 +858,13 @@ function MonthlyTargetsWorkspace({
           <button
             className="ep-button primary"
             type="button"
-            onClick={() => startEditing(targetRows[0])}
+            onClick={annualPlan && !hasTargets ? startMonthlyWizard : () => startEditing(targetRows[0])}
           >
-            {hasTargets ? "Editar objetivos" : "Definir objetivos"}
+            {hasTargets
+              ? "Editar objetivos"
+              : annualPlan
+                ? "Rever objetivos sugeridos"
+                : "Definir objetivos"}
           </button>
         </div>
       </div>
@@ -517,11 +919,23 @@ function MonthlyTargetsWorkspace({
         <article className={styles.emptyState}>
           <Target size={22} aria-hidden="true" />
           <div>
-            <h2>Ainda não tens objetivos para este mês.</h2>
-            <p>Define metas simples para Grind, Estudo, Review e Sport. Isto vai dar contexto ao Hoje e ao Plano semanal.</p>
+            <h2>
+              {annualPlan
+                ? "Já tens direção anual. Revê os objetivos sugeridos para este mês."
+                : "Ainda não tens objetivos para este mês."}
+            </h2>
+            <p>
+              {annualPlan
+                ? "Gerámos uma proposta a partir do ritmo anual. Ajusta antes de confirmar."
+                : "Define metas simples para Grind, Estudo, Review e Sport. Isto vai dar contexto ao Hoje e ao Plano semanal."}
+            </p>
           </div>
-          <button className="ep-button primary" type="button" onClick={() => startEditing(targetRows[0])}>
-            Definir objetivos
+          <button
+            className="ep-button primary"
+            type="button"
+            onClick={annualPlan ? startMonthlyWizard : () => startEditing(targetRows[0])}
+          >
+            {annualPlan ? "Rever objetivos sugeridos" : "Definir objetivos"}
           </button>
         </article>
       ) : null}
@@ -717,10 +1131,10 @@ function MonthlyTargetsWorkspace({
               <Gauge size={18} aria-hidden="true" />
             </div>
             <ul>
-              {paceSummary.map((target) => (
+              {summaryRows.map((target) => (
                 <li key={target.id}>
                   <span>{target.label}</span>
-                  <strong>{paceLabels[target.pace]}</strong>
+                  <strong>{target.paceLabel}</strong>
                   <small>
                     {formatValue(target.currentValue, target.primaryUnit)} /{" "}
                     {target.targetValue ? formatValue(target.targetValue, target.primaryUnit) : "por definir"}
@@ -769,6 +1183,22 @@ function MonthlyTargetsWorkspace({
           </div>
         </article>
       </section>
+
+      {wizardOpen ? (
+        <MonthlySetupWizard
+          annualPlan={annualPlan}
+          initialSuggestions={suggestedTargets}
+          month={month}
+          saveState={localSaveState}
+          step={wizardStep}
+          onCancel={() => {
+            setWizardOpen(false);
+            setWizardStep(0);
+          }}
+          onSave={saveWizardTargets}
+          onStepChange={setWizardStep}
+        />
+      ) : null}
     </section>
   );
 }

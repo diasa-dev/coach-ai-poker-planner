@@ -76,6 +76,7 @@ type AnnualDirectionWorkspaceProps = {
   initialPlan: AnnualPlanRecord | null;
   initialOperatingTargets?: OperatingTarget[];
   onSave?: (plan: AnnualPlanForm) => Promise<void>;
+  onDeleteOperatingMetric?: (metricKey: string) => Promise<void>;
   onSaveOperatingTarget?: (target: OperatingTargetDraft) => Promise<void>;
   operatingSaveState?: SaveState;
   saveState?: SaveState;
@@ -155,12 +156,12 @@ const operatingTargetPresets: OperatingTargetDraft[] = [
     effectiveFrom: "",
   },
   {
-    metricKey: "study_days_monthly",
-    label: "Dias de estudo por mês",
+    metricKey: "study_hours_monthly",
+    label: "Horas de estudo por mês",
     category: "study",
-    unit: "dias",
+    unit: "horas",
     cadence: "monthly",
-    targetValue: 8,
+    targetValue: 24,
     effectiveFrom: "",
   },
   {
@@ -232,12 +233,6 @@ function normalizePlan(plan: AnnualPlanForm): AnnualPlanForm {
     avoidRepeating: plan.avoidRepeating.trim(),
     decisionRule: plan.decisionRule.trim(),
   };
-}
-
-function getSuggestion(examples: string[], existing: string[]) {
-  const normalized = new Set(existing.map((item) => item.trim()).filter(Boolean));
-
-  return examples.find((example) => !normalized.has(example)) ?? examples[existing.length % examples.length] ?? "";
 }
 
 function getDecisionRules(plan: AnnualPlanForm) {
@@ -349,6 +344,7 @@ function PersistedAnnualDirection() {
     canUsePersistence ? { year: currentYear } : "skip",
   );
   const saveAnnualPlan = useMutation(api.annualPlan.save);
+  const deleteOperatingMetric = useMutation(api.annualOperatingTarget.deactivateMetric);
   const saveOperatingTarget = useMutation(api.annualOperatingTarget.saveVersion);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [operatingSaveState, setOperatingSaveState] = useState<SaveState>("idle");
@@ -405,6 +401,20 @@ function PersistedAnnualDirection() {
           throw error;
         }
       }}
+      onDeleteOperatingMetric={async (metricKey) => {
+        setOperatingSaveState("saving");
+
+        try {
+          await deleteOperatingMetric({
+            year: currentYear,
+            metricKey,
+          });
+          setOperatingSaveState("saved");
+        } catch (error) {
+          setOperatingSaveState("error");
+          throw error;
+        }
+      }}
       onSaveOperatingTarget={async (target) => {
         setOperatingSaveState("saving");
 
@@ -432,6 +442,7 @@ function AnnualDirectionWorkspace({
   initialPlan,
   initialOperatingTargets = [],
   onSave,
+  onDeleteOperatingMetric,
   onSaveOperatingTarget,
   operatingSaveState = "idle",
   saveState = "idle",
@@ -568,13 +579,7 @@ function AnnualDirectionWorkspace({
     if (draft.priorities.length >= 4) return;
     setDraft((current) => ({
       ...current,
-      priorities: [
-        ...current.priorities,
-        getSuggestion(
-          priorityExamples,
-          current.priorities.map((priority, index) => priority || priorityExamples[index] || ""),
-        ),
-      ],
+      priorities: [...current.priorities, ""],
     }));
     markDirty();
   };
@@ -601,10 +606,7 @@ function AnnualDirectionWorkspace({
   const addNonNegotiable = () => {
     setDraft((current) => ({
       ...current,
-      nonNegotiables: [
-        ...current.nonNegotiables,
-        getSuggestion(nonNegotiableExamples, current.nonNegotiables),
-      ],
+      nonNegotiables: [...current.nonNegotiables, ""],
     }));
     markDirty();
   };
@@ -688,6 +690,42 @@ function AnnualDirectionWorkspace({
     setOperatingDraft(null);
     setShowEffectiveFrom(false);
     setLocalOperatingSaveState("saved");
+  };
+
+  const deleteOperatingTarget = async (metricKey: string) => {
+    const target = operatingTargets.find((item) => item.metricKey === metricKey && item.active);
+    const confirmed = window.confirm(
+      `Remover esta métrica anual${target?.label ? `: ${target.label}` : ""}?`,
+    );
+
+    if (!confirmed) return;
+
+    setLocalOperatingSaveState("saving");
+
+    try {
+      if (onDeleteOperatingMetric) {
+        await onDeleteOperatingMetric(metricKey);
+      }
+
+      const now = Date.now();
+      setOperatingTargets((current) =>
+        current.map((target) =>
+          target.metricKey === metricKey
+            ? {
+                ...target,
+                active: false,
+                updatedAt: now,
+              }
+            : target,
+        ),
+      );
+      if (operatingDraft?.metricKey === metricKey) {
+        setOperatingDraft(null);
+      }
+      setLocalOperatingSaveState("saved");
+    } catch {
+      setLocalOperatingSaveState("error");
+    }
   };
 
   return (
@@ -990,6 +1028,15 @@ function AnnualDirectionWorkspace({
                         >
                           Ajustar
                         </button>
+                        <button
+                          aria-label={`Remover métrica ${target.label}`}
+                          className={styles.dangerButton}
+                          type="button"
+                          onClick={() => deleteOperatingTarget(target.metricKey)}
+                        >
+                          <Trash2 size={14} aria-hidden="true" />
+                          Remover
+                        </button>
                         {history.length ? (
                           <details className={styles.historyDetails}>
                             <summary>Histórico</summary>
@@ -1278,6 +1325,7 @@ function AnnualDirectionWorkspace({
           onCancel={cancelEditing}
           onCancelOperatingTarget={cancelOperatingTarget}
           onEditOperatingTarget={editOperatingTarget}
+          onDeleteOperatingTarget={deleteOperatingTarget}
           onRemoveNonNegotiable={removeNonNegotiable}
           onRemovePriority={removePriority}
           onSave={saveDirection}
@@ -1315,6 +1363,7 @@ function AnnualDirectionWizard({
   onCancel,
   onCancelOperatingTarget,
   onEditOperatingTarget,
+  onDeleteOperatingTarget,
   onRemoveNonNegotiable,
   onRemovePriority,
   onSave,
@@ -1343,6 +1392,7 @@ function AnnualDirectionWizard({
   onCancel: () => void;
   onCancelOperatingTarget: () => void;
   onEditOperatingTarget: (target: OperatingTarget) => void;
+  onDeleteOperatingTarget: (metricKey: string) => void;
   onRemoveNonNegotiable: (index: number) => void;
   onRemovePriority: (index: number) => void;
   onSave: () => Promise<void>;
@@ -1362,30 +1412,26 @@ function AnnualDirectionWizard({
     "Métricas",
     "Revisão",
   ];
-  const decisionRules = getDecisionRules(draft);
+  const [decisionRuleRows, setDecisionRuleRows] = useState(() => getDecisionRules(draft));
+  const decisionRules = decisionRuleRows;
   const canContinue = step !== 0 || Boolean(draft.primaryDirection.trim());
 
   function updateDecisionRule(index: number, value: string) {
     const nextRules = decisionRules.map((rule, ruleIndex) =>
       ruleIndex === index ? value : rule,
     );
+    setDecisionRuleRows(nextRules);
     onSetDraft(setDecisionRules(draft, nextRules));
   }
 
   function addDecisionRule() {
-    onSetDraft(
-      setDecisionRules(draft, [
-        ...decisionRules,
-        getSuggestion(
-          decisionRuleExamples,
-          decisionRules.map((rule, index) => rule || decisionRuleExamples[index] || ""),
-        ),
-      ]),
-    );
+    setDecisionRuleRows((current) => [...current, ""]);
   }
 
   function removeDecisionRule(index: number) {
-    onSetDraft(setDecisionRules(draft, decisionRules.filter((_, ruleIndex) => ruleIndex !== index)));
+    const nextRules = decisionRules.filter((_, ruleIndex) => ruleIndex !== index);
+    setDecisionRuleRows(nextRules);
+    onSetDraft(setDecisionRules(draft, nextRules));
   }
 
   async function continueOrSave() {
@@ -1532,6 +1578,7 @@ function AnnualDirectionWizard({
                 showEffectiveFrom={showEffectiveFrom}
                 onCancelOperatingTarget={onCancelOperatingTarget}
                 onEditOperatingTarget={onEditOperatingTarget}
+                onDeleteOperatingTarget={onDeleteOperatingTarget}
                 onSaveOperatingTarget={onSaveOperatingTarget}
                 onSetOperatingDraft={onSetOperatingDraft}
                 onSetShowEffectiveFrom={onSetShowEffectiveFrom}
@@ -1703,6 +1750,7 @@ function OperatingTargetsEditor({
   showEffectiveFrom,
   onCancelOperatingTarget,
   onEditOperatingTarget,
+  onDeleteOperatingTarget,
   onSaveOperatingTarget,
   onSetOperatingDraft,
   onSetShowEffectiveFrom,
@@ -1716,6 +1764,7 @@ function OperatingTargetsEditor({
   showEffectiveFrom: boolean;
   onCancelOperatingTarget: () => void;
   onEditOperatingTarget: (target: OperatingTarget) => void;
+  onDeleteOperatingTarget: (metricKey: string) => void;
   onSaveOperatingTarget: () => Promise<void>;
   onSetOperatingDraft: Dispatch<SetStateAction<OperatingTargetDraft | null>>;
   onSetShowEffectiveFrom: Dispatch<SetStateAction<boolean>>;
@@ -1746,6 +1795,15 @@ function OperatingTargetsEditor({
                 <span className={styles.categoryTag}>{categoryLabels[target.category]}</span>
                 <button className={styles.textButton} type="button" onClick={() => onEditOperatingTarget(target)}>
                   Ajustar
+                </button>
+                <button
+                  aria-label={`Remover métrica ${target.label}`}
+                  className={styles.dangerButton}
+                  type="button"
+                  onClick={() => onDeleteOperatingTarget(target.metricKey)}
+                >
+                  <Trash2 size={14} aria-hidden="true" />
+                  Remover
                 </button>
                 {history.length ? (
                   <details className={styles.historyDetails}>

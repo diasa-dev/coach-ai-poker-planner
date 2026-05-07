@@ -216,7 +216,8 @@
 
 .row button,
 .addButton,
-.textButton {
+.textButton,
+.dangerButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -238,13 +239,24 @@
   color: var(--ep-navy-800);
 }
 
+.dangerButton:hover {
+  border-color: rgba(197, 72, 63, 0.46);
+  background: var(--pill-notdone-bg);
+}
+
 .addButton,
-.textButton {
+.textButton,
+.dangerButton {
   min-height: 34px;
   gap: 7px;
   padding: 0 10px;
   font-size: 12px;
   font-weight: 850;
+}
+
+.dangerButton {
+  border-color: rgba(197, 72, 63, 0.24);
+  color: var(--pill-notdone-fg);
 }
 
 .operatingPanel {
@@ -260,7 +272,7 @@
 
 .operatingItem {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content max-content;
+  grid-template-columns: minmax(0, 1fr) max-content max-content max-content;
   gap: 10px;
   align-items: center;
   border: 1px solid var(--ep-border-1);
@@ -670,10 +682,11 @@
 }
 
 .metricsStep .operatingItem {
-  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-columns: minmax(0, 1fr) max-content max-content;
 }
 
 .metricsStep .operatingItem .textButton,
+.metricsStep .operatingItem .dangerButton,
 .metricsStep .historyDetails {
   grid-column: 1 / -1;
 }

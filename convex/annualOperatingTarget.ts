@@ -116,3 +116,36 @@ export const saveVersion = mutation({
     });
   },
 });
+
+export const deactivateMetric = mutation({
+  args: {
+    year: v.number(),
+    metricKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    validateYear(args.year);
+
+    const metricKey = args.metricKey.trim();
+    if (!metricKey) throw new Error("Annual operating target requires a metric key");
+
+    const userId = await requireUserId(ctx);
+    const now = Date.now();
+    const versions = await ctx.db
+      .query("annualOperatingTargets")
+      .withIndex("by_user_year_metric", (q) =>
+        q.eq("userId", userId).eq("year", args.year).eq("metricKey", metricKey),
+      )
+      .collect();
+
+    for (const version of versions) {
+      if (version.active) {
+        await ctx.db.patch(version._id, {
+          active: false,
+          updatedAt: now,
+        });
+      }
+    }
+
+    return null;
+  },
+});

@@ -88,7 +88,8 @@
 }
 
 .textButton,
-.iconButton {
+.iconButton,
+.iconOnlyButton {
   border: 1px solid var(--ep-border-1);
   border-radius: var(--ep-radius-sm);
   background: var(--ep-bg-surface);
@@ -286,6 +287,13 @@
   justify-content: center;
   gap: 6px;
   padding: 0 9px;
+}
+
+.iconOnlyButton {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
 }
 
 .iconButton:hover,
@@ -488,6 +496,257 @@
   color: var(--ep-accent-primary-hover);
 }
 
+.modalLayer {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.modalScrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(8, 18, 28, 0.52);
+}
+
+.modal {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  width: min(860px, 100%);
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: hidden;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-md);
+  background: var(--ep-bg-surface);
+  box-shadow: var(--ep-shadow-sm);
+}
+
+.modalHeader,
+.modalFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.modalHeader {
+  border-bottom: 1px solid var(--ep-border-1);
+}
+
+.modalHeader span,
+.contextReview span,
+.reviewCard span {
+  display: block;
+  color: var(--ep-fg-3);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.modalHeader h2,
+.wizardIntro h3 {
+  margin: 3px 0 0;
+  color: var(--ep-fg-1);
+  line-height: 1.2;
+}
+
+.modalHeader h2 {
+  font-size: 19px;
+}
+
+.stepper {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  border-bottom: 1px solid var(--ep-border-1);
+  padding: 8px 16px;
+}
+
+.stepper button {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface-2);
+  color: var(--ep-fg-2);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.stepper button span {
+  display: grid;
+  width: 19px;
+  height: 19px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--ep-bg-surface);
+  color: var(--ep-fg-3);
+  font-size: 11px;
+}
+
+.stepper .activeStep {
+  border-color: rgba(6, 182, 196, 0.5);
+  background: rgba(6, 182, 196, 0.12);
+  color: var(--ep-navy-800);
+}
+
+.modalBody {
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+}
+
+.wizardStack {
+  display: grid;
+  gap: 12px;
+}
+
+.wizardIntro {
+  display: grid;
+  gap: 5px;
+}
+
+.wizardIntro h3 {
+  font-size: 18px;
+}
+
+.wizardIntro p,
+.contextReview small,
+.reviewCard p,
+.wizardEmpty p {
+  margin: 0;
+  color: var(--ep-fg-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.contextReview,
+.reviewCard,
+.wizardEmpty {
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface-2);
+  padding: 12px;
+}
+
+.contextReview {
+  display: grid;
+  gap: 10px;
+}
+
+.contextReview strong,
+.reviewCard strong {
+  color: var(--ep-fg-1);
+  font-size: 18px;
+  line-height: 1.22;
+}
+
+.suggestionList {
+  display: grid;
+  gap: 9px;
+}
+
+.suggestionItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 0.36fr) 94px minmax(90px, 0.3fr);
+  gap: 10px;
+  align-items: end;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface-2);
+  padding: 10px;
+}
+
+.suggestionItem span {
+  display: block;
+  color: var(--ep-fg-3);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.suggestionItem strong {
+  color: var(--ep-fg-1);
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.suggestionItem label {
+  display: grid;
+  gap: 5px;
+  color: var(--ep-fg-3);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.suggestionItem input,
+.suggestionItem select {
+  min-height: 34px;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface);
+  color: var(--ep-fg-1);
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.reviewGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.reviewCard {
+  display: grid;
+  gap: 5px;
+}
+
+.reviewCard small {
+  color: var(--ep-fg-2);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.wizardEmpty {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.wizardEmpty svg {
+  color: var(--ep-fg-3);
+}
+
+.modalError {
+  margin: 0 16px 10px;
+  border: 1px solid rgba(197, 72, 63, 0.24);
+  border-radius: var(--ep-radius-sm);
+  background: var(--pill-notdone-bg);
+  color: var(--pill-notdone-fg);
+  padding: 8px 9px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.modalFooter {
+  justify-content: flex-end;
+  border-top: 1px solid var(--ep-border-1);
+}
+
 @media (max-width: 1120px) {
   .monthlyLayout,
   .contextGrid {
@@ -500,6 +759,10 @@
 
   .targetRow {
     grid-template-columns: minmax(0, 1fr) minmax(130px, 0.5fr);
+  }
+
+  .suggestionItem {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .progressCell,
@@ -519,14 +782,31 @@
   .missingDirection,
   .emptyState,
   .targetRow,
-  .contextGrid article {
+  .contextGrid article,
+  .reviewGrid,
+  .suggestionItem,
+  .wizardEmpty {
     grid-template-columns: 1fr;
   }
 
   .annualHeader,
-  .editorActions {
+  .editorActions,
+  .modalHeader,
+  .modalFooter {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .modalLayer {
+    padding: 10px;
+  }
+
+  .modal {
+    max-height: calc(100vh - 20px);
+  }
+
+  .stepper {
+    grid-template-columns: 1fr;
   }
 
   .secondaryFields {
