@@ -4,10 +4,8 @@ import {
   Activity,
   ArrowRight,
   Check,
-  Flag,
   Hand,
   Lock,
-  Pause,
   Play,
   Search,
   Sparkles,
@@ -24,12 +22,13 @@ import {
   type PlanBlock,
 } from "@/lib/planning/weekly-plan";
 import { PersistenceUnavailable } from "@/components/persistence-unavailable";
+import { StartSessionForm, type StartSessionPayload } from "@/components/start-session-form";
 import { usePersistenceAuth } from "@/lib/persistence-auth";
 import { hasPersistenceConfig } from "@/lib/runtime-config";
 import styles from "./poker-sessions.module.css";
 
 type SessionStatus = "active" | "reviewPending" | "reviewed";
-type Modal = "start" | "checkup" | "hand" | "review" | null;
+type Modal = "start" | "checkup" | "review" | null;
 type EventType = "started" | "checkup" | "hand" | "note" | "microIntention" | "paused" | "resumed" | "finished";
 
 type SessionView = {
@@ -76,6 +75,8 @@ type SessionEventView = {
   type: EventType;
   title: string;
   detail: string;
+  template?: string;
+  note?: string;
   createdAt: number;
 };
 
@@ -118,7 +119,15 @@ const demoPendingReviewSession: SessionView = {
 
 const demoEvents: SessionEventView[] = [
   { type: "checkup", title: "Quick check-up", detail: "Energia 4 · Foco 4 · Tilt 1 · 6 mesas", createdAt: Date.now() - 52 * 60 * 1000 },
-  { type: "hand", title: "Mão para rever — ICM", detail: "Stack 12bb · UTG · QQ · open shove", createdAt: Date.now() - 66 * 60 * 1000 },
+  {
+    _id: "demo-hand-1" as Id<"pokerSessionEvents">,
+    type: "hand",
+    title: "Mão para rever — ICM",
+    detail: "Stack 12bb · UTG · QQ · open shove",
+    template: "ICM",
+    note: "Stack 12bb · UTG · QQ · open shove",
+    createdAt: Date.now() - 66 * 60 * 1000,
+  },
   { type: "note", title: "Nota — distração", detail: "Pausa de 2 min para água", createdAt: Date.now() - 88 * 60 * 1000 },
   { type: "microIntention", title: "Micro-intenção", detail: "Não pagar river sem motivo", createdAt: Date.now() - 102 * 60 * 1000 },
   { type: "started", title: "Sessão iniciada", detail: "Foco · Disciplina em ICM até bolha", createdAt: demoStartedAt },
@@ -141,8 +150,9 @@ function PersistedPokerSessions() {
   );
   const startSession = useMutation(api.pokerSession.start);
   const addEvent = useMutation(api.pokerSession.addEvent);
+  const updateHandEvent = useMutation(api.pokerSession.updateHandEvent);
+  const removeHandEvent = useMutation(api.pokerSession.removeHandEvent);
   const confirmReview = useMutation(api.pokerSession.confirmReview);
-  const togglePause = useMutation(api.pokerSession.togglePause);
   const finishSession = useMutation(api.pokerSession.finish);
 
   if (auth.kind === "loading" || (canUsePersistence && (weeklyPlan === undefined || activeSession === undefined || sessions === undefined))) {
@@ -199,6 +209,9 @@ function PersistedPokerSessions() {
       onFinishSession={async (sessionId) => {
         await finishSession({ sessionId });
       }}
+      onRemoveHandEvent={async (eventId) => {
+        await removeHandEvent({ eventId });
+      }}
       onStartSession={async (payload) => {
         await startSession({
           date: todayIsoDate,
@@ -214,8 +227,8 @@ function PersistedPokerSessions() {
           microIntention: payload.microIntention,
         });
       }}
-      onTogglePause={async (sessionId) => {
-        await togglePause({ sessionId });
+      onUpdateHandEvent={async (eventId, hand) => {
+        await updateHandEvent({ eventId, ...hand });
       }}
       pendingReviewSession={pendingReviewSession as SessionView | null}
       rows={sessionRows}
@@ -234,8 +247,9 @@ function PokerSessionsDemo({ banner }: { banner?: string }) {
       onAddEvent={async () => undefined}
       onConfirmReview={async () => undefined}
       onFinishSession={async () => undefined}
+      onRemoveHandEvent={async () => undefined}
       onStartSession={async () => undefined}
-      onTogglePause={async () => undefined}
+      onUpdateHandEvent={async () => undefined}
       pendingReviewSession={demoPendingReviewSession}
       rows={[
         {
@@ -263,8 +277,9 @@ function SessionsWorkspace({
   onAddEvent,
   onConfirmReview,
   onFinishSession,
+  onRemoveHandEvent,
   onStartSession,
-  onTogglePause,
+  onUpdateHandEvent,
   pendingReviewSession,
   rows,
 }: {
@@ -302,32 +317,21 @@ function SessionsWorkspace({
     },
   ) => Promise<void>;
   onFinishSession: (sessionId: Id<"pokerSessions">) => Promise<void>;
-  onStartSession: (payload: {
-    weeklyPlanBlockId?: Id<"weeklyPlanBlocks">;
-    blockLabel?: string;
-    sessionFocus: string;
-    maxTables: number;
-    energy: number;
-    focusScore: number;
-    tilt: number;
-    microIntention?: string;
-  }) => Promise<void>;
-  onTogglePause: (sessionId: Id<"pokerSessions">) => Promise<void>;
+  onRemoveHandEvent: (eventId: Id<"pokerSessionEvents">) => Promise<void>;
+  onStartSession: (payload: StartSessionPayload) => Promise<void>;
+  onUpdateHandEvent: (
+    eventId: Id<"pokerSessionEvents">,
+    hand: { template: string; note?: string },
+  ) => Promise<void>;
   pendingReviewSession: SessionView | null;
   rows: SessionRow[];
 }) {
   const [modal, setModal] = useState<Modal>(null);
   const [view, setView] = useState<"history" | "active">(activeSession ? "active" : "history");
   const [demoActiveSession, setDemoActiveSession] = useState<SessionView | null>(null);
+  const [demoEventsState, setDemoEventsState] = useState<SessionEventView[]>(events);
   const [demoPendingReviewSession, setDemoPendingReviewSession] = useState<SessionView | null>(pendingReviewSession);
   const [demoRows, setDemoRows] = useState<SessionRow[]>(rows);
-  const [startFocus, setStartFocus] = useState("Disciplina em ICM até bolha");
-  const [selectedBlockId, setSelectedBlockId] = useState(grindBlocks[0]?.id ?? "none");
-  const [maxTables, setMaxTables] = useState(6);
-  const [energy, setEnergy] = useState(4);
-  const [focusScore, setFocusScore] = useState(4);
-  const [tilt, setTilt] = useState(1);
-  const [microIntention, setMicroIntention] = useState("");
   const [tournamentsPlayed, setTournamentsPlayed] = useState(0);
   const [decisionQuality, setDecisionQuality] = useState(4);
   const [finalFocus, setFinalFocus] = useState(4);
@@ -340,12 +344,10 @@ function SessionsWorkspace({
   const [actionError, setActionError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const selectedBlock = grindBlocks.find((block) => block.id === selectedBlockId);
   const effectivePendingReviewSession = demoMode ? demoPendingReviewSession : pendingReviewSession;
+  const effectiveEvents = demoMode ? demoEventsState : events;
   const effectiveRows = demoMode ? demoRows : rows;
   const visibleActiveSession = activeSession ?? demoActiveSession;
-  const trimmedStartFocus = startFocus.trim();
-  const canStartSession = Boolean(trimmedStartFocus);
   const summary = useMemo(
     () => ({
       sessions: effectiveRows.length,
@@ -373,38 +375,32 @@ function SessionsWorkspace({
     window.dispatchEvent(new Event(demoSessionCtaEvent));
   }, [demoMode, effectivePendingReviewSession, visibleActiveSession]);
 
-  async function submitStartSession() {
-    if (!canStartSession) {
-      setActionError("Define um foco curto antes de iniciar a sessão.");
-      return;
-    }
-
+  async function submitStartSession(payload: StartSessionPayload) {
     await runSessionAction(async () => {
-      await onStartSession({
-        weeklyPlanBlockId: selectedBlock?.id as Id<"weeklyPlanBlocks"> | undefined,
-        blockLabel: selectedBlock ? `Grind · ${selectedBlock.title}${selectedBlock.target ? ` (${selectedBlock.target})` : ""}` : undefined,
-        sessionFocus: trimmedStartFocus,
-        maxTables,
-        energy,
-        focusScore,
-        tilt,
-        microIntention,
-      });
+      await onStartSession(payload);
       if (demoMode) {
         setDemoActiveSession({
           ...demoSession,
-          sessionFocus: trimmedStartFocus,
-          blockLabel: selectedBlock ? `Grind · ${selectedBlock.title}${selectedBlock.target ? ` (${selectedBlock.target})` : ""}` : undefined,
-          maxTables,
-          currentTables: maxTables,
-          energy,
-          focusScore,
-          tilt,
-          microIntention: microIntention.trim() || undefined,
+          sessionFocus: payload.sessionFocus,
+          blockLabel: payload.blockLabel,
+          maxTables: payload.maxTables,
+          currentTables: payload.maxTables,
+          energy: payload.energy,
+          focusScore: payload.focusScore,
+          tilt: payload.tilt,
+          microIntention: payload.microIntention,
           startedAt: Date.now(),
           endedAt: undefined,
           status: "active",
         });
+        setDemoEventsState([
+          {
+            type: "started",
+            title: "Sessão iniciada",
+            detail: `Foco · ${payload.sessionFocus}`,
+            createdAt: Date.now(),
+          },
+        ]);
       }
       setModal(null);
       setView("active");
@@ -444,24 +440,86 @@ function SessionsWorkspace({
 
       {visibleActiveSession && view === "active" ? (
         <ActiveSession
-          events={events}
+          events={effectiveEvents}
+          isBusy={isSubmitting}
           onCapture={setModal}
           onFinish={() => openReviewModal(visibleActiveSession)}
+          onHandAdd={async ({ note, template }) => {
+            if (!visibleActiveSession._id) return;
+            const nextEvent: SessionEventView = {
+              _id: `demo-hand-${Date.now()}` as Id<"pokerSessionEvents">,
+              type: "hand",
+              title: `Mão para rever — ${template}`,
+              detail: note || "Sem nota adicional",
+              template,
+              note,
+              createdAt: Date.now(),
+            };
+
+            await runSessionAction(async () => {
+              await onAddEvent(visibleActiveSession._id!, {
+                type: "hand",
+                title: nextEvent.title,
+                detail: nextEvent.detail,
+                template,
+                note,
+              });
+              if (demoMode) {
+                setDemoEventsState((current) => [nextEvent, ...current]);
+                setDemoActiveSession((current) =>
+                  current ? { ...current, handsToReview: current.handsToReview + 1 } : current,
+                );
+              }
+            });
+          }}
+          onHandRemove={async (eventId) => {
+            await runSessionAction(async () => {
+              await onRemoveHandEvent(eventId);
+              if (demoMode) {
+                setDemoEventsState((current) => current.filter((event) => event._id !== eventId));
+                setDemoActiveSession((current) =>
+                  current ? { ...current, handsToReview: Math.max(0, current.handsToReview - 1) } : current,
+                );
+              }
+            });
+          }}
+          onHandUpdate={async (eventId, hand) => {
+            await runSessionAction(async () => {
+              await onUpdateHandEvent(eventId, hand);
+              if (demoMode) {
+                setDemoEventsState((current) =>
+                  current.map((event) =>
+                    event._id === eventId
+                      ? {
+                          ...event,
+                          title: `Mão para rever — ${hand.template}`,
+                          detail: hand.note || "Sem nota adicional",
+                          template: hand.template,
+                          note: hand.note,
+                        }
+                      : event,
+                  ),
+                );
+              }
+            });
+          }}
           onQuickNote={async (text) => {
             if (!visibleActiveSession._id || !text.trim()) return;
+            const nextEvent: SessionEventView = {
+              type: "note",
+              title: "Nota rápida",
+              detail: text.trim(),
+              note: text.trim(),
+              createdAt: Date.now(),
+            };
             await onAddEvent(visibleActiveSession._id, {
               type: "note",
               title: "Nota rápida",
               detail: text.trim(),
               note: text.trim(),
             });
-          }}
-          onTogglePause={async () => {
-            if (visibleActiveSession._id) await onTogglePause(visibleActiveSession._id);
             if (demoMode) {
-              setDemoActiveSession((current) =>
-                current ? { ...current, isPaused: !current.isPaused } : current,
-              );
+              setDemoEventsState((current) => [nextEvent, ...current]);
             }
           }}
           session={visibleActiveSession}
@@ -538,67 +596,14 @@ function SessionsWorkspace({
 
       {modal === "start" ? (
         <ModalFrame title="Iniciar sessão" onClose={() => setModal(null)}>
-          <div className={styles.formGrid}>
-            <label className={styles.fullField}>
-              Foco da sessão
-              <input
-                aria-invalid={!canStartSession}
-                required
-                value={startFocus}
-                onChange={(event) => {
-                  setStartFocus(event.target.value);
-                  if (actionError) setActionError("");
-                }}
-              />
-            </label>
-            <label>
-              Bloco
-              <select value={selectedBlockId} onChange={(event) => setSelectedBlockId(event.target.value)}>
-                {grindBlocks.map((block) => (
-                  <option key={block.id} value={block.id}>
-                    Grind · {block.title}{block.target ? ` (${block.target})` : ""}
-                  </option>
-                ))}
-                <option value="none">Sem bloco associado</option>
-              </select>
-            </label>
-            <label>
-              Mesas
-              <input value={maxTables} inputMode="numeric" onChange={(event) => setMaxTables(Number(event.target.value) || 1)} />
-            </label>
-          </div>
-          <label className={styles.inlineField}>
-            Micro-intenção
-            <input
-              placeholder='ex: "Não pagar river sem motivo"'
-              value={microIntention}
-              onChange={(event) => setMicroIntention(event.target.value)}
-            />
-          </label>
-          <section className={styles.initialStateBox}>
-            <header>
-              <span>Estado inicial</span>
-              <small>opcional</small>
-            </header>
-            <div className={styles.ratingGrid}>
-              <Rating label="Energia" min={1} value={energy} onChange={setEnergy} />
-              <Rating label="Foco" min={1} value={focusScore} onChange={setFocusScore} />
-              <Rating label="Tilt" min={0} tone="tilt" value={tilt} onChange={setTilt} />
-            </div>
-          </section>
-          <button className={styles.qualityRuleButton} type="button">
-            + Adicionar regra de qualidade
-          </button>
-          <div className={styles.modalActions}>
-            <button className="ep-button secondary" type="button" onClick={() => setModal(null)}>
-              Cancelar
-            </button>
-            <button className="ep-button primary" type="button" disabled={isSubmitting || !canStartSession} onClick={submitStartSession}>
-              <Play size={15} aria-hidden="true" />
-              {isSubmitting ? "A iniciar..." : "Iniciar sessão"}
-            </button>
-          </div>
-          {actionError ? <p className={styles.actionError}>{actionError}</p> : null}
+          <StartSessionForm
+            error={actionError}
+            grindBlocks={grindBlocks}
+            isSubmitting={isSubmitting}
+            onCancel={() => setModal(null)}
+            onErrorClear={() => setActionError("")}
+            onSubmit={(payload) => void submitStartSession(payload)}
+          />
         </ModalFrame>
       ) : null}
 
@@ -620,6 +625,17 @@ function SessionsWorkspace({
               tables: payload.tables,
               microIntention: payload.microIntention || undefined,
             });
+            if (demoMode) {
+              setDemoEventsState((current) => [
+                {
+                  type: "checkup",
+                  title: "Quick check-up",
+                  detail: `Energia ${payload.energy} · Foco ${payload.focusScore} · Tilt ${payload.tilt} · ${payload.tables} mesas`,
+                  createdAt: Date.now(),
+                },
+                ...current,
+              ]);
+            }
             if (payload.microIntention) {
               await onAddEvent(visibleActiveSession._id!, {
                 type: "microIntention",
@@ -627,6 +643,17 @@ function SessionsWorkspace({
                 detail: payload.microIntention,
                 microIntention: payload.microIntention,
               });
+              if (demoMode) {
+                setDemoEventsState((current) => [
+                  {
+                    type: "microIntention",
+                    title: "Micro-intenção",
+                    detail: payload.microIntention,
+                    createdAt: Date.now() + 1,
+                  },
+                  ...current,
+                ]);
+              }
             }
             if (demoMode) {
               setDemoActiveSession((current) =>
@@ -640,27 +667,6 @@ function SessionsWorkspace({
                       tilt: payload.tilt,
                     }
                   : current,
-              );
-            }
-            setModal(null);
-          }}
-        />
-      ) : null}
-
-      {visibleActiveSession?._id && modal === "hand" ? (
-        <HandModal
-          onClose={() => setModal(null)}
-          onSave={async ({ note, template }) => {
-            await onAddEvent(visibleActiveSession._id!, {
-              type: "hand",
-              title: `Mão para rever — ${template}`,
-              detail: note || "Sem nota adicional",
-              template,
-              note,
-            });
-            if (demoMode) {
-              setDemoActiveSession((current) =>
-                current ? { ...current, handsToReview: current.handsToReview + 1 } : current,
               );
             }
             setModal(null);
@@ -877,20 +883,27 @@ function upsertSessionRow(rows: SessionRow[], nextRow: SessionRow) {
 
 function ActiveSession({
   events,
+  isBusy,
   onCapture,
   onFinish,
+  onHandAdd,
+  onHandRemove,
+  onHandUpdate,
   onQuickNote,
-  onTogglePause,
   session,
 }: {
   events: SessionEventView[];
+  isBusy: boolean;
   onCapture: (modal: Modal) => void;
   onFinish: () => void;
+  onHandAdd: (payload: { template: string; note: string }) => Promise<void>;
+  onHandRemove: (eventId: Id<"pokerSessionEvents">) => Promise<void>;
+  onHandUpdate: (eventId: Id<"pokerSessionEvents">, payload: { template: string; note?: string }) => Promise<void>;
   onQuickNote: (text: string) => Promise<void>;
-  onTogglePause: () => Promise<void>;
   session: SessionView;
 }) {
   const [quickNote, setQuickNote] = useState("");
+  const handEvents = events.filter((event) => event.type === "hand");
 
   async function saveQuickNote() {
     const value = quickNote.trim();
@@ -902,60 +915,37 @@ function ActiveSession({
   return (
     <div className={styles.activePage}>
       <article className={styles.focusBanner}>
-        <div>
-          <span>Foco da semana · semana 18</span>
-          <p>{session.weeklyFocus}</p>
+        <div className={styles.focusMain}>
+          <span>Foco da sessão</span>
           <h2>{session.sessionFocus}</h2>
-          <small>{session.blockLabel ?? "Sessão sem bloco associado"}</small>
+          <p>{session.weeklyFocus}</p>
+          {session.blockLabel ? <small>{session.blockLabel}</small> : null}
         </div>
         <div className={styles.timerBox}>
-          <span>{session.isPaused ? "Em pausa" : "Em curso"}</span>
+          <span>{session.isPaused ? "Registada em pausa" : "Em curso"}</span>
           <strong>{formatElapsed(session.startedAt)}</strong>
-          <small>{formatStartedAt(session.startedAt)} · {session.currentTables} mesas</small>
+          <small>{formatStartedAt(session.startedAt)} · {getLastCheckupLabel(events)}</small>
         </div>
-        <div className={styles.intentBox}>
-          <Flag size={18} aria-hidden="true" />
-          <div>
-            <span>Micro-intenção atual</span>
-            <strong>{session.microIntention || "Sem micro-intenção definida"}</strong>
-          </div>
+        <div className={styles.topActions}>
+          <button className="ep-button secondary" type="button" onClick={() => onCapture("checkup")}>
+            <Activity size={15} aria-hidden="true" />
+            Quick check-up
+          </button>
+          <button className={`ep-button primary ${styles.endSessionButton}`} type="button" onClick={onFinish}>
+            <Square size={15} aria-hidden="true" />
+            Terminar sessão
+          </button>
         </div>
       </article>
 
-      <div className={styles.stateStrip}>
-        <StateCell label="Energia" value={`${session.energy} / 5`} />
-        <StateCell label="Foco" value={`${session.focusScore} / 5`} />
-        <StateCell label="Tilt" value={`${session.tilt} / 5`} warning={session.tilt > 1 ? "acompanhar no break" : undefined} />
-        <StateCell label="Mesas" value={String(session.currentTables)} />
-        <StateCell label="Mãos a rever" value={`${session.handsToReview} · ver`} />
-        <StateCell label="Último check-up" value={getLastCheckupLabel(events)} />
-      </div>
-
       <div className={styles.activeLayout}>
-        <article className={styles.capturePanel}>
-          <div className={styles.panelHead}>
-            <h2>Captura rápida</h2>
-            <span>um clique · sem sair de jogo</span>
-          </div>
-          <div className={styles.captureGrid}>
-            <CaptureButton icon={Activity} title="Check-up rápido" detail="Energia · Foco · Tilt · mesas" onClick={() => onCapture("checkup")} />
-            <CaptureButton icon={Hand} title="Mão para rever" detail="Marca a mão e adiciona contexto" onClick={() => onCapture("hand")} />
-            <CaptureButton icon={Flag} title="Micro-intenção" detail="Foco para a próxima hora" onClick={() => onCapture("checkup")} />
-            <label className={styles.quickNoteCard}>
-              <span>Nota rápida</span>
-              <textarea
-                onBlur={saveQuickNote}
-                onChange={(event) => setQuickNote(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void saveQuickNote();
-                }}
-                placeholder="Autopilot, tilt, boa decisão..."
-                value={quickNote}
-              />
-              <small>Guarda ao sair do campo. Cmd/Ctrl+Enter também guarda.</small>
-            </label>
-          </div>
-        </article>
+        <HandReviewPanel
+          events={handEvents}
+          isBusy={isBusy}
+          onAdd={onHandAdd}
+          onRemove={onHandRemove}
+          onUpdate={onHandUpdate}
+        />
 
         <article className={styles.timelinePanel}>
           <div className={styles.panelHead}>
@@ -976,6 +966,19 @@ function ActiveSession({
         </article>
 
         <aside className={styles.activeSide}>
+          <label className={styles.quickNoteCard}>
+            <span>Nota rápida</span>
+            <textarea
+              onBlur={saveQuickNote}
+              onChange={(event) => setQuickNote(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void saveQuickNote();
+              }}
+              placeholder="Autopilot, tilt, boa decisão..."
+              value={quickNote}
+            />
+            <small>Guarda ao sair do campo. Cmd/Ctrl+Enter também guarda.</small>
+          </label>
           <article className={styles.passiveCoach}>
             <div>
               <Sparkles size={15} aria-hidden="true" />
@@ -989,14 +992,6 @@ function ActiveSession({
             </p>
             <small>contexto · check-ups da sessão</small>
           </article>
-          <button className={`ep-button primary ${styles.actionButton}`} type="button" onClick={onFinish}>
-            <Square size={14} aria-hidden="true" />
-            Terminar sessão
-          </button>
-          <button className={`ep-button secondary ${styles.actionButton}`} type="button" onClick={() => void onTogglePause()}>
-            <Pause size={14} aria-hidden="true" />
-            {session.isPaused ? "Retomar" : "Pausa"}
-          </button>
         </aside>
       </div>
     </div>
@@ -1163,64 +1158,113 @@ function CheckupModal({
   );
 }
 
-function HandModal({
-  onClose,
-  onSave,
+function HandReviewPanel({
+  events,
+  isBusy,
+  onAdd,
+  onRemove,
+  onUpdate,
 }: {
-  onClose: () => void;
-  onSave: (payload: { template: string; note: string }) => Promise<void>;
+  events: SessionEventView[];
+  isBusy: boolean;
+  onAdd: (payload: { template: string; note: string }) => Promise<void>;
+  onRemove: (eventId: Id<"pokerSessionEvents">) => Promise<void>;
+  onUpdate: (eventId: Id<"pokerSessionEvents">, payload: { template: string; note?: string }) => Promise<void>;
 }) {
   const [template, setTemplate] = useState(handTemplates[0]);
   const [note, setNote] = useState("");
+  const [editingId, setEditingId] = useState<Id<"pokerSessionEvents"> | null>(null);
+  const [editTemplate, setEditTemplate] = useState(handTemplates[0]);
+  const [editNote, setEditNote] = useState("");
+
+  async function addHand() {
+    await onAdd({ template, note: note.trim() });
+    setNote("");
+  }
+
+  function startEditing(event: SessionEventView) {
+    if (!event._id) return;
+    setEditingId(event._id);
+    setEditTemplate(event.template ?? getTemplateFromTitle(event.title));
+    setEditNote(event.note ?? (event.detail === "Sem nota adicional" ? "" : event.detail));
+  }
+
+  async function saveEdit(eventId: Id<"pokerSessionEvents">) {
+    await onUpdate(eventId, { template: editTemplate, note: editNote.trim() || undefined });
+    setEditingId(null);
+  }
 
   return (
-    <ModalFrame title="Marcar mão para rever" onClose={onClose}>
-      <TemplatePicker label="Template" options={handTemplates} selected={template} onSelect={setTemplate} />
-      <label className={styles.inlineField}>
-        Nota opcional
-        <textarea placeholder="Stack, posição, raciocínio rápido..." value={note} onChange={(event) => setNote(event.target.value)} />
-      </label>
-      <div className={styles.modalActions}>
-        <button className="ep-button secondary" type="button" onClick={onClose}>
-          Cancelar
-        </button>
-        <button className="ep-button primary" type="button" onClick={() => void onSave({ template, note })}>
+    <article className={styles.capturePanel}>
+      <div className={styles.panelHead}>
+        <h2>Mãos para rever</h2>
+        <span>{events.length} marcadas</span>
+      </div>
+      <div className={styles.handQuickAdd}>
+        <select value={template} onChange={(event) => setTemplate(event.target.value)} aria-label="Tipo de mão">
+          {handTemplates.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+        <input
+          aria-label="Nota rápida da mão"
+          placeholder="Stack, posição, spot..."
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void addHand();
+          }}
+        />
+        <button className="ep-button primary" type="button" disabled={isBusy} onClick={() => void addHand()}>
+          <Hand size={15} aria-hidden="true" />
           Marcar
         </button>
       </div>
-    </ModalFrame>
-  );
-}
-
-function CaptureButton({
-  detail,
-  icon: Icon,
-  onClick,
-  title,
-}: {
-  detail: string;
-  icon: typeof Activity;
-  onClick: () => void;
-  title: string;
-}) {
-  return (
-    <button className={styles.captureButton} type="button" onClick={onClick}>
-      <span>
-        <Icon size={19} aria-hidden="true" />
-      </span>
-      <strong>{title}</strong>
-      <small>{detail}</small>
-    </button>
-  );
-}
-
-function StateCell({ label, value, warning }: { label: string; value: string; warning?: string }) {
-  return (
-    <div className={warning ? styles.stateCellWarning : styles.stateCell}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-      {warning ? <small>{warning}</small> : null}
-    </div>
+      <div className={styles.handList}>
+        {events.length ? (
+          events.map((event) => (
+            <div className={styles.handRow} key={event._id ?? `${event.createdAt}-${event.title}`}>
+              {editingId && event._id === editingId ? (
+                <>
+                  <select value={editTemplate} onChange={(input) => setEditTemplate(input.target.value)}>
+                    {handTemplates.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                  <input value={editNote} onChange={(input) => setEditNote(input.target.value)} />
+                  <button className="ep-button primary" type="button" disabled={isBusy} onClick={() => void saveEdit(event._id!)}>
+                    Guardar
+                  </button>
+                  <button className="ep-button secondary" type="button" onClick={() => setEditingId(null)}>
+                    Cancelar
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <strong>{event.template ?? getTemplateFromTitle(event.title)}</strong>
+                    <small>{event.detail}</small>
+                  </div>
+                  <button className={styles.textButton} type="button" disabled={!event._id || isBusy} onClick={() => startEditing(event)}>
+                    Editar
+                  </button>
+                  <button
+                    className={styles.textButtonDanger}
+                    type="button"
+                    disabled={!event._id || isBusy}
+                    onClick={() => event._id && void onRemove(event._id)}
+                  >
+                    Remover
+                  </button>
+                </>
+              )}
+            </div>
+          ))
+        ) : (
+          <p className={styles.emptyHandList}>Sem mãos marcadas nesta sessão.</p>
+        )}
+      </div>
+    </article>
   );
 }
 
@@ -1363,6 +1407,10 @@ function getLastCheckupLabel(events: SessionEventView[]) {
   if (!checkup) return "sem check-up";
   const minutes = Math.max(0, Math.floor((Date.now() - checkup.createdAt) / 60000));
   return minutes < 1 ? "agora" : `há ${minutes} min`;
+}
+
+function getTemplateFromTitle(title: string) {
+  return title.split("—")[1]?.trim() || "Mão";
 }
 
 function getActionErrorMessage(error: unknown) {

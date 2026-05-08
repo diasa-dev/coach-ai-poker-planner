@@ -252,6 +252,62 @@ export const addEvent = mutation({
   },
 });
 
+export const updateHandEvent = mutation({
+  args: {
+    eventId: v.id("pokerSessionEvents"),
+    template: v.string(),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const event = await ctx.db.get(args.eventId);
+
+    if (!event || event.userId !== userId || event.type !== "hand") {
+      throw new Error("Hand event not found");
+    }
+
+    const template = args.template.trim() || "Mão";
+    const note = args.note?.trim() || undefined;
+
+    await ctx.db.patch(event._id, {
+      title: `Mão para rever — ${template}`,
+      detail: note ?? "Sem nota adicional",
+      template,
+      note,
+    });
+
+    return null;
+  },
+});
+
+export const removeHandEvent = mutation({
+  args: {
+    eventId: v.id("pokerSessionEvents"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const event = await ctx.db.get(args.eventId);
+
+    if (!event || event.userId !== userId || event.type !== "hand") {
+      throw new Error("Hand event not found");
+    }
+
+    const session = await ctx.db.get(event.sessionId);
+
+    if (!session || session.userId !== userId) {
+      throw new Error("Session not found");
+    }
+
+    await ctx.db.delete(event._id);
+    await ctx.db.patch(session._id, {
+      handsToReview: Math.max(0, session.handsToReview - 1),
+      updatedAt: Date.now(),
+    });
+
+    return null;
+  },
+});
+
 export const togglePause = mutation({
   args: {
     sessionId: v.id("pokerSessions"),

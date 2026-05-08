@@ -511,7 +511,7 @@ Linked Grind block display:
 - Short drawer/modal opens.
 - Player enters required `Foco da sessão`.
 - Player optionally links a Grind block.
-- Player optionally enters energy, focus, tilt, micro-intention, max tables, and quality rule.
+- Player optionally enters energy, focus, and micro-intention.
 - Player confirms `Iniciar sessão`.
 - App opens active session page.
 
@@ -524,9 +524,10 @@ Rules:
 ### Active Capture
 
 - Player can log `Check-up rápido`.
-- Player can mark `Mão para rever`.
+- Player can mark `Mão para rever` inline with a quick category/template and short note.
+- Player can edit or remove marked hands from the visible hand list.
 - Player can add `Nota rápida`.
-- Player can set/update `Micro-intenção`.
+- Player can set/update `Micro-intenção` inside check-up.
 - Timeline updates with latest 3-5 events.
 - Coach observation remains passive and non-chat.
 
@@ -593,9 +594,9 @@ When implemented, visually verify:
 - Sessions page shows active/pending cards only when relevant.
 - History is compact and not calendar-first.
 - Starting a session uses a short drawer/modal, not a multi-step flow.
-- `Foco da sessão` is required.
+- `Foco da sessão` is required and visually dominant.
 - Linking a Grind block is optional.
-- Active session page shows weekly focus, session focus, linked block, timer/status, micro-intention, state strip, quick capture, timeline, passive Coach observation, and `Terminar sessão`.
+- Active session page shows weekly focus, session focus, linked block, timer/status, quick check-up, discreet last check-up, inline hands-to-review, timeline, passive Coach observation, and prominent `Terminar sessão`.
 - Timeline shows only latest 3-5 events.
 - Mobile active session prioritizes quick capture and finish/review.
 - End review opens immediately after `Terminar sessão`.

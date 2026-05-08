@@ -5,7 +5,6 @@ import {
   Bell,
   BookOpen,
   CalendarDays,
-  Check,
   Compass,
   MessageSquareText,
   Moon,
@@ -16,7 +15,6 @@ import {
   Spade,
   Sun,
   Target,
-  X,
 } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import Image from "next/image";
@@ -24,12 +22,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
-import type { Id } from "../../convex/_generated/dataModel";
 import {
   buildPlanDaysFromStoredBlocks,
   getTodayIsoDate,
-  type PlanBlock,
 } from "@/lib/planning/weekly-plan";
+import { SidebarStartSessionModal } from "@/components/start-session-form";
 import { usePersistenceAuth } from "@/lib/persistence-auth";
 import { hasClerkConfig, hasPersistenceConfig } from "@/lib/runtime-config";
 
@@ -394,109 +391,6 @@ function SessionCta({
       <Play size={16} aria-hidden="true" />
       <span>{label}</span>
     </Link>
-  );
-}
-
-function SidebarStartSessionModal({
-  grindBlocks,
-  onClose,
-  onStart,
-}: {
-  grindBlocks: PlanBlock[];
-  onClose: () => void;
-  onStart: (payload: {
-    weeklyPlanBlockId?: Id<"weeklyPlanBlocks">;
-    blockLabel?: string;
-    sessionFocus: string;
-    maxTables: number;
-    energy: number;
-    focusScore: number;
-    tilt: number;
-    microIntention?: string;
-  }) => Promise<void>;
-}) {
-  const [sessionFocus, setSessionFocus] = useState("Disciplina em ICM até bolha");
-  const [selectedBlockId, setSelectedBlockId] = useState(grindBlocks[0]?.id ?? "none");
-  const [maxTables, setMaxTables] = useState(6);
-  const [microIntention, setMicroIntention] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const selectedBlock = grindBlocks.find((block) => block.id === selectedBlockId);
-  const trimmedFocus = sessionFocus.trim();
-
-  async function submit() {
-    if (!trimmedFocus) {
-      setError("Define um foco curto antes de iniciar a sessão.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError("");
-    try {
-      await onStart({
-        weeklyPlanBlockId: selectedBlock?.id as Id<"weeklyPlanBlocks"> | undefined,
-        blockLabel: selectedBlock ? `Grind · ${selectedBlock.title}${selectedBlock.target ? ` (${selectedBlock.target})` : ""}` : undefined,
-        sessionFocus: trimmedFocus,
-        maxTables,
-        energy: 4,
-        focusScore: 4,
-        tilt: 1,
-        microIntention: microIntention.trim() || undefined,
-      });
-    } catch {
-      setError("Não foi possível iniciar a sessão. Tenta novamente.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  return (
-    <>
-      <button className="scrim" type="button" aria-label="Fechar início de sessão" onClick={onClose} />
-      <section className="sidebar-session-modal" role="dialog" aria-modal="true" aria-label="Iniciar sessão">
-        <header>
-          <h2>Iniciar sessão</h2>
-          <button type="button" aria-label="Fechar" onClick={onClose}>
-            <X size={18} aria-hidden="true" />
-          </button>
-        </header>
-        <div className="sidebar-session-body">
-          <label className="field">
-            Foco da sessão
-            <input value={sessionFocus} onChange={(event) => setSessionFocus(event.target.value)} />
-          </label>
-          <label className="field">
-            Bloco
-            <select value={selectedBlockId} onChange={(event) => setSelectedBlockId(event.target.value)}>
-              {grindBlocks.map((block) => (
-                <option key={block.id} value={block.id}>
-                  Grind · {block.title}{block.target ? ` (${block.target})` : ""}
-                </option>
-              ))}
-              <option value="none">Sem bloco associado</option>
-            </select>
-          </label>
-          <label className="field">
-            Mesas
-            <input value={maxTables} inputMode="numeric" onChange={(event) => setMaxTables(Number(event.target.value) || 1)} />
-          </label>
-          <label className="field">
-            Micro-intenção
-            <input value={microIntention} onChange={(event) => setMicroIntention(event.target.value)} placeholder="ex: Não pagar river sem motivo" />
-          </label>
-          {error ? <p className="sidebar-session-error">{error}</p> : null}
-        </div>
-        <footer>
-          <button className="ep-button secondary" type="button" onClick={onClose} disabled={isSubmitting}>
-            Cancelar
-          </button>
-          <button className="ep-button primary" type="button" onClick={() => void submit()} disabled={isSubmitting || !trimmedFocus}>
-            <Check size={15} aria-hidden="true" />
-            {isSubmitting ? "A iniciar..." : "Iniciar sessão"}
-          </button>
-        </footer>
-      </section>
-    </>
   );
 }
 

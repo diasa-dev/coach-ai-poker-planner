@@ -87,12 +87,10 @@ Optional:
 - Link to planned Grind block.
 - Initial energy 1-5.
 - Initial focus 1-5.
-- Initial tilt 0-5.
 - Initial micro-intention with templates.
-- Max tables, suggested from plan/block when available.
-- Quality rule, suggested from plan/block when available.
 
 The player should be able to start quickly. Missing optional context is also useful signal for Coach AI.
+Do not ask for tilt or table count before the session starts; those are captured once there is live session context.
 
 ## Active Session
 
@@ -108,10 +106,11 @@ Primary elements:
 
 - Session focus.
 - Weekly focus/intention.
-- Current micro-intention, if set.
 - Linked Grind block, if any.
-- Max tables and quality rule, if set.
-- Quick capture buttons.
+- Timer/status.
+- Quick check-up action in the main session card.
+- Last check-up info, shown discreetly.
+- Fast hand-review capture and visible hand list.
 - Compact latest timeline.
 - Small contextual Coach insight when useful.
 - Finish session CTA.
@@ -119,9 +118,8 @@ Primary elements:
 Quick capture:
 
 - Check-up rápido.
-- Mão para rever.
+- Mão para rever with inline quick add, edit, and remove.
 - Nota rápida.
-- Micro-intenção.
 
 ## Check-Up Rápido
 
@@ -360,10 +358,8 @@ Avoid:
 - focus
 - initialEnergy
 - initialFocus
-- initialTilt
 - initialMicroIntention
 - maxTables
-- qualityRule
 - tournamentsPlayed
 - decisionQualityFinal
 - energyFinal
@@ -398,16 +394,6 @@ Avoid:
 - template
 - note
 - createdAt
-
-### `reviewHands`
-
-- userId
-- sessionId
-- eventId
-- category
-- note
-- priorityRank
-- status: pending | priority | reviewed
 - createdAt
 - updatedAt
 
