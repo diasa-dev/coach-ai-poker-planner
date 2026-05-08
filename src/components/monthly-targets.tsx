@@ -41,7 +41,7 @@ type OperatingTargetContext = {
   label: string;
   category: "grind" | "study" | "review" | "sport" | "recovery" | "custom";
   unit: string;
-  cadence: "weekly" | "monthly";
+  cadence: "daily" | "weekly" | "monthly" | "yearly";
   targetValue: number;
   effectiveFrom: string;
   active: boolean;
@@ -113,14 +113,14 @@ const categoryConfig: Record<
     defaultUnit: "horas",
   },
   review: {
-    label: "Review",
+    label: "Revisão",
     description: "Mãos ou tempo dedicado a revisão.",
     icon: BookCheck,
     accent: "var(--ep-cat-review)",
     defaultUnit: "mãos",
   },
   sport: {
-    label: "Sport",
+    label: "Desporto",
     description: "Sessões ou blocos para proteger energia.",
     icon: Dumbbell,
     accent: "var(--ep-cat-sport)",
@@ -132,7 +132,7 @@ const categoryOrder: CategoryId[] = ["grind", "study", "review", "sport"];
 
 const unitOptions: Record<CategoryId, string[]> = {
   grind: ["sessões"],
-  study: ["horas", "minutos"],
+  study: ["horas", "minutos", "sessões"],
   review: ["mãos", "horas", "minutos"],
   sport: ["sessões", "blocos", "horas", "minutos"],
 };
@@ -212,24 +212,26 @@ function getWholeTargetValue(value: number) {
 }
 
 function buildRows(targets: MonthlyTargetRecord[]): TargetRow[] {
-  return categoryOrder.map((category) => {
-    const config = categoryConfig[category];
-    const target = targets.find((item) => item.category === category);
+  return [...targets]
+    .sort((a, b) => categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category))
+    .map((target) => {
+      const category = target.category;
+      const config = categoryConfig[category];
 
-    return {
-      id: category,
-      label: config.label,
-      description: config.description,
-      icon: config.icon,
-      accent: config.accent,
-      primaryUnit: target?.primaryUnit ?? config.defaultUnit,
-      targetValue: target?.targetValue ?? 0,
-      currentValue: target?.currentValue ?? 0,
-      secondaryUnit: target?.optionalSecondaryUnit,
-      secondaryTargetValue: target?.optionalSecondaryTargetValue,
-      currentSecondaryValue: target?.optionalSecondaryUnit ? 0 : undefined,
-    };
-  });
+      return {
+        id: category,
+        label: config.label,
+        description: config.description,
+        icon: config.icon,
+        accent: config.accent,
+        primaryUnit: target.primaryUnit,
+        targetValue: target.targetValue,
+        currentValue: target.currentValue ?? 0,
+        secondaryUnit: target.optionalSecondaryUnit,
+        secondaryTargetValue: target.optionalSecondaryTargetValue,
+        currentSecondaryValue: target.optionalSecondaryUnit ? 0 : undefined,
+      };
+    });
 }
 
 function targetToDraft(target: TargetRow): TargetDraft {
@@ -243,8 +245,18 @@ function targetToDraft(target: TargetRow): TargetDraft {
 }
 
 function getOperatingContextLabel(target: OperatingTargetContext, daysInMonth: number) {
+  if (target.cadence === "daily") {
+    const monthlyEquivalent = Math.round(target.targetValue * daysInMonth * 10) / 10;
+    return `${target.targetValue} ${target.unit}/dia · ≈ ${monthlyEquivalent} ${target.unit}/mês`;
+  }
+
   if (target.cadence === "monthly") {
     return `${target.targetValue} ${target.unit}/mês`;
+  }
+
+  if (target.cadence === "yearly") {
+    const monthlyEquivalent = Math.round((target.targetValue / 12) * 10) / 10;
+    return `${target.targetValue} ${target.unit}/ano · ≈ ${monthlyEquivalent} ${target.unit}/mês`;
   }
 
   const monthlyEquivalent = Math.round(((target.targetValue * daysInMonth) / 7) * 10) / 10;
@@ -254,10 +266,12 @@ function getOperatingContextLabel(target: OperatingTargetContext, daysInMonth: n
 function getMonthlyEquivalentValue(target: OperatingTargetContext, month: string) {
   const daysInMonth = getDaysInMonth(month);
   const remainingRatio = getRemainingMonthRatio(month);
-  const monthlyValue =
-    target.cadence === "monthly"
-      ? target.targetValue * remainingRatio
-      : (target.targetValue * daysInMonth * remainingRatio) / 7;
+  const monthlyValue = (() => {
+    if (target.cadence === "daily") return target.targetValue * daysInMonth * remainingRatio;
+    if (target.cadence === "weekly") return (target.targetValue * daysInMonth * remainingRatio) / 7;
+    if (target.cadence === "yearly") return (target.targetValue / 12) * remainingRatio;
+    return target.targetValue * remainingRatio;
+  })();
 
   return getWholeTargetValue(monthlyValue);
 }
@@ -596,7 +610,7 @@ function MonthlySetupWizard({
               ) : (
                 <div className={styles.wizardEmpty}>
                   <Gauge size={18} aria-hidden="true" />
-                  <p>Não há métricas anuais ativas que mapeiem diretamente para Grind, Estudo, Review ou Sport.</p>
+                  <p>Não há métricas anuais ativas que mapeiem diretamente para Grind, Estudo, Revisão ou Desporto.</p>
                 </div>
               )}
             </div>
@@ -687,10 +701,12 @@ function MonthlyTargetsWorkspace({
   const activeOperatingTargets = initialOperatingTargets.filter(
     (target) => target.active && categoryOrder.includes(target.category as CategoryId),
   );
+  const hasActiveOperatingTargets = activeOperatingTargets.length > 0;
   const suggestedTargets = useMemo(
     () => buildSuggestedMonthlyTargets(activeOperatingTargets, month),
     [activeOperatingTargets, month],
   );
+  const hasMonthlySuggestions = suggestedTargets.length > 0;
 
   const paceSummary = useMemo(
     () =>
@@ -700,14 +716,36 @@ function MonthlyTargetsWorkspace({
       })),
     [month, targetRows],
   );
+  const suggestedRows = useMemo(
+    () =>
+      suggestedTargets.map((target) => {
+        const config = categoryConfig[target.category];
+        return {
+          id: target.category,
+          label: config.label,
+          description: target.sourceLabel,
+          icon: config.icon,
+          accent: config.accent,
+          primaryUnit: target.primaryUnit,
+          targetValue: target.targetValue,
+          currentValue: 0,
+          secondaryUnit: target.optionalSecondaryUnit,
+          secondaryTargetValue: target.optionalSecondaryTargetValue,
+          currentSecondaryValue: target.optionalSecondaryUnit ? 0 : undefined,
+          pace: "none" as const,
+        };
+      }),
+    [suggestedTargets],
+  );
+  const visibleTargetRows = hasTargets ? paceSummary : suggestedRows;
   const summaryRows = hasTargets
     ? paceSummary.map((target) => ({
         ...target,
         paceLabel: paceLabels[target.pace],
       }))
-    : buildRows(suggestedTargets).map((target) => ({
+    : suggestedRows.map((target) => ({
         ...target,
-        paceLabel: target.targetValue ? "Sugerido" : "Sem meta mensal",
+        paceLabel: "Sugerido",
       }));
 
   const editingTarget = targetRows.find((target) => target.id === editingId) ?? null;
@@ -855,17 +893,19 @@ function MonthlyTargetsWorkspace({
           <p>Define o ritmo do mês para orientar a semana e o dia.</p>
         </div>
         <div className="ep-page-actions">
-          <button
-            className="ep-button primary"
-            type="button"
-            onClick={annualPlan && !hasTargets ? startMonthlyWizard : () => startEditing(targetRows[0])}
-          >
-            {hasTargets
-              ? "Editar objetivos"
-              : annualPlan
-                ? "Rever objetivos sugeridos"
-                : "Definir objetivos"}
-          </button>
+          {hasTargets || hasMonthlySuggestions ? (
+            <button
+              className="ep-button primary"
+              type="button"
+              onClick={hasMonthlySuggestions && !hasTargets ? startMonthlyWizard : () => startEditing(targetRows[0])}
+            >
+              {hasTargets ? "Editar objetivos" : "Rever objetivos sugeridos"}
+            </button>
+          ) : (
+            <a className="ep-button primary" href="/annual">
+              Definir Direção anual
+            </a>
+          )}
         </div>
       </div>
 
@@ -905,7 +945,7 @@ function MonthlyTargetsWorkspace({
               <AlertTriangle size={18} aria-hidden="true" />
               <div>
                 <strong>Ainda não definiste a direção anual.</strong>
-                <p>Podes definir objetivos mensais agora, mas o plano terá menos contexto estratégico.</p>
+                <p>Define primeiro a Direção anual e os ritmos operacionais para este mês nascer de dados reais.</p>
               </div>
               <a className="ep-button secondary" href="/annual">
                 Definir direção anual
@@ -920,27 +960,38 @@ function MonthlyTargetsWorkspace({
           <Target size={22} aria-hidden="true" />
           <div>
             <h2>
-              {annualPlan
-                ? "Já tens direção anual. Revê os objetivos sugeridos para este mês."
-                : "Ainda não tens objetivos para este mês."}
+              {hasActiveOperatingTargets
+                ? hasMonthlySuggestions
+                  ? "Revê os objetivos sugeridos para este mês."
+                  : "As métricas anuais guardadas não criam objetivos mensais."
+                : "Ainda não há métricas anuais para orientar este mês."}
             </h2>
             <p>
-              {annualPlan
-                ? "Gerámos uma proposta a partir do ritmo anual. Ajusta antes de confirmar."
-                : "Define metas simples para Grind, Estudo, Review e Sport. Isto vai dar contexto ao Hoje e ao Plano semanal."}
+              {hasActiveOperatingTargets
+                ? hasMonthlySuggestions
+                  ? "Gerámos uma proposta apenas a partir dos ritmos anuais guardados. Ajusta antes de confirmar."
+                  : "Adiciona ritmos anuais de Grind, Estudo, Revisão ou Desporto para gerar este mês."
+                : "Define primeiro os ritmos operacionais na Direção anual para evitar objetivos mensais inventados."}
             </p>
           </div>
-          <button
-            className="ep-button primary"
-            type="button"
-            onClick={annualPlan ? startMonthlyWizard : () => startEditing(targetRows[0])}
-          >
-            {annualPlan ? "Rever objetivos sugeridos" : "Definir objetivos"}
-          </button>
+          {hasMonthlySuggestions ? (
+            <button
+              className="ep-button primary"
+              type="button"
+              onClick={startMonthlyWizard}
+            >
+              Rever objetivos sugeridos
+            </button>
+          ) : (
+            <a className="ep-button primary" href="/annual">
+              Definir Direção anual
+            </a>
+          )}
         </article>
       ) : null}
 
-      <div className={styles.monthlyLayout}>
+      {hasTargets || hasMonthlySuggestions ? (
+        <div className={styles.monthlyLayout}>
         <article className={styles.targetTable} aria-label="Objetivos mensais por categoria">
           <header className={styles.tableHeader}>
             <span>Categoria</span>
@@ -950,7 +1001,7 @@ function MonthlyTargetsWorkspace({
             <span aria-label="Ações" />
           </header>
 
-          {paceSummary.map((target) => {
+          {visibleTargetRows.map((target) => {
             const Icon = target.icon;
             const progress = target.targetValue
               ? Math.min(100, Math.round((target.currentValue / target.targetValue) * 100))
@@ -1165,7 +1216,8 @@ function MonthlyTargetsWorkspace({
             )}
           </article>
         </aside>
-      </div>
+        </div>
+      ) : null}
 
       <section className={styles.contextGrid} aria-label="Contexto usado por outras superfícies">
         <article>

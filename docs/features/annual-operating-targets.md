@@ -4,7 +4,7 @@
 
 Add a lightweight operating rhythm layer under Annual direction.
 
-Annual Operating Targets should let a player define concrete rhythm metrics for the rest of the year, such as grind days per month, tournaments per month, study hours per week, review volume, sport sessions, or custom metrics.
+Annual Operating Targets let a player define concrete rhythm metrics for the rest of the year, such as grind days per month, tournaments per month, study hours per week, review volume, training sessions, coaching sessions, sport sessions, or custom metrics.
 
 This layer should help future Monthly targets and Weekly plan decisions without turning Annual direction into OKRs, annual forecasting, financial tracking, or dense analytics.
 
@@ -22,12 +22,13 @@ This layer should help future Monthly targets and Weekly plan decisions without 
 2. User sees Annual direction as the strategic layer.
 3. User sees a separate section named `Ritmo operacional anual`.
 4. User adds a predefined metric or a custom metric.
-5. User sets target value, unit, cadence, and effective start date.
-6. By default, `effectiveFrom` is today's date.
-7. User may reveal a less prominent date control to change `effectiveFrom`.
-8. User saves explicitly.
-9. If the same metric is changed later, the old version remains in history and the new version becomes active from its `effectiveFrom`.
-10. Current metrics are visible by default; history is visible but discreet.
+5. For preset metrics, user sets cadence, target value, and effective start date; label, unit, and category stay canonical.
+6. For custom metrics, user also sets label, unit, and category.
+7. By default, `effectiveFrom` is today's date.
+8. User may reveal a less prominent date control to change `effectiveFrom`.
+9. User saves explicitly.
+10. If the same metric is changed later, the old version remains in history and the new version becomes active from its `effectiveFrom`.
+11. Current metrics are visible by default; history is visible but discreet.
 
 ## Data Model
 
@@ -39,7 +40,7 @@ This layer should help future Monthly targets and Weekly plan decisions without 
 - `label`
 - `category`: `grind | study | review | sport | recovery | custom`
 - `unit`
-- `cadence`: `weekly | monthly`
+- `cadence`: `daily | weekly | monthly | yearly`
 - `targetValue`
 - `effectiveFrom`
 - `active`
@@ -68,11 +69,19 @@ When a new version is saved for the same metric:
   - category: `study`
   - unit: `horas`
   - cadence: `weekly`
-- `Reviews por semana`
+- `Horas de revisão por semana`
   - category: `review`
-  - unit: `reviews`
+  - unit: `horas`
   - cadence: `weekly`
-- `Sessões de sport por semana`
+- `Sessões de treino por mês`
+  - category: `study`
+  - unit: `sessões`
+  - cadence: `monthly`
+- `Sessões de coaching por mês`
+  - category: `study`
+  - unit: `sessões`
+  - cadence: `monthly`
+- `Sessões de desporto por semana`
   - category: `sport`
   - unit: `sessões`
   - cadence: `weekly`
@@ -84,8 +93,8 @@ When a new version is saved for the same metric:
 - This lives inside `Direção anual` as a separate section.
 - Do not create a new page or navigation item.
 - Do not make Annual direction itself heavier.
-- Do not create monthly targets from this section.
-- Do not show alignment with the current month in this slice.
+- Do not auto-create monthly targets from this section.
+- Monthly targets may derive suggestions only from saved active annual metrics; unsaved modal changes must not leak into Monthly.
 - Do not create quarterly planning.
 - Do not create OKRs, key results, scores, weights, or annual forecasts.
 - Do not include financial poker metrics such as profit, ROI, ABI, EV, or bankroll.
@@ -94,18 +103,20 @@ When a new version is saved for the same metric:
 ## Success Criteria
 
 - User can add a preset metric quickly.
+- Preset metric label, unit, and category are hidden and saved from canonical definitions.
 - User can add a custom metric.
-- User can save target value, unit, cadence, and `effectiveFrom`.
+- Custom metrics expose editable label, unit, category, target value, cadence, and `effectiveFrom`.
 - `effectiveFrom` defaults to today.
 - User can change `effectiveFrom` when needed.
 - Editing an existing metric creates a new active version and keeps older versions.
+- Adding, editing, or removing metrics inside the Annual direction wizard remains isolated until the user saves the wizard.
+- Removing a metric uses an in-app confirmation modal, not native browser confirmation.
 - History is visible but not visually dominant.
 - Annual direction remains the strategic layer; operating targets remain a practical rhythm layer.
+- Monthly targets show an empty state with a CTA to Annual direction when no saved active annual metric can produce monthly suggestions.
 
 ## Out Of Scope
 
-- Monthly pace calculations.
-- Monthly target suggestions.
 - Today, Weekly plan, Sessions, Review, or Coach integration.
 - Analytics dashboards.
 - Calendar scheduling.

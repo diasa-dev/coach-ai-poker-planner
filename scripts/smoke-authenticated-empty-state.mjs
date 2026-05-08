@@ -25,7 +25,7 @@ const routes = ["/", "/weekly", "/monthly", "/annual", "/sessions", "/study", "/
 const expectedEmptyStateCopy = new Map([
   ["/", ["Começa pela direção anual", "Definir direção anual"]],
   ["/weekly", ["Planear semana", "Dados reais ligados"]],
-  ["/monthly", ["Ainda não tens objetivos para este mês.", "Sem direção anual"]],
+  ["/monthly", ["Ainda não há métricas anuais para orientar este mês.", "Sem direção anual"]],
   ["/annual", ["Ainda não definiste a direção anual.", "Definir direção"]],
   ["/sessions", ["Ainda não há sessões registadas."]],
   ["/study", ["Ainda não tens registos de estudo", "Registar estudo"]],

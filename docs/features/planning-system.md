@@ -273,7 +273,7 @@ The dashboard should not become session-first, but it should include session sta
 - label
 - category: grind | study | review | sport | recovery | custom
 - unit
-- cadence: weekly | monthly
+- cadence: daily | weekly | monthly | yearly
 - targetValue
 - effectiveFrom
 - active

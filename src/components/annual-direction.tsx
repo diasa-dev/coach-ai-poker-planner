@@ -45,7 +45,7 @@ type AnnualPlanRecord = AnnualPlanForm & {
 
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
 type OperatingTargetCategory = "grind" | "study" | "review" | "sport" | "recovery" | "custom";
-type OperatingTargetCadence = "weekly" | "monthly";
+type OperatingTargetCadence = "daily" | "weekly" | "monthly" | "yearly";
 
 type OperatingTarget = {
   metricKey: string;
@@ -138,10 +138,11 @@ const decisionRuleExamples = [
 
 const operatingMetricExamples = [
   "Dias de grind por mês",
-  "Dias de estudo por mês",
   "Volume de torneios por mês",
-  "Horas de review por mês",
-  "Sessões de treino/coaching por mês",
+  "Horas de estudo por semana",
+  "Horas de revisão por semana",
+  "Sessões de treino por mês",
+  "Sessões de coaching por mês",
   "Dias off reais por mês",
 ];
 
@@ -156,12 +157,12 @@ const operatingTargetPresets: OperatingTargetDraft[] = [
     effectiveFrom: "",
   },
   {
-    metricKey: "study_hours_monthly",
-    label: "Horas de estudo por mês",
+    metricKey: "study_hours_weekly",
+    label: "Horas de estudo por semana",
     category: "study",
     unit: "horas",
-    cadence: "monthly",
-    targetValue: 24,
+    cadence: "weekly",
+    targetValue: 6,
     effectiveFrom: "",
   },
   {
@@ -174,17 +175,26 @@ const operatingTargetPresets: OperatingTargetDraft[] = [
     effectiveFrom: "",
   },
   {
-    metricKey: "review_hours_monthly",
-    label: "Horas de review por mês",
+    metricKey: "review_hours_weekly",
+    label: "Horas de revisão por semana",
     category: "review",
     unit: "horas",
+    cadence: "weekly",
+    targetValue: 3,
+    effectiveFrom: "",
+  },
+  {
+    metricKey: "training_sessions_monthly",
+    label: "Sessões de treino por mês",
+    category: "study",
+    unit: "sessões",
     cadence: "monthly",
-    targetValue: 10,
+    targetValue: 4,
     effectiveFrom: "",
   },
   {
     metricKey: "coaching_sessions_monthly",
-    label: "Sessões de treino/coaching por mês",
+    label: "Sessões de coaching por mês",
     category: "study",
     unit: "sessões",
     cadence: "monthly",
@@ -214,15 +224,17 @@ const operatingTargetPresets: OperatingTargetDraft[] = [
 const categoryLabels: Record<OperatingTargetCategory, string> = {
   grind: "Grind",
   study: "Estudo",
-  review: "Review",
-  sport: "Sport",
-  recovery: "Recovery",
-  custom: "Custom",
+  review: "Revisão",
+  sport: "Desporto",
+  recovery: "Recuperação",
+  custom: "Personalizada",
 };
 
 const cadenceLabels: Record<OperatingTargetCadence, string> = {
+  daily: "por dia",
   weekly: "por semana",
   monthly: "por mês",
+  yearly: "por ano",
 };
 
 function normalizePlan(plan: AnnualPlanForm): AnnualPlanForm {
@@ -292,6 +304,29 @@ function createDraftFromPreset(metricKey: string, effectiveFrom: string): Operat
   };
 }
 
+function isPresetMetric(metricKey: string) {
+  return operatingTargetPresets.some(
+    (target) => target.metricKey !== "custom" && target.metricKey === metricKey,
+  );
+}
+
+function isCustomMetric(target: Pick<OperatingTargetDraft, "metricKey">) {
+  return !isPresetMetric(target.metricKey);
+}
+
+function applyPresetCanonicalFields(target: OperatingTargetDraft): OperatingTargetDraft {
+  const preset = operatingTargetPresets.find((item) => item.metricKey === target.metricKey);
+
+  if (!preset || preset.metricKey === "custom") return target;
+
+  return {
+    ...target,
+    label: preset.label,
+    category: preset.category,
+    unit: preset.unit,
+  };
+}
+
 function getActiveTargets(targets: OperatingTarget[]) {
   return targets
     .filter((target) => target.active)
@@ -305,14 +340,49 @@ function getInactiveVersions(targets: OperatingTarget[], metricKey: string) {
 }
 
 function normalizeOperatingTarget(target: OperatingTargetDraft): OperatingTargetDraft {
+  const canonicalTarget = applyPresetCanonicalFields(target);
+
   return {
-    ...target,
-    metricKey: target.metricKey.trim(),
-    label: target.label.trim(),
-    unit: target.unit.trim(),
-    targetValue: Number(target.targetValue),
-    effectiveFrom: target.effectiveFrom,
+    ...canonicalTarget,
+    metricKey: canonicalTarget.metricKey.trim(),
+    label: canonicalTarget.label.trim(),
+    unit: canonicalTarget.unit.trim(),
+    targetValue: Number(canonicalTarget.targetValue),
+    effectiveFrom: canonicalTarget.effectiveFrom,
   };
+}
+
+function getOperatingValidationMessage(target: OperatingTargetDraft | null) {
+  if (!target) return null;
+
+  const normalized = normalizeOperatingTarget(target);
+
+  if (!normalized.label) return "Dá um nome à métrica.";
+  if (!normalized.unit) return "Escolhe a unidade.";
+  if (!normalized.targetValue || normalized.targetValue <= 0) {
+    return "Define um valor positivo.";
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized.effectiveFrom)) {
+    return "Escolhe uma data de início válida.";
+  }
+
+  return null;
+}
+
+function areOperatingTargetsEquivalent(
+  current: OperatingTarget | undefined,
+  next: OperatingTarget,
+) {
+  return Boolean(
+    current &&
+      current.label === next.label &&
+      current.category === next.category &&
+      current.unit === next.unit &&
+      current.cadence === next.cadence &&
+      current.targetValue === next.targetValue &&
+      current.effectiveFrom === next.effectiveFrom &&
+      current.active === next.active,
+  );
 }
 
 export function AnnualDirection() {
@@ -377,9 +447,12 @@ function PersistedAnnualDirection() {
     return <PersistenceUnavailable featureName="Direção anual" />;
   }
 
+  const operatingTargetsKey =
+    operatingTargets?.map((target) => `${target.metricKey}:${target.active}:${target.updatedAt}`).join("|") ??
+    "no-operating-targets";
   const workspaceKey = annualPlan
-    ? `${annualPlan._id}:${annualPlan.updatedAt}`
-    : `empty:${currentYear}`;
+    ? `${annualPlan._id}:${annualPlan.updatedAt}:${operatingTargetsKey}`
+    : `empty:${currentYear}:${operatingTargetsKey}`;
 
   return (
     <AnnualDirectionWorkspace
@@ -455,7 +528,17 @@ function AnnualDirectionWorkspace({
   const [operatingTargets, setOperatingTargets] =
     useState<OperatingTarget[]>(initialOperatingTargets);
   const [operatingDraft, setOperatingDraft] = useState<OperatingTargetDraft | null>(null);
+  const [wizardOperatingTargets, setWizardOperatingTargets] =
+    useState<OperatingTarget[]>(initialOperatingTargets);
+  const [wizardOperatingDraft, setWizardOperatingDraft] =
+    useState<OperatingTargetDraft | null>(null);
+  const [removeCandidate, setRemoveCandidate] = useState<{
+    metricKey: string;
+    label: string;
+    source: "page" | "wizard";
+  } | null>(null);
   const [showEffectiveFrom, setShowEffectiveFrom] = useState(false);
+  const [wizardShowEffectiveFrom, setWizardShowEffectiveFrom] = useState(false);
   const [mode, setMode] = useState<"read" | "edit" | "empty">(initialPlan ? "read" : "empty");
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(0);
@@ -473,6 +556,10 @@ function AnnualDirectionWorkspace({
     () => getActiveTargets(operatingTargets),
     [operatingTargets],
   );
+  const activeWizardOperatingTargets = useMemo(
+    () => getActiveTargets(wizardOperatingTargets),
+    [wizardOperatingTargets],
+  );
 
   useEffect(() => {
     if (openedSetupFromUrl.current) return;
@@ -487,13 +574,16 @@ function AnnualDirectionWorkspace({
 
     const frame = window.requestAnimationFrame(() => {
       setDraft(hasSavedPlan ? plan : emptyPlan);
+      setWizardOperatingTargets(operatingTargets);
+      setWizardOperatingDraft(null);
+      setWizardShowEffectiveFrom(false);
       setWizardStep(0);
       setWizardOpen(true);
       setLocalSaveState("dirty");
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [hasSavedPlan, plan]);
+  }, [hasSavedPlan, operatingTargets, plan]);
 
   const validationMessage = useMemo(() => {
     const normalized = normalizePlan(draft);
@@ -505,24 +595,17 @@ function AnnualDirectionWorkspace({
     return null;
   }, [draft]);
   const operatingValidationMessage = useMemo(() => {
-    if (!operatingDraft) return null;
-
-    const normalized = normalizeOperatingTarget(operatingDraft);
-
-    if (!normalized.label) return "Dá um nome à métrica.";
-    if (!normalized.unit) return "Escolhe a unidade.";
-    if (!normalized.targetValue || normalized.targetValue <= 0) {
-      return "Define um valor positivo.";
-    }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized.effectiveFrom)) {
-      return "Escolhe uma data de início válida.";
-    }
-
-    return null;
+    return getOperatingValidationMessage(operatingDraft);
   }, [operatingDraft]);
+  const wizardOperatingValidationMessage = useMemo(() => {
+    return getOperatingValidationMessage(wizardOperatingDraft);
+  }, [wizardOperatingDraft]);
 
   const startEditing = () => {
     setDraft(hasSavedPlan ? plan : emptyPlan);
+    setWizardOperatingTargets(operatingTargets);
+    setWizardOperatingDraft(null);
+    setWizardShowEffectiveFrom(false);
     setWizardStep(0);
     setWizardOpen(true);
     setLocalSaveState("dirty");
@@ -530,6 +613,9 @@ function AnnualDirectionWorkspace({
 
   const cancelEditing = () => {
     setDraft(plan);
+    setWizardOperatingTargets(operatingTargets);
+    setWizardOperatingDraft(null);
+    setWizardShowEffectiveFrom(false);
     setWizardOpen(false);
     setWizardStep(0);
     setLocalSaveState("idle");
@@ -547,6 +633,7 @@ function AnnualDirectionWorkspace({
     if (onSave) {
       try {
         await onSave(normalized);
+        await persistOperatingTargetChanges(wizardOperatingTargets);
       } catch {
         setLocalSaveState("error");
         return;
@@ -555,6 +642,11 @@ function AnnualDirectionWorkspace({
 
     setPlan(normalized);
     setDraft(normalized);
+    setOperatingTargets(wizardOperatingTargets);
+    setOperatingDraft(null);
+    setWizardOperatingDraft(null);
+    setShowEffectiveFrom(false);
+    setWizardShowEffectiveFrom(false);
     setMode("read");
     setWizardOpen(false);
     setWizardStep(0);
@@ -573,6 +665,37 @@ function AnnualDirectionWorkspace({
       ),
     }));
     markDirty();
+  };
+
+  const persistOperatingTargetChanges = async (nextTargets: OperatingTarget[]) => {
+    if (!onSaveOperatingTarget && !onDeleteOperatingMetric) return;
+
+    const currentActive = getActiveTargets(operatingTargets);
+    const nextActive = getActiveTargets(nextTargets);
+    const currentByKey = new Map(currentActive.map((target) => [target.metricKey, target]));
+    const nextByKey = new Map(nextActive.map((target) => [target.metricKey, target]));
+
+    for (const currentTarget of currentActive) {
+      if (!nextByKey.has(currentTarget.metricKey)) {
+        await onDeleteOperatingMetric?.(currentTarget.metricKey);
+      }
+    }
+
+    for (const nextTarget of nextActive) {
+      const currentTarget = currentByKey.get(nextTarget.metricKey);
+
+      if (areOperatingTargetsEquivalent(currentTarget, nextTarget)) continue;
+
+      await onSaveOperatingTarget?.({
+        metricKey: nextTarget.metricKey,
+        label: nextTarget.label,
+        category: nextTarget.category,
+        unit: nextTarget.unit,
+        cadence: nextTarget.cadence,
+        targetValue: nextTarget.targetValue,
+        effectiveFrom: nextTarget.effectiveFrom,
+      });
+    }
   };
 
   const addPriority = () => {
@@ -633,6 +756,21 @@ function AnnualDirectionWorkspace({
     setLocalOperatingSaveState("dirty");
   };
 
+  const startWizardOperatingTarget = (metricKey?: string) => {
+    const activeMetricKeys = new Set(getActiveTargets(wizardOperatingTargets).map((target) => target.metricKey));
+    const nextMetricKey =
+      metricKey ??
+      operatingTargetPresets.find(
+        (preset) => preset.metricKey !== "custom" && !activeMetricKeys.has(preset.metricKey),
+      )?.metricKey ??
+      "custom";
+
+    setWizardOperatingDraft(createDraftFromPreset(nextMetricKey, getTodayIsoDate()));
+    setWizardShowEffectiveFrom(false);
+    setLocalOperatingSaveState("dirty");
+    markDirty();
+  };
+
   const editOperatingTarget = (target: OperatingTarget) => {
     setOperatingDraft({
       metricKey: target.metricKey,
@@ -647,9 +785,30 @@ function AnnualDirectionWorkspace({
     setLocalOperatingSaveState("dirty");
   };
 
+  const editWizardOperatingTarget = (target: OperatingTarget) => {
+    setWizardOperatingDraft({
+      metricKey: target.metricKey,
+      label: target.label,
+      category: target.category,
+      unit: target.unit,
+      cadence: target.cadence,
+      targetValue: target.targetValue,
+      effectiveFrom: getTodayIsoDate(),
+    });
+    setWizardShowEffectiveFrom(false);
+    setLocalOperatingSaveState("dirty");
+    markDirty();
+  };
+
   const cancelOperatingTarget = () => {
     setOperatingDraft(null);
     setShowEffectiveFrom(false);
+    setLocalOperatingSaveState("idle");
+  };
+
+  const cancelWizardOperatingTarget = () => {
+    setWizardOperatingDraft(null);
+    setWizardShowEffectiveFrom(false);
     setLocalOperatingSaveState("idle");
   };
 
@@ -692,14 +851,37 @@ function AnnualDirectionWorkspace({
     setLocalOperatingSaveState("saved");
   };
 
+  const saveWizardOperatingTargetDraft = async () => {
+    if (!wizardOperatingDraft) return;
+
+    if (wizardOperatingValidationMessage) {
+      setLocalOperatingSaveState("error");
+      return;
+    }
+
+    const normalized = normalizeOperatingTarget(wizardOperatingDraft);
+    const now = Date.now();
+
+    setWizardOperatingTargets((current) => [
+      ...current.map((target) =>
+        target.metricKey === normalized.metricKey
+          ? { ...target, active: false, updatedAt: now }
+          : target,
+      ),
+      {
+        ...normalized,
+        active: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]);
+    setWizardOperatingDraft(null);
+    setWizardShowEffectiveFrom(false);
+    setLocalOperatingSaveState("dirty");
+    markDirty();
+  };
+
   const deleteOperatingTarget = async (metricKey: string) => {
-    const target = operatingTargets.find((item) => item.metricKey === metricKey && item.active);
-    const confirmed = window.confirm(
-      `Remover esta métrica anual${target?.label ? `: ${target.label}` : ""}?`,
-    );
-
-    if (!confirmed) return;
-
     setLocalOperatingSaveState("saving");
 
     try {
@@ -726,6 +908,49 @@ function AnnualDirectionWorkspace({
     } catch {
       setLocalOperatingSaveState("error");
     }
+  };
+
+  const requestDeleteOperatingTarget = (metricKey: string, source: "page" | "wizard") => {
+    const targetSource = source === "wizard" ? wizardOperatingTargets : operatingTargets;
+    const target = targetSource.find((item) => item.metricKey === metricKey && item.active);
+
+    setRemoveCandidate({
+      metricKey,
+      label: target?.label ?? "esta métrica",
+      source,
+    });
+  };
+
+  const confirmDeleteOperatingTarget = async () => {
+    if (!removeCandidate) return;
+
+    if (removeCandidate.source === "wizard") {
+      const now = Date.now();
+      const metricKey = removeCandidate.metricKey;
+
+      setWizardOperatingTargets((current) =>
+        current.map((target) =>
+          target.metricKey === metricKey
+            ? {
+                ...target,
+                active: false,
+                updatedAt: now,
+              }
+            : target,
+        ),
+      );
+      if (wizardOperatingDraft?.metricKey === metricKey) {
+        setWizardOperatingDraft(null);
+      }
+      setRemoveCandidate(null);
+      setLocalOperatingSaveState("dirty");
+      markDirty();
+      return;
+    }
+
+    const metricKey = removeCandidate.metricKey;
+    setRemoveCandidate(null);
+    await deleteOperatingTarget(metricKey);
   };
 
   return (
@@ -1026,13 +1251,14 @@ function AnnualDirectionWorkspace({
                           type="button"
                           onClick={() => editOperatingTarget(target)}
                         >
+                          <Edit3 size={14} aria-hidden="true" />
                           Ajustar
                         </button>
                         <button
                           aria-label={`Remover métrica ${target.label}`}
                           className={styles.dangerButton}
                           type="button"
-                          onClick={() => deleteOperatingTarget(target.metricKey)}
+                          onClick={() => requestDeleteOperatingTarget(target.metricKey, "page")}
                         >
                           <Trash2 size={14} aria-hidden="true" />
                           Remover
@@ -1088,41 +1314,45 @@ function AnnualDirectionWorkspace({
                       </select>
                     </label>
 
-                    <label>
-                      Nome
-                      <input
-                        value={operatingDraft.label}
-                        onChange={(event) =>
-                          setOperatingDraft((current) =>
-                            current ? { ...current, label: event.target.value } : current,
-                          )
-                        }
-                        placeholder="Exemplo: Horas de estudo por semana"
-                      />
-                    </label>
+                    {isCustomMetric(operatingDraft) ? (
+                      <>
+                        <label>
+                          Nome
+                          <input
+                            value={operatingDraft.label}
+                            onChange={(event) =>
+                              setOperatingDraft((current) =>
+                                current ? { ...current, label: event.target.value } : current,
+                              )
+                            }
+                            placeholder="Exemplo: Horas de estudo por semana"
+                          />
+                        </label>
 
-                    <label>
-                      Categoria
-                      <select
-                        value={operatingDraft.category}
-                        onChange={(event) =>
-                          setOperatingDraft((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  category: event.target.value as OperatingTargetCategory,
-                                }
-                              : current,
-                          )
-                        }
-                      >
-                        {Object.entries(categoryLabels).map(([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                        <label>
+                          Categoria
+                          <select
+                            value={operatingDraft.category}
+                            onChange={(event) =>
+                              setOperatingDraft((current) =>
+                                current
+                                  ? {
+                                      ...current,
+                                      category: event.target.value as OperatingTargetCategory,
+                                    }
+                                  : current,
+                              )
+                            }
+                          >
+                            {Object.entries(categoryLabels).map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </>
+                    ) : null}
 
                     <label>
                       Valor
@@ -1140,18 +1370,20 @@ function AnnualDirectionWorkspace({
                       />
                     </label>
 
-                    <label>
-                      Unidade
-                      <input
-                        value={operatingDraft.unit}
-                        onChange={(event) =>
-                          setOperatingDraft((current) =>
-                            current ? { ...current, unit: event.target.value } : current,
-                          )
-                        }
-                        placeholder="horas, torneios, sessões..."
-                      />
-                    </label>
+                    {isCustomMetric(operatingDraft) ? (
+                      <label>
+                        Unidade
+                        <input
+                          value={operatingDraft.unit}
+                          onChange={(event) =>
+                            setOperatingDraft((current) =>
+                              current ? { ...current, unit: event.target.value } : current,
+                            )
+                          }
+                          placeholder="horas, torneios, sessões..."
+                        />
+                      </label>
+                    ) : null}
 
                     <label>
                       Cadência
@@ -1168,8 +1400,10 @@ function AnnualDirectionWorkspace({
                           )
                         }
                       >
+                        <option value="daily">por dia</option>
                         <option value="weekly">por semana</option>
                         <option value="monthly">por mês</option>
+                        <option value="yearly">por ano</option>
                       </select>
                     </label>
                   </div>
@@ -1309,40 +1543,97 @@ function AnnualDirectionWorkspace({
 
       {wizardOpen ? (
         <AnnualDirectionWizard
-          activeOperatingTargets={activeOperatingTargets}
           draft={draft}
           effectiveOperatingSaveState={effectiveOperatingSaveState}
           effectiveSaveState={effectiveSaveState}
-          operatingDraft={operatingDraft}
-          operatingTargets={operatingTargets}
-          operatingValidationMessage={operatingValidationMessage}
-          showEffectiveFrom={showEffectiveFrom}
+          activeOperatingTargets={activeWizardOperatingTargets}
+          operatingDraft={wizardOperatingDraft}
+          operatingTargets={wizardOperatingTargets}
+          operatingValidationMessage={wizardOperatingValidationMessage}
+          showEffectiveFrom={wizardShowEffectiveFrom}
           step={wizardStep}
           validationMessage={validationMessage}
           year={year}
           onAddNonNegotiable={addNonNegotiable}
           onAddPriority={addPriority}
           onCancel={cancelEditing}
-          onCancelOperatingTarget={cancelOperatingTarget}
-          onEditOperatingTarget={editOperatingTarget}
-          onDeleteOperatingTarget={deleteOperatingTarget}
+          onCancelOperatingTarget={cancelWizardOperatingTarget}
+          onEditOperatingTarget={editWizardOperatingTarget}
+          onDeleteOperatingTarget={(metricKey) => requestDeleteOperatingTarget(metricKey, "wizard")}
           onRemoveNonNegotiable={removeNonNegotiable}
           onRemovePriority={removePriority}
           onSave={saveDirection}
-          onSaveOperatingTarget={saveOperatingTargetDraft}
+          onSaveOperatingTarget={saveWizardOperatingTargetDraft}
           onSetDraft={(nextDraft) => {
             setDraft(nextDraft);
             markDirty();
           }}
-          onSetOperatingDraft={setOperatingDraft}
-          onSetShowEffectiveFrom={setShowEffectiveFrom}
-          onStartOperatingTarget={startOperatingTarget}
+          onSetOperatingDraft={setWizardOperatingDraft}
+          onSetShowEffectiveFrom={setWizardShowEffectiveFrom}
+          onStartOperatingTarget={startWizardOperatingTarget}
           onStepChange={setWizardStep}
           onUpdateNonNegotiable={updateNonNegotiable}
           onUpdatePriority={updatePriority}
         />
       ) : null}
+
+      {removeCandidate ? (
+        <RemoveOperatingMetricModal
+          label={removeCandidate.label}
+          saving={effectiveOperatingSaveState === "saving"}
+          onCancel={() => setRemoveCandidate(null)}
+          onConfirm={confirmDeleteOperatingTarget}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function RemoveOperatingMetricModal({
+  label,
+  saving,
+  onCancel,
+  onConfirm,
+}: {
+  label: string;
+  saving: boolean;
+  onCancel: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  return (
+    <div className={styles.modalLayer} role="presentation">
+      <button className={styles.modalScrim} type="button" aria-label="Fechar" onClick={onCancel} />
+      <section
+        aria-labelledby="remove-metric-title"
+        aria-modal="true"
+        className={`${styles.modal} ${styles.confirmModal}`}
+        role="dialog"
+      >
+        <header className={styles.modalHeader}>
+          <div>
+            <span>Remover métrica</span>
+            <h2 id="remove-metric-title">Remover {label}?</h2>
+          </div>
+          <button className={styles.iconButton} type="button" aria-label="Fechar" onClick={onCancel}>
+            <X size={16} aria-hidden="true" />
+          </button>
+        </header>
+        <div className={styles.modalBody}>
+          <p className={styles.quietText}>
+            Esta métrica deixa de estar ativa para a Direção anual. O histórico anterior continua guardado.
+          </p>
+        </div>
+        <footer className={styles.modalFooter}>
+          <button className="ep-button secondary" disabled={saving} type="button" onClick={onCancel}>
+            Cancelar
+          </button>
+          <button className={styles.dangerButton} disabled={saving} type="button" onClick={onConfirm}>
+            <Trash2 size={14} aria-hidden="true" />
+            {saving ? "A remover..." : "Remover métrica"}
+          </button>
+        </footer>
+      </section>
+    </div>
   );
 }
 
@@ -1794,6 +2085,7 @@ function OperatingTargetsEditor({
                 </div>
                 <span className={styles.categoryTag}>{categoryLabels[target.category]}</span>
                 <button className={styles.textButton} type="button" onClick={() => onEditOperatingTarget(target)}>
+                  <Edit3 size={14} aria-hidden="true" />
                   Ajustar
                 </button>
                 <button
@@ -1849,16 +2141,18 @@ function OperatingTargetsEditor({
                 ))}
               </select>
             </label>
-            <label>
-              Nome
-              <input
-                value={operatingDraft.label}
-                onChange={(event) =>
-                  onSetOperatingDraft((current) => current ? { ...current, label: event.target.value } : current)
-                }
-                placeholder="Exemplo: Dias de grind por mês"
-              />
-            </label>
+            {isCustomMetric(operatingDraft) ? (
+              <label>
+                Nome
+                <input
+                  value={operatingDraft.label}
+                  onChange={(event) =>
+                    onSetOperatingDraft((current) => current ? { ...current, label: event.target.value } : current)
+                  }
+                  placeholder="Exemplo: Dias de grind por mês"
+                />
+              </label>
+            ) : null}
             <label>
               Valor
               <input
@@ -1870,16 +2164,18 @@ function OperatingTargetsEditor({
                 }
               />
             </label>
-            <label>
-              Unidade
-              <input
-                value={operatingDraft.unit}
-                onChange={(event) =>
-                  onSetOperatingDraft((current) => current ? { ...current, unit: event.target.value } : current)
-                }
-                placeholder="dias, torneios, reviews..."
-              />
-            </label>
+            {isCustomMetric(operatingDraft) ? (
+              <label>
+                Unidade
+                <input
+                  value={operatingDraft.unit}
+                  onChange={(event) =>
+                    onSetOperatingDraft((current) => current ? { ...current, unit: event.target.value } : current)
+                  }
+                  placeholder="dias, torneios, revisões..."
+                />
+              </label>
+            ) : null}
             <label>
               Cadência
               <select
@@ -1890,27 +2186,31 @@ function OperatingTargetsEditor({
                   )
                 }
               >
-                <option value="monthly">por mês</option>
+                <option value="daily">por dia</option>
                 <option value="weekly">por semana</option>
+                <option value="monthly">por mês</option>
+                <option value="yearly">por ano</option>
               </select>
             </label>
-            <label>
-              Categoria
-              <select
-                value={operatingDraft.category}
-                onChange={(event) =>
-                  onSetOperatingDraft((current) =>
-                    current ? { ...current, category: event.target.value as OperatingTargetCategory } : current,
-                  )
-                }
-              >
-                {Object.entries(categoryLabels).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {isCustomMetric(operatingDraft) ? (
+              <label>
+                Categoria
+                <select
+                  value={operatingDraft.category}
+                  onChange={(event) =>
+                    onSetOperatingDraft((current) =>
+                      current ? { ...current, category: event.target.value as OperatingTargetCategory } : current,
+                    )
+                  }
+                >
+                  {Object.entries(categoryLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
           </div>
           <button className={styles.textButton} type="button" onClick={() => onSetShowEffectiveFrom((value) => !value)}>
             {showEffectiveFrom ? "Ocultar data de início" : "Alterar data de início"}

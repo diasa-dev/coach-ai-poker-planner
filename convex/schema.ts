@@ -47,7 +47,12 @@ export default defineSchema({
       v.literal("custom"),
     ),
     unit: v.string(),
-    cadence: v.union(v.literal("weekly"), v.literal("monthly")),
+    cadence: v.union(
+      v.literal("daily"),
+      v.literal("weekly"),
+      v.literal("monthly"),
+      v.literal("yearly"),
+    ),
     targetValue: v.number(),
     effectiveFrom: v.string(),
     active: v.boolean(),

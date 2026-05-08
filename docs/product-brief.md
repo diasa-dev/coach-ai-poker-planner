@@ -165,11 +165,11 @@ Annual direction should stay simple and operational. It must not become detailed
 
 Quarterly planning can remain later. Monthly targets should be the first operational pacing layer under the annual direction.
 
-Future layer: Annual Operating Targets.
+Annual Operating Targets layer:
 
-Annual direction may later be supported by lightweight operating targets: concrete rhythm metrics such as grind days per month, tournaments per month, study hours per week, review volume, sport sessions, or other player-defined metrics.
+Annual direction is supported by lightweight operating targets: concrete rhythm metrics such as grind days per month, tournaments per month, study hours per week, review volume, training sessions, coaching sessions, sport sessions, or other player-defined metrics.
 
-This should remain separate from Annual direction itself. Annual direction defines strategic context and trade-offs; Annual Operating Targets define the default operating rhythm that can inform monthly targets and weekly planning.
+This remains separate from Annual direction itself. Annual direction defines strategic context and trade-offs; Annual Operating Targets define the default operating rhythm that can inform monthly targets and weekly planning.
 
 Rules for a future implementation:
 
@@ -177,7 +177,7 @@ Rules for a future implementation:
 - Store changes with `effectiveFrom` so new targets apply from the date they are set and do not rewrite past months.
 - Support users who start using the app mid-year without making the app judge earlier months as missed.
 - Allow player-defined custom metrics without turning the feature into OKRs, quarterly planning, annual forecasting, financial tracking, or dense analytics.
-- Treat these metrics as suggested operating context for Monthly targets, not as automatic target generation.
+- Treat these metrics as saved operating context for Monthly targets. Monthly may derive suggestions from saved active metrics only, never from unsaved modal drafts.
 
 How it influences the app:
 
@@ -383,7 +383,7 @@ Roadmap from the current planning-system direction:
 
 2. Annual Operating Targets
    - Add optional concrete rhythm metrics under the annual direction.
-   - Examples: grind days per month, tournaments per month, study hours per week, review volume, sport sessions.
+   - Examples: grind days per month, tournaments per month, study hours per week, review volume, training/coaching sessions, sport sessions.
    - Use `effectiveFrom` so mid-year starts and mid-year adjustments apply only from the chosen date forward.
    - Keep this separate from OKRs, quarterly planning, annual forecasting, and financial targets.
 

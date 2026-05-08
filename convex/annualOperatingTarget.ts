@@ -10,7 +10,12 @@ const targetCategory = v.union(
   v.literal("custom"),
 );
 
-const targetCadence = v.union(v.literal("weekly"), v.literal("monthly"));
+const targetCadence = v.union(
+  v.literal("daily"),
+  v.literal("weekly"),
+  v.literal("monthly"),
+  v.literal("yearly"),
+);
 
 async function requireUserId(ctx: {
   auth: { getUserIdentity: () => Promise<{ subject: string } | null> };

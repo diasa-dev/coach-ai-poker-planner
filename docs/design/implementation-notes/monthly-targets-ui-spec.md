@@ -201,7 +201,7 @@ When Annual direction does not exist:
 Suggested copy:
 
 - `Ainda não definiste a direção anual.`
-- `Podes definir objetivos mensais agora, mas o plano terá menos contexto estratégico.`
+- `Define primeiro a Direção anual e os ritmos operacionais para este mês nascer de dados reais.`
 
 Today and Weekly plan may still receive monthly pace context, but without annual-alignment copy.
 
@@ -210,15 +210,16 @@ Today and Weekly plan may still receive monthly pace context, but without annual
 When the current month has no targets:
 
 - Show Annual direction context if available.
-- Show four empty categories: Grind, Estudo, Review, Sport.
-- Make `Definir objetivos` the primary CTA.
+- If saved active annual metrics can map to monthly objectives, show only those suggested rows.
+- If no saved active annual metric can map to monthly objectives, do not show default generated categories.
+- Make `Rever objetivos sugeridos` the primary CTA when suggestions exist.
+- Make `Definir Direção anual` the primary CTA when there are no annual metrics to derive from.
 - Do not show empty analytics panels.
 
 Suggested copy:
 
-- `Ainda não tens objetivos para este mês.`
-- `Define metas simples para Grind, Estudo, Review e Sport.`
-- `Isto vai dar contexto ao Hoje e ao Plano semanal.`
+- `Ainda não há métricas anuais para orientar este mês.`
+- `Define primeiro os ritmos operacionais na Direção anual para evitar objetivos mensais inventados.`
 
 ### Existing Targets
 
@@ -439,8 +440,9 @@ When implemented, verify:
 - Desktop page loads in the app shell with `Objetivos mensais` active in navigation.
 - Official logo and global session CTA remain visible and unchanged.
 - Missing Annual direction state appears without blocking target creation.
-- No-targets state shows Grind, Estudo, Review, and Sport plus `Definir objetivos`.
-- Existing-targets state shows all four categories with current/target values and pace status.
+- No-targets state shows annual-derived suggestions only when saved active annual metrics exist.
+- No-targets state without annual metrics shows a strong CTA to `Direção anual` and no generated category rows.
+- Existing-targets state shows only saved monthly target rows with current/target values and pace status.
 - Category editor opens for one category at a time.
 - Target save is explicit.
 - Grind uses `sessões` as primary unit and optional `torneios` as secondary context.

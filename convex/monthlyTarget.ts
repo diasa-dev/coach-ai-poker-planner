@@ -12,7 +12,7 @@ const categoryOrder = ["grind", "study", "review", "sport"];
 
 const allowedPrimaryUnits = {
   grind: ["sessões"],
-  study: ["horas", "minutos"],
+  study: ["horas", "minutos", "sessões"],
   review: ["mãos", "horas", "minutos"],
   sport: ["sessões", "blocos", "horas", "minutos"],
 } as const;
