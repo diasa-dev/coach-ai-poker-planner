@@ -79,7 +79,6 @@ type WeeklyPlanWorkspaceProps = {
     focus: string;
     status: "draft" | "active";
   }) => Promise<void>;
-  onWeekStartDayChange?: (weekStartDay: number) => Promise<void>;
   saveState?: SaveState;
   weekRange?: string;
   weekStartDay?: number;
@@ -161,7 +160,6 @@ function PersistedWeeklyPlan() {
   );
   const saveWeeklyPlan = useMutation(api.weeklyPlan.save);
   const copyPreviousWeek = useMutation(api.weeklyPlan.copyPreviousWeek);
-  const setWeekStartDay = useMutation(api.weeklyPlan.setWeekStartDay);
   const [saveState, setSaveState] = useState<SaveState>("idle");
 
   if (
@@ -259,15 +257,6 @@ function PersistedWeeklyPlan() {
           setSaveState("error");
         }
       }}
-      onWeekStartDayChange={async (weekStartDay) => {
-        setSaveState("saving");
-        try {
-          await setWeekStartDay({ weekStartDay });
-          setSaveState("saved");
-        } catch {
-          setSaveState("error");
-        }
-      }}
       saveState={saveState}
       weekRange={formatWeekRange(weeklyPlan.weekStartDate)}
       weekStartDay={weeklyPlan.weekStartDay}
@@ -287,7 +276,6 @@ function WeeklyPlanWorkspace({
   isFirstUse = false,
   onCopyPreviousWeek,
   onSavePlan,
-  onWeekStartDayChange,
   saveState = "idle",
   weekRange = "12–18 Mai",
   weekStartDay = 1,
@@ -301,6 +289,9 @@ function WeeklyPlanWorkspace({
   const [addingDay, setAddingDay] = useState<string | null>(null);
   const [draftBlock, setDraftBlock] = useState(createEmptyBlockDraft);
   const [editing, setEditing] = useState<{ dayDate: string; block: PlanBlock } | null>(null);
+  const [objectivesOpen, setObjectivesOpen] = useState(false);
+  const [coachContextOpen, setCoachContextOpen] = useState(false);
+  const [activePreset, setActivePreset] = useState<string | null>(null);
 
   const visibleDays = useMemo(() => {
     if (view === "full") return days;
@@ -343,12 +334,6 @@ function WeeklyPlanWorkspace({
     setWeeklyFocus(weeklyFocus.trim());
     setPlanStatus(status);
     setMode("execution");
-  }
-
-  async function handleWeekStartDayChange(value: string) {
-    if (onWeekStartDayChange) {
-      await onWeekStartDayChange(Number(value));
-    }
   }
 
   function addBlock(dayDate: string, blockType?: PlanBlockType) {
@@ -454,6 +439,17 @@ function WeeklyPlanWorkspace({
     setEditing(null);
   }
 
+  function applyPreset(preset: string) {
+    const nextDays = buildPresetDays(days, preset);
+
+    if (!nextDays) return;
+
+    setDays(nextDays.days);
+    setWeeklyFocus(nextDays.focus);
+    setPlanStatus("draft");
+    setActivePreset(preset);
+  }
+
   if (mode === "planning") {
     return (
       <section className="ep-page ep-weekly-page wpp-page">
@@ -461,7 +457,6 @@ function WeeklyPlanWorkspace({
           demoReason={demoReason}
           hasPersistence={hasPersistence}
           isFirstUse={isFirstUse}
-          onWeekStartDayChange={handleWeekStartDayChange}
           saveState={saveState}
           weekStartDay={weekStartDay}
         />
@@ -481,7 +476,7 @@ function WeeklyPlanWorkspace({
               <Copy size={14} aria-hidden="true" />
               Copiar semana anterior
             </button>
-            <button className="ep-button secondary" type="button">
+            <button className="ep-button secondary" type="button" onClick={() => setCoachContextOpen(true)}>
               <Sparkles size={14} aria-hidden="true" />
               Rever com Coach
             </button>
@@ -520,22 +515,27 @@ function WeeklyPlanWorkspace({
           />
         </div>
 
-        <MonthlyPlanContext context={monthlyPlanContext} />
-
         <div className="wpp-presets" aria-label="Pontos de partida">
           <span>Começar de</span>
           <div className="wpp-preset-chips">
-            {weeklyPlanPresets.map((preset, index) => (
-              <button className={index === 0 ? "active" : undefined} key={preset} type="button">
+            {weeklyPlanPresets.map((preset) => (
+              <button
+                className={activePreset === preset ? "active" : undefined}
+                key={preset}
+                type="button"
+                onClick={() => applyPreset(preset)}
+              >
                 {preset}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="wpp-grid" aria-label="Grelha de planeamento semanal">
+        <MonthlyPlanContext context={monthlyPlanContext} onViewObjectives={() => setObjectivesOpen(true)} />
+
+        <div className="ep-week-list wpp-planning-list" aria-label="Lista de planeamento semanal">
           {days.map((day) => (
-            <DayColumn
+            <PlanningDayRow
               day={day}
               duplicateDay={duplicateDay}
               key={day.date}
@@ -543,7 +543,7 @@ function WeeklyPlanWorkspace({
               removeBlock={removeBlock}
               setEditing={setEditing}
               toggleDayOff={toggleDayOff}
-              addTypedBlock={addBlock}
+              onAdd={() => setAddingDay(day.date)}
             />
           ))}
         </div>
@@ -551,9 +551,10 @@ function WeeklyPlanWorkspace({
         <WeeklySummary summary={summary} />
 
         {addingDay ? (
-          <BlockDrawer
+          <BlockModal
             block={draftBlock}
             day={days.find((day) => day.date === addingDay)}
+            days={days}
             onChange={setDraftBlock}
             onClose={() => setAddingDay(null)}
             onSave={() => addBlock(addingDay)}
@@ -562,9 +563,10 @@ function WeeklyPlanWorkspace({
         ) : null}
 
         {editing ? (
-          <BlockDrawer
+          <BlockModal
             block={editing.block}
             day={days.find((day) => day.date === editing.dayDate)}
+            days={days}
             onChange={(block) =>
               setEditing((current) => (current ? { ...current, block: block as PlanBlock } : current))
             }
@@ -572,6 +574,15 @@ function WeeklyPlanWorkspace({
             onSave={saveEditedBlock}
             title="Editar bloco"
           />
+        ) : null}
+        {objectivesOpen ? (
+          <ObjectivesModal
+            context={monthlyPlanContext}
+            onClose={() => setObjectivesOpen(false)}
+          />
+        ) : null}
+        {coachContextOpen ? (
+          <CoachContextModal context={monthlyPlanContext} onClose={() => setCoachContextOpen(false)} />
         ) : null}
       </section>
     );
@@ -583,7 +594,6 @@ function WeeklyPlanWorkspace({
         demoReason={demoReason}
         hasPersistence={hasPersistence}
         isFirstUse={isFirstUse}
-        onWeekStartDayChange={handleWeekStartDayChange}
         saveState={saveState}
         weekStartDay={weekStartDay}
       />
@@ -627,7 +637,7 @@ function WeeklyPlanWorkspace({
             <Copy size={14} aria-hidden="true" />
             Copiar semana anterior
           </button>
-          <button className="ep-button secondary" type="button">
+          <button className="ep-button secondary" type="button" onClick={() => setCoachContextOpen(true)}>
             <Sparkles size={14} aria-hidden="true" />
             Rever com Coach
           </button>
@@ -645,8 +655,6 @@ function WeeklyPlanWorkspace({
           </button>
         </div>
       </div>
-
-      <MonthlyPlanContext context={monthlyPlanContext} />
 
       <div className="wp-totals">
         <div className="wp-total"><span>Grind</span><strong>{formatPlanMinutes(totals.Grind)}</strong><small>/ 14h</small></div>
@@ -678,6 +686,8 @@ function WeeklyPlanWorkspace({
         </section>
       ) : null}
 
+      <MonthlyPlanContext context={monthlyPlanContext} onViewObjectives={() => setObjectivesOpen(true)} />
+
       <div className="ep-week-list wp-grid" aria-label="Execução do plano semanal">
         {visibleDays.map((day) => (
           <DayRow
@@ -691,14 +701,24 @@ function WeeklyPlanWorkspace({
       </div>
 
       {addingDay ? (
-        <BlockDrawer
+        <BlockModal
           block={draftBlock}
           day={days.find((day) => day.date === addingDay)}
+          days={days}
           onChange={setDraftBlock}
           onClose={() => setAddingDay(null)}
           onSave={() => addBlock(addingDay)}
           title="Adicionar bloco"
         />
+      ) : null}
+      {objectivesOpen ? (
+        <ObjectivesModal
+          context={monthlyPlanContext}
+          onClose={() => setObjectivesOpen(false)}
+        />
+      ) : null}
+      {coachContextOpen ? (
+        <CoachContextModal context={monthlyPlanContext} onClose={() => setCoachContextOpen(false)} />
       ) : null}
     </section>
   );
@@ -708,17 +728,17 @@ function PlanModeBanner({
   demoReason,
   hasPersistence,
   isFirstUse,
-  onWeekStartDayChange,
   saveState,
   weekStartDay,
 }: {
   demoReason?: string;
   hasPersistence: boolean;
   isFirstUse?: boolean;
-  onWeekStartDayChange: (value: string) => void;
   saveState: SaveState;
   weekStartDay: number;
 }) {
+  void weekStartDay;
+
   return (
     <div className={hasPersistence ? "wp-demo-banner is-real" : "wp-demo-banner"}>
       <div>
@@ -732,22 +752,6 @@ function PlanModeBanner({
         </span>
       </div>
       <div className="wp-demo-actions">
-        <label>
-          Semana começa
-          <select
-            value={weekStartDay}
-            onChange={(event) => onWeekStartDayChange(event.target.value)}
-            disabled={!hasPersistence || saveState === "saving"}
-          >
-            <option value={1}>Segunda</option>
-            <option value={2}>Terça</option>
-            <option value={3}>Quarta</option>
-            <option value={4}>Quinta</option>
-            <option value={5}>Sexta</option>
-            <option value={6}>Sábado</option>
-            <option value={0}>Domingo</option>
-          </select>
-        </label>
         <small>{getSaveStateLabel(saveState)}</small>
       </div>
     </div>
@@ -756,8 +760,10 @@ function PlanModeBanner({
 
 function MonthlyPlanContext({
   context,
+  onViewObjectives,
 }: {
   context: ReturnType<typeof buildMonthlyPlanContext>;
+  onViewObjectives: () => void;
 }) {
   if (!context.rows.length) {
     return (
@@ -769,9 +775,9 @@ function MonthlyPlanContext({
             <span>O plano semanal tem menos contexto de ritmo.</span>
           </div>
         </div>
-        <a className="ep-button secondary" href="/monthly">
+        <button className="ep-button secondary" type="button" onClick={onViewObjectives}>
           Definir objetivos mensais
-        </a>
+        </button>
       </section>
     );
   }
@@ -801,9 +807,9 @@ function MonthlyPlanContext({
           ))}
         </div>
       ) : null}
-      <a className="ep-button secondary" href="/monthly">
+      <button className="ep-button secondary" type="button" onClick={onViewObjectives}>
         Ver objetivos
-      </a>
+      </button>
     </section>
   );
 }
@@ -873,37 +879,50 @@ function DayRow({
   );
 }
 
-function DayColumn({
+function PlanningDayRow({
   day,
-  addTypedBlock,
   duplicateDay,
   moveBlock,
+  onAdd,
   removeBlock,
   setEditing,
   toggleDayOff,
 }: {
   day: PlanDay;
-  addTypedBlock: (dayDate: string, blockType?: PlanBlockType) => void;
   duplicateDay: (dayDate: string) => void;
   moveBlock: (dayDate: string, blockId: string, direction: -1 | 1) => void;
+  onAdd: () => void;
   removeBlock: (dayDate: string, blockId: string) => void;
   setEditing: (editing: { dayDate: string; block: PlanBlock }) => void;
   toggleDayOff: (dayDate: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [addingInline, setAddingInline] = useState(false);
   const dayMinutes = getDayMinutes(day);
 
   return (
-    <article className={["ep-day-column", "wpp-col", day.isToday ? "today" : "", day.isOff ? "day-off" : ""].filter(Boolean).join(" ")}>
+    <article
+      className={["ep-week-row", "wpp-plan-row", day.isToday ? "today" : "", day.isOff ? "day-off" : ""]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <header>
         <div>
           <span>{day.label}</span>
           <h2>{day.date}</h2>
+          {day.isToday ? <em>Hoje</em> : null}
         </div>
-        <button className="wpp-col-menu" type="button" aria-label={`Ações de ${day.label}`} onClick={() => setMenuOpen((value) => !value)}>
-          <MoreHorizontal size={14} aria-hidden="true" />
-        </button>
+        <p>
+          {day.isOff ? "Dia off" : dayMinutes ? `${formatPlanMinutes(dayMinutes)} · ${day.blocks.length} bloco${day.blocks.length === 1 ? "" : "s"}` : "Sem blocos"}
+        </p>
+        <div className="wpp-plan-row-actions">
+          <button className="wp-row-action" type="button" onClick={onAdd}>
+            <Plus size={12} aria-hidden="true" />
+            Adicionar
+          </button>
+          <button className="wpp-col-menu" type="button" aria-label={`Ações de ${day.label}`} onClick={() => setMenuOpen((value) => !value)}>
+            <MoreHorizontal size={14} aria-hidden="true" />
+          </button>
+        </div>
         {menuOpen ? (
           <div className="wpp-menu" onMouseLeave={() => setMenuOpen(false)}>
             <button type="button" onClick={() => { duplicateDay(day.date); setMenuOpen(false); }}>
@@ -916,43 +935,22 @@ function DayColumn({
         ) : null}
       </header>
 
-      <div className={day.blocks.length ? "wpp-dist-mini" : "wpp-dist-mini is-empty"} aria-hidden="true">
-        {getDistributionSegments(day.blocks).map((segment) => (
-          <span className={segment.className} key={segment.id} style={{ width: segment.width }} />
-        ))}
-      </div>
-
-      <p>
-        {day.isOff ? (
-          <span className="wpp-off-tag">Dia off</span>
-        ) : dayMinutes ? (
-          <>
-            <span className="wpp-total-val">{formatPlanMinutes(dayMinutes)}</span>{" "}
-            <span className="wpp-total-cnt">{day.blocks.length} bloco{day.blocks.length === 1 ? "" : "s"}</span>
-          </>
-        ) : (
-          <span className="wpp-empty-tag">Sem blocos</span>
-        )}
-      </p>
-
-      <div className="ep-plan-blocks wpp-col-blocks">
+      <div className="ep-week-row-blocks">
         {day.blocks.map((block) => (
-          <div className={`${getBlockClassName(block.type)} wpp-block`} key={block.id}>
+          <div className={`${getBlockClassName(block.type)} wp-row-like st-${statusClass(block.status)}`} key={block.id}>
             <button
-              className="wpp-block-main"
+              className="wpp-row-edit"
               type="button"
               onClick={() => setEditing({ dayDate: day.date, block: { ...block } })}
             >
-              <div>
-                <span>
-                  {block.type}
-                  {block.source === "coachProposal" ? <em className="ep-origin-badge">Coach</em> : null}
-                </span>
-                <strong>{block.title}</strong>
-              </div>
+              <span>
+                {block.type}
+                {block.source === "coachProposal" ? <em className="ep-origin-badge">Coach</em> : null}
+              </span>
+              <strong>{block.title}</strong>
               <small>{block.target ?? "—"}</small>
             </button>
-            <div className="ep-plan-block-footer">
+            <div className="wp-row-actions wpp-row-actions">
               <button type="button" aria-label="Mover para o dia anterior" onClick={() => moveBlock(day.date, block.id, -1)}>
                 ←
               </button>
@@ -966,38 +964,14 @@ function DayColumn({
           </div>
         ))}
       </div>
-
-      {day.isOff ? null : addingInline ? (
-        <div className="wpp-add-pop" onMouseLeave={() => setAddingInline(false)}>
-          {blockTypes.map((type) => (
-            <button
-              className={`wpp-add-cat cat-${type.toLowerCase().replace("ç", "c")}`}
-              key={type}
-              type="button"
-              onClick={() => {
-                addTypedBlock(day.date, type);
-                setAddingInline(false);
-              }}
-            >
-              <span />
-              {type}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <button className="ep-add-day-block wpp-add-btn" type="button" onClick={() => setAddingInline(true)}>
-          <Plus size={12} aria-hidden="true" />
-          Adicionar
-        </button>
-      )}
-
     </article>
   );
 }
 
-function BlockDrawer({
+function BlockModal({
   block,
   day,
+  days,
   onChange,
   onClose,
   onSave,
@@ -1005,6 +979,7 @@ function BlockDrawer({
 }: {
   block: BlockDraft | PlanBlock;
   day?: PlanDay;
+  days: PlanDay[];
   onChange: (block: BlockDraft | PlanBlock) => void;
   onClose: () => void;
   onSave: () => void;
@@ -1012,8 +987,8 @@ function BlockDrawer({
 }) {
   return (
     <>
-      <button className="scrim" type="button" aria-label="Fechar painel" onClick={onClose} />
-      <aside className="drawer" role="dialog" aria-modal="true" aria-label={title}>
+      <button className="scrim" type="button" aria-label="Fechar modal" onClick={onClose} />
+      <section className="wp-modal" role="dialog" aria-modal="true" aria-label={title}>
         <div className="drawer-head">
           <h2>{day ? `${title} · ${day.label} ${day.date}` : title}</h2>
           <button className="ep-icon-button" type="button" aria-label="Fechar" onClick={onClose}>
@@ -1021,6 +996,7 @@ function BlockDrawer({
           </button>
         </div>
         <div className="drawer-body">
+          <WeekPreview days={days} selectedDay={day?.date} />
           <label className="field">
             Categoria
             <select
@@ -1061,7 +1037,102 @@ function BlockDrawer({
             Guardar
           </button>
         </div>
-      </aside>
+      </section>
+    </>
+  );
+}
+
+function WeekPreview({ days, selectedDay }: { days: PlanDay[]; selectedDay?: string }) {
+  return (
+    <section className="wp-week-preview" aria-label="Resumo compacto da semana">
+      {days.map((day) => (
+        <div className={day.date === selectedDay ? "active" : undefined} key={day.date}>
+          <strong>{day.label}</strong>
+          <span>{day.blocks.length}</span>
+          <small>{formatPlanMinutes(getDayMinutes(day))}</small>
+          <div className={day.blocks.length ? "wpp-dist-mini" : "wpp-dist-mini is-empty"} aria-hidden="true">
+            {getDistributionSegments(day.blocks).map((segment) => (
+              <i className={segment.className} key={segment.id} style={{ width: segment.width }} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function ObjectivesModal({
+  context,
+  onClose,
+}: {
+  context: ReturnType<typeof buildMonthlyPlanContext>;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <button className="scrim" type="button" aria-label="Fechar objetivos" onClick={onClose} />
+      <section className="wp-modal compact" role="dialog" aria-modal="true" aria-label="Objetivos mensais">
+        <div className="drawer-head">
+          <h2>Objetivos mensais</h2>
+          <button className="ep-icon-button" type="button" aria-label="Fechar" onClick={onClose}>
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="drawer-body">
+          {context.rows.length ? (
+            <div className="wp-objective-list">
+              {context.rows.map((row) => (
+                <div className={`wp-monthly-context-row ${row.kind}`} key={row.category}>
+                  <span>{row.label}</span>
+                  <strong>{row.plannedLabel}</strong>
+                  <small>{row.targetLabel}</small>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="wp-modal-copy">Ainda não há objetivos mensais definidos. O plano semanal continua editável.</p>
+          )}
+          {context.feedback.length ? (
+            <div className="wp-strategic-feedback">
+              {context.feedback.map((item) => (
+                <p className={item.kind} key={item.message}>{item.message}</p>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function CoachContextModal({
+  context,
+  onClose,
+}: {
+  context: ReturnType<typeof buildMonthlyPlanContext>;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <button className="scrim" type="button" aria-label="Fechar revisão do Coach" onClick={onClose} />
+      <section className="wp-modal compact" role="dialog" aria-modal="true" aria-label="Rever com Coach">
+        <div className="drawer-head">
+          <h2>Rever com Coach</h2>
+          <button className="ep-icon-button" type="button" aria-label="Fechar" onClick={onClose}>
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="drawer-body">
+          <p className="wp-modal-copy">
+            Revisão rápida baseada no ritmo mensal e na direção anual disponível. Nada é aplicado ao plano sem guardares.
+          </p>
+          <div className="wp-strategic-feedback">
+            {(context.feedback.length ? context.feedback : [{ kind: "info" as const, message: "Sem alertas fortes neste draft." }]).map((item) => (
+              <p className={item.kind} key={item.message}>{item.message}</p>
+            ))}
+          </div>
+        </div>
+      </section>
     </>
   );
 }
@@ -1281,6 +1352,71 @@ function buildMonthlyPlanContext(
   }
 
   return { feedback, rows };
+}
+
+function buildPresetDays(days: PlanDay[], preset: string) {
+  const presetBlocks = getPresetBlocks(preset);
+
+  if (!presetBlocks) return null;
+
+  return {
+    focus: presetBlocks.focus,
+    days: days.map((day, dayIndex) => {
+      const blocks = (presetBlocks.days[dayIndex] ?? []).map((draft) => createPlanBlock(day.date, draft));
+
+      return {
+        ...day,
+        isOff: blocks.length > 0 && blocks.every((block) => block.type === "Descanso"),
+        blocks,
+        summary: getDaySummary(blocks),
+      };
+    }),
+  };
+}
+
+function getPresetBlocks(preset: string): { focus: string; days: BlockDraft[][] } | null {
+  if (preset === "Personalizada") {
+    return {
+      focus: initialWeeklyFocus,
+      days: [[], [], [], [], [], [], []],
+    };
+  }
+
+  const restDay: BlockDraft[] = [{ type: "Descanso", title: "Dia off", target: "—" }];
+  const study: BlockDraft = { type: "Estudo", title: "Estudo técnico", target: "45m" };
+  const review: BlockDraft = { type: "Review", title: "Rever mãos", target: "30m" };
+  const sport: BlockDraft = { type: "Desporto", title: "Treino", target: "45m" };
+  const grind: BlockDraft = { type: "Grind", title: "Sessão MTT", target: "3h" };
+
+  if (preset === "Semana equilibrada") {
+    return {
+      focus: "Equilibrar volume, estudo e recuperação sem forçar.",
+      days: [[study, sport], [grind], [review, grind], [study], restDay, [grind], restDay],
+    };
+  }
+
+  if (preset === "Semana grind pesada") {
+    return {
+      focus: "Volume forte com limites claros de energia e review.",
+      days: [[study, grind], [grind], [review, grind], [grind], restDay, [grind], [review]],
+    };
+  }
+
+  if (preset === "Semana estudo / review") {
+    return {
+      focus: "Transformar leaks em trabalho técnico antes de aumentar volume.",
+      days: [[study, review], [study], [review], [study, sport], restDay, [grind], [review]],
+    };
+  }
+
+  if (preset === "Semana recuperação") {
+    return {
+      focus: "Recuperar energia mantendo contacto leve com poker.",
+      days: [[study], restDay, [sport], [review], restDay, [grind], restDay],
+    };
+  }
+
+  return null;
 }
 
 function getDefaultTitle(type: PlanBlockType) {

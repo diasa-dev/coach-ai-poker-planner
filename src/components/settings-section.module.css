@@ -180,6 +180,139 @@
   line-height: 1.4;
 }
 
+.errorMessage {
+  margin-top: 12px;
+  color: var(--ep-state-danger);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.settingRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+}
+
+.settingControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settingControls select {
+  min-height: 38px;
+  border: 1px solid var(--ep-border-2);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface);
+  color: var(--ep-fg-1);
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.primaryAction {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--ep-accent-primary);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-accent-primary);
+  color: #0b1d3d;
+  padding: 0 15px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.primaryAction:disabled,
+.secondaryAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.modalLayer {
+  position: fixed;
+  z-index: 110;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.modalScrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(13, 27, 42, 0.55);
+}
+
+.modal {
+  position: relative;
+  display: grid;
+  width: min(520px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-md);
+  background: var(--ep-bg-surface);
+  box-shadow: 0 24px 60px rgba(13, 27, 42, 0.18);
+}
+
+.modal header,
+.modal footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+}
+
+.modal header {
+  border-bottom: 1px solid var(--ep-border-1);
+}
+
+.modal footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--ep-border-1);
+}
+
+.modal header span {
+  color: var(--ep-fg-3);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.modal h2 {
+  margin: 3px 0 0;
+  color: var(--ep-fg-1);
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.modal header button {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ep-border-1);
+  border-radius: var(--ep-radius-sm);
+  background: transparent;
+  color: var(--ep-fg-2);
+}
+
+.modal p {
+  margin: 0;
+  color: var(--ep-fg-2);
+  padding: 18px 20px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
 @media (max-width: 720px) {
   .settingsPage {
     max-width: none;
@@ -197,6 +330,14 @@
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 14px;
   }
+
+  .settingRow {
+    grid-template-columns: 1fr;
+  }
+
+  .settingControls {
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 480px) {
@@ -206,5 +347,17 @@
 
   .secondaryAction {
     width: 100%;
+  }
+
+  .settingControls {
+    display: grid;
+  }
+
+  .primaryAction {
+    width: 100%;
+  }
+
+  .modal footer {
+    display: grid;
   }
 }

@@ -200,7 +200,7 @@ Reason selection should be optional. The goal is useful pattern data, not interr
 
 The weekly plan is the main planning surface.
 
-Represent it as a day-based board:
+Represent it as a compact day-based planning list:
 
 - Seven days
 - Days start from the user's configured planning-week start day
@@ -208,6 +208,13 @@ Represent it as a day-based board:
 - Multiple blocks per day
 - No fixed-time calendar requirement
 - No drag-and-drop requirement for the MVP
+
+Planning UX:
+
+- Keep monthly rhythm feedback immediately above the editable weekly list.
+- Keep monthly objectives in context through an in-app modal or inline summary, not route navigation.
+- Add or edit blocks in an in-app modal with a small week preview, so the player does not lose planning context.
+- Use starter presets only as local draft helpers; applying a preset must not persist automatically.
 
 Initial block types:
 
@@ -254,7 +261,7 @@ If monthly targets are not defined yet, the player should still be allowed to cr
 - Message: `Without monthly targets, the plan has less pacing context`
 - Secondary CTA: `Set monthly targets`
 
-The first weekly plan should start from one balanced editable template. Do not offer multiple template choices in the MVP.
+The first weekly plan should support simple editable starting points such as balanced, heavy grind, study/review, recovery, and custom. Applying one should only update the local draft until the player explicitly saves or activates the plan.
 
 Do not include personal template management in the MVP. Instead, support a simpler `Copy previous week` action when a previous week exists. Copying a previous week should create a clean editable draft.
 
@@ -307,12 +314,7 @@ This is important for poker players because Sunday is often the highest-volume o
 
 Use the phrase `planning week` where needed to avoid confusion with the civil week.
 
-When the player creates the first weekly plan, ask about the planning-week start as a light, non-blocking setup question:
-
-- Default copy: `Your planning week starts on Monday`
-- Secondary action: `Change`
-
-After this first setup, store the value as a global user preference. Do not ask on every new plan. Future plans should use the saved preference automatically, while settings should allow the player to change it later.
+Store the value as a global user preference. Do not keep the control in the Weekly Plan page header. Future plans should use the saved preference automatically, while Settings allows the player to change it later with explicit Save and an in-app confirmation explaining that the weekly plan display will change.
 
 ## Next Week Draft
 

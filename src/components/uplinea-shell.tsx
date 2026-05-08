@@ -5,6 +5,7 @@ import {
   Bell,
   BookOpen,
   CalendarDays,
+  Check,
   Compass,
   MessageSquareText,
   Moon,
@@ -15,18 +16,26 @@ import {
   Spade,
   Sun,
   Target,
+  X,
 } from "lucide-react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
+import {
+  buildPlanDaysFromStoredBlocks,
+  getTodayIsoDate,
+  type PlanBlock,
+} from "@/lib/planning/weekly-plan";
 import { usePersistenceAuth } from "@/lib/persistence-auth";
 import { hasClerkConfig, hasPersistenceConfig } from "@/lib/runtime-config";
 
 const demoSessionCtaStorageKey = "uplinea-demo-session-cta-state";
 const demoSessionCtaEvent = "uplinea-demo-session-state-change";
+const todayIsoDate = getTodayIsoDate();
 
 const navItems = [
   { href: "/", label: "Hoje", icon: Sun },
@@ -251,14 +260,58 @@ function PersistedSessionCta() {
   const canUsePersistence = auth.kind === "ready";
   const activeSession = useQuery(api.pokerSession.getActive, canUsePersistence ? {} : "skip");
   const pendingReviewSession = useQuery(api.pokerSession.getPendingReview, canUsePersistence ? {} : "skip");
+  const weeklyPlan = useQuery(api.weeklyPlan.getCurrent, canUsePersistence ? { today: todayIsoDate } : "skip");
+  const startSession = useMutation(api.pokerSession.start);
+  const [startModalOpen, setStartModalOpen] = useState(false);
+  const safeWeeklyPlan = weeklyPlan ?? { currentPlan: null, currentBlocks: [], weekStartDate: todayIsoDate };
+  const activePlan = safeWeeklyPlan.currentPlan?.status === "active" ? safeWeeklyPlan.currentPlan : null;
+  const days = activePlan
+    ? buildPlanDaysFromStoredBlocks({
+        blocks: safeWeeklyPlan.currentBlocks,
+        today: todayIsoDate,
+        weekStartDate: safeWeeklyPlan.weekStartDate,
+      })
+    : [];
+  const grindBlocks = days.find((day) => day.isToday)?.blocks.filter((block) => block.type === "Grind") ?? [];
 
-  return <SessionCta activeSession={activeSession ?? null} hasPendingReview={Boolean(pendingReviewSession)} />;
+  return (
+    <>
+      <SessionCta
+        activeSession={activeSession ?? null}
+        hasPendingReview={Boolean(pendingReviewSession)}
+        onStartClick={() => setStartModalOpen(true)}
+      />
+      {startModalOpen && !activeSession && !pendingReviewSession ? (
+        <SidebarStartSessionModal
+          grindBlocks={grindBlocks}
+          onClose={() => setStartModalOpen(false)}
+          onStart={async (payload) => {
+            await startSession({
+              date: todayIsoDate,
+              weeklyPlanId: activePlan?._id,
+              weeklyPlanBlockId: payload.weeklyPlanBlockId,
+              sessionFocus: payload.sessionFocus,
+              weeklyFocus: activePlan?.focus ?? "Sem plano semanal ativo.",
+              blockLabel: payload.blockLabel,
+              maxTables: payload.maxTables,
+              energy: payload.energy,
+              focusScore: payload.focusScore,
+              tilt: payload.tilt,
+              microIntention: payload.microIntention,
+            });
+            setStartModalOpen(false);
+          }}
+        />
+      ) : null}
+    </>
+  );
 }
 
 function DemoSessionCta() {
   const [state, setState] = useState<{ status: "idle" | "active" | "pendingReview"; startedAt?: number }>({
     status: "idle",
   });
+  const [startModalOpen, setStartModalOpen] = useState(false);
 
   useEffect(() => {
     function readDemoState() {
@@ -284,19 +337,37 @@ function DemoSessionCta() {
   }, []);
 
   return (
-    <SessionCta
-      activeSession={state.status === "active" && state.startedAt ? { startedAt: state.startedAt } : null}
-      hasPendingReview={state.status === "pendingReview"}
-    />
+    <>
+      <SessionCta
+        activeSession={state.status === "active" && state.startedAt ? { startedAt: state.startedAt } : null}
+        hasPendingReview={state.status === "pendingReview"}
+        onStartClick={() => setStartModalOpen(true)}
+      />
+      {startModalOpen && state.status === "idle" ? (
+        <SidebarStartSessionModal
+          grindBlocks={[{ id: "demo-grind", type: "Grind", title: "Sessão MTT — manhã", target: "2h", status: "Planeado" }]}
+          onClose={() => setStartModalOpen(false)}
+          onStart={async () => {
+            const nextState = { status: "active" as const, startedAt: Date.now() };
+            window.localStorage.setItem(demoSessionCtaStorageKey, JSON.stringify(nextState));
+            window.dispatchEvent(new Event(demoSessionCtaEvent));
+            setState(nextState);
+            setStartModalOpen(false);
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 
 function SessionCta({
   activeSession,
   hasPendingReview = false,
+  onStartClick,
 }: {
   activeSession: { startedAt: number } | null;
   hasPendingReview?: boolean;
+  onStartClick?: () => void;
 }) {
   const ctaState = activeSession ? "active" : hasPendingReview ? "pendingReview" : "idle";
   const label =
@@ -306,14 +377,126 @@ function SessionCta({
         ? "Terminar e rever"
         : "Iniciar sessão";
 
+  const className =
+    ctaState === "idle" ? "ep-session-cta" : `ep-session-cta ${ctaState === "active" ? "active-session" : "review-pending"}`;
+
+  if (ctaState === "idle" && onStartClick) {
+    return (
+      <button className={className} type="button" onClick={onStartClick}>
+        <Play size={16} aria-hidden="true" />
+        <span>{label}</span>
+      </button>
+    );
+  }
+
   return (
-    <Link
-      className={ctaState === "idle" ? "ep-session-cta" : `ep-session-cta ${ctaState === "active" ? "active-session" : "review-pending"}`}
-      href="/sessions"
-    >
+    <Link className={className} href="/sessions">
       <Play size={16} aria-hidden="true" />
       <span>{label}</span>
     </Link>
+  );
+}
+
+function SidebarStartSessionModal({
+  grindBlocks,
+  onClose,
+  onStart,
+}: {
+  grindBlocks: PlanBlock[];
+  onClose: () => void;
+  onStart: (payload: {
+    weeklyPlanBlockId?: Id<"weeklyPlanBlocks">;
+    blockLabel?: string;
+    sessionFocus: string;
+    maxTables: number;
+    energy: number;
+    focusScore: number;
+    tilt: number;
+    microIntention?: string;
+  }) => Promise<void>;
+}) {
+  const [sessionFocus, setSessionFocus] = useState("Disciplina em ICM até bolha");
+  const [selectedBlockId, setSelectedBlockId] = useState(grindBlocks[0]?.id ?? "none");
+  const [maxTables, setMaxTables] = useState(6);
+  const [microIntention, setMicroIntention] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const selectedBlock = grindBlocks.find((block) => block.id === selectedBlockId);
+  const trimmedFocus = sessionFocus.trim();
+
+  async function submit() {
+    if (!trimmedFocus) {
+      setError("Define um foco curto antes de iniciar a sessão.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError("");
+    try {
+      await onStart({
+        weeklyPlanBlockId: selectedBlock?.id as Id<"weeklyPlanBlocks"> | undefined,
+        blockLabel: selectedBlock ? `Grind · ${selectedBlock.title}${selectedBlock.target ? ` (${selectedBlock.target})` : ""}` : undefined,
+        sessionFocus: trimmedFocus,
+        maxTables,
+        energy: 4,
+        focusScore: 4,
+        tilt: 1,
+        microIntention: microIntention.trim() || undefined,
+      });
+    } catch {
+      setError("Não foi possível iniciar a sessão. Tenta novamente.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <>
+      <button className="scrim" type="button" aria-label="Fechar início de sessão" onClick={onClose} />
+      <section className="sidebar-session-modal" role="dialog" aria-modal="true" aria-label="Iniciar sessão">
+        <header>
+          <h2>Iniciar sessão</h2>
+          <button type="button" aria-label="Fechar" onClick={onClose}>
+            <X size={18} aria-hidden="true" />
+          </button>
+        </header>
+        <div className="sidebar-session-body">
+          <label className="field">
+            Foco da sessão
+            <input value={sessionFocus} onChange={(event) => setSessionFocus(event.target.value)} />
+          </label>
+          <label className="field">
+            Bloco
+            <select value={selectedBlockId} onChange={(event) => setSelectedBlockId(event.target.value)}>
+              {grindBlocks.map((block) => (
+                <option key={block.id} value={block.id}>
+                  Grind · {block.title}{block.target ? ` (${block.target})` : ""}
+                </option>
+              ))}
+              <option value="none">Sem bloco associado</option>
+            </select>
+          </label>
+          <label className="field">
+            Mesas
+            <input value={maxTables} inputMode="numeric" onChange={(event) => setMaxTables(Number(event.target.value) || 1)} />
+          </label>
+          <label className="field">
+            Micro-intenção
+            <input value={microIntention} onChange={(event) => setMicroIntention(event.target.value)} placeholder="ex: Não pagar river sem motivo" />
+          </label>
+          {error ? <p className="sidebar-session-error">{error}</p> : null}
+        </div>
+        <footer>
+          <button className="ep-button secondary" type="button" onClick={onClose} disabled={isSubmitting}>
+            Cancelar
+          </button>
+          <button className="ep-button primary" type="button" onClick={() => void submit()} disabled={isSubmitting || !trimmedFocus}>
+            <Check size={15} aria-hidden="true" />
+            {isSubmitting ? "A iniciar..." : "Iniciar sessão"}
+          </button>
+        </footer>
+      </section>
+    </>
   );
 }
 

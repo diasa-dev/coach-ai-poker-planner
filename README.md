@@ -22,15 +22,17 @@ Implemented:
 - Persisted Annual Operating Targets with `effectiveFrom` versioning
 - Persisted Monthly Targets for Grind, Study, Review, and Sport
 - Weekly Plan consumes Monthly Targets as compact strategic pace context
+- Weekly Plan UX flow with contextual objectives modal, local draft presets, compact planning list, and modal block creation
+- Settings can persist the planning-week start day with explicit in-app confirmation
 - Today consumes Monthly Targets as compact read-only pace context
 - Functional slices for Weekly Plan, Today, Sessions, Review, and Coach proposal application
-- Demo UI slices for Study and Settings
+- Demo UI slice for Study
 
 Planned next:
 
 - Continue Strategic Feedback Integration across Today, Sessions, Review, and Coach mock/rules-based feedback
 - Connect Review context into Coach suggestions
-- Replace mocked Study and Settings data with persistence when their specs are approved
+- Replace mocked Study data with persistence when its spec is approved
 - Keep AI generation mocked until real app data flow is stable
 
 ## Product Design Source Of Truth
