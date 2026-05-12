@@ -12,7 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
-import { useEffect, useMemo, useState } from "react";
+import { Component, useEffect, useMemo, useState, type ErrorInfo, type ReactNode } from "react";
 
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -134,8 +134,51 @@ const demoEvents: SessionEventView[] = [
 ];
 
 export function PokerSessions() {
+  return (
+    <SessionsRuntimeBoundary>
+      <PokerSessionsInner />
+    </SessionsRuntimeBoundary>
+  );
+}
+
+function PokerSessionsInner() {
   if (!hasPersistenceConfig) return <PokerSessionsDemo />;
   return <PersistedPokerSessions />;
+}
+
+type SessionsRuntimeBoundaryState = {
+  errorMessage: string | null;
+};
+
+class SessionsRuntimeBoundary extends Component<{ children: ReactNode }, SessionsRuntimeBoundaryState> {
+  state: SessionsRuntimeBoundaryState = { errorMessage: null };
+
+  static getDerivedStateFromError(error: unknown): SessionsRuntimeBoundaryState {
+    return { errorMessage: getActionErrorMessage(error) };
+  }
+
+  componentDidCatch(error: unknown, errorInfo: ErrorInfo) {
+    console.error("Uplinea sessions render failed", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.errorMessage) {
+      return (
+        <section className="ep-page">
+          <div className="wp-demo-banner">
+            <div>
+              <strong>Sessões não carregaram</strong>
+              <span>{this.state.errorMessage}</span>
+              <small>Esta mensagem é temporária para diagnosticar o caminho autenticado sem esconder o erro.</small>
+            </div>
+          </div>
+          <PokerSessionsDemo banner="Fallback temporário: o módulo de sessões reais falhou neste login. Dados reais não foram alterados." />
+        </section>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 function PersistedPokerSessions() {
