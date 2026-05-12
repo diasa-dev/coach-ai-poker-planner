@@ -50,9 +50,10 @@ const todayIsoDate = getTodayIsoDate();
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 type PlanStatus = "draft" | "active" | "reviewed" | "archived";
-type MonthlyTargetCategory = "grind" | "study" | "review" | "sport";
+type MonthlyTargetCategory = "grind" | "study" | "review" | "sport" | "recovery" | "custom";
 type MonthlyTargetContext = {
   category: MonthlyTargetCategory;
+  metricLabel?: string;
   primaryUnit: string;
   targetValue: number;
   optionalSecondaryUnit?: string;
@@ -1298,6 +1299,8 @@ function buildMonthlyPlanContext(
     study: "Estudo",
     review: "Review",
     sport: "Sport",
+    recovery: "Recuperação",
+    custom: "Personalizado",
   };
   const uncoveredCategories: string[] = [];
   const rows = targets.map((target) => {
@@ -1308,7 +1311,7 @@ function buildMonthlyPlanContext(
       return {
         category: target.category,
         kind: "neutral",
-        label: labelByCategory[target.category],
+        label: target.metricLabel ?? labelByCategory[target.category],
         plannedLabel: "Sem comparação direta",
         targetLabel,
       };
@@ -1319,13 +1322,13 @@ function buildMonthlyPlanContext(
     const kind = weeklyShare >= 0.2 ? "supporting" : "light";
 
     if (plannedValue <= 0) {
-      uncoveredCategories.push(labelByCategory[target.category]);
+      uncoveredCategories.push(target.metricLabel ?? labelByCategory[target.category]);
     }
 
     return {
       category: target.category,
       kind,
-      label: labelByCategory[target.category],
+      label: target.metricLabel ?? labelByCategory[target.category],
       plannedLabel,
       targetLabel,
     };

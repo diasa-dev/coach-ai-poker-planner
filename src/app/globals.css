@@ -25,13 +25,13 @@
 }
 
 body.dark-mode {
-  --bg: #101923;
-  --surface: #172230;
-  --surface-soft: #111b27;
-  --line: #293747;
-  --text: #edf4f8;
-  --muted: #9aa8b8;
-  --faint: #718196;
+  --bg: #07111d;
+  --surface: #111f2e;
+  --surface-soft: #142437;
+  --line: #24364a;
+  --text: #f0f6fb;
+  --muted: #a9b8c9;
+  --faint: #7f91a6;
   --blue: #78a6ff;
   --blue-soft: rgba(120, 166, 255, 0.14);
   --green: #45d6a7;
@@ -44,6 +44,32 @@ body.dark-mode {
   --risk-soft: rgba(255, 122, 122, 0.1);
   --shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
   --small-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+}
+
+body.dark-mode {
+  --ep-bg-app: #07111d;
+  --ep-bg-surface: #111f2e;
+  --ep-bg-surface-2: #142437;
+  --ep-bg-sidebar: #07111d;
+  --ep-fg-1: #f0f6fb;
+  --ep-fg-2: #b2c0d1;
+  --ep-fg-3: #8799ae;
+  --ep-fg-on-sidebar: #f0f6fb;
+  --ep-fg-on-sidebar-2: #a0b0c4;
+  --ep-border-1: #24364a;
+  --ep-border-2: #2f4359;
+  --bg-app: var(--ep-bg-app);
+  --bg-surface: var(--ep-bg-surface);
+  --bg-surface-2: var(--ep-bg-surface-2);
+  --bg-inset: #0b1624;
+  --bg-sidebar: var(--ep-bg-sidebar);
+  --fg-1: var(--ep-fg-1);
+  --fg-2: var(--ep-fg-2);
+  --fg-3: var(--ep-fg-3);
+  --fg-on-sidebar: var(--ep-fg-on-sidebar);
+  --fg-on-sidebar-2: var(--ep-fg-on-sidebar-2);
+  --border-1: var(--ep-border-1);
+  --border-2: var(--ep-border-2);
 }
 
 @theme inline {
@@ -2620,6 +2646,9 @@ dd {
   --ep-navy-900: #0a1320;
   --ep-navy-800: #0b1d3d;
   --ep-navy-700: #142539;
+  --ep-sidebar-logo-bg: #0b5a98;
+  --ep-sidebar-gradient-start: #073f69;
+  --ep-sidebar-gradient-mid: #082943;
   --ep-blue-700: #1d4edb;
   --ep-teal-600: #1aa8b8;
   --ep-teal-500: #06b6c4;
@@ -2699,30 +2728,58 @@ dd {
 .ep-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   height: 100vh;
   border-right: 1px solid rgba(255, 255, 255, 0.04);
-  background: var(--bg-sidebar);
+  background:
+    linear-gradient(
+      180deg,
+      var(--ep-sidebar-logo-bg) 0,
+      var(--ep-sidebar-logo-bg) 148px,
+      var(--ep-sidebar-gradient-start) 148px,
+      var(--ep-sidebar-gradient-mid) 42%,
+      var(--ep-navy-800) 72%,
+      var(--ep-navy-950) 100%
+    );
   color: var(--fg-on-sidebar);
-  padding: 18px 14px;
+  padding: 0 14px 18px;
 }
 
 .ep-brand {
+  position: relative;
   display: flex;
+  min-height: 148px;
   align-items: center;
-  min-height: auto;
-  padding: 6px 8px 12px;
+  justify-content: center;
+  margin: 0 -14px;
+  overflow: hidden;
+  background: var(--ep-sidebar-logo-bg);
+  padding: 16px 36px 18px;
+}
+
+.ep-brand::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 26px;
+  background: linear-gradient(180deg, rgba(11, 90, 152, 0), var(--ep-sidebar-gradient-start));
+  content: "";
+  pointer-events: none;
 }
 
 .ep-brand img {
   width: auto;
-  height: 30px;
+  height: auto;
   display: block;
 }
 
 .ep-sidebar .ep-brand img {
-  width: 156px;
-  height: 30px;
+  position: relative;
+  z-index: 1;
+  width: 112px;
+  height: auto;
+  max-height: 112px;
   object-fit: contain;
 }
 
@@ -2974,9 +3031,14 @@ dd {
   padding: 36px;
 }
 
-.ep-auth-panel img {
+.ep-auth-panel img,
+.ep-auth-logo {
   width: 172px;
   height: auto;
+}
+
+.ep-auth-logo-dark {
+  display: none;
 }
 
 .ep-auth-eyebrow {
@@ -3004,15 +3066,15 @@ dd {
   min-height: 44px;
   border: 0;
   border-radius: 6px;
-  background: var(--accent);
-  color: var(--fg-inverse);
+  background: var(--ep-accent-primary);
+  color: #0b1d3d;
   cursor: pointer;
   font: var(--t-body-strong);
   padding: 0 18px;
 }
 
 .ep-auth-primary:hover {
-  background: var(--accent-strong);
+  background: var(--ep-accent-primary-hover);
 }
 
 .ep-auth-context {
@@ -5953,6 +6015,13 @@ dd {
   gap: 7px;
 }
 
+.today-head-actions .today-hero-cta {
+  min-height: 54px;
+  padding: 0 24px;
+  font-size: 15px;
+  font-weight: 900;
+}
+
 .today-state-switch {
   display: inline-grid;
   grid-template-columns: repeat(3, minmax(98px, 1fr));
@@ -6815,17 +6884,31 @@ dd {
 }
 
 .ep-sidebar {
-  gap: 14px;
-  padding: 38px 14px 28px;
+  gap: 12px;
+  padding: 0 14px 28px;
+  background:
+    linear-gradient(
+      180deg,
+      var(--ep-sidebar-logo-bg) 0,
+      var(--ep-sidebar-logo-bg) 156px,
+      var(--ep-sidebar-gradient-start) 156px,
+      var(--ep-sidebar-gradient-mid) 42%,
+      var(--ep-navy-800) 72%,
+      var(--ep-navy-950) 100%
+    );
 }
 
 .ep-brand {
-  padding: 0 10px 18px;
+  min-height: 156px;
+  margin: 0 -14px;
+  padding: 18px 36px 20px;
+  background: var(--ep-sidebar-logo-bg);
 }
 
 .ep-sidebar .ep-brand img {
-  width: 75px;
+  width: 116px;
   height: auto;
+  max-height: 116px;
 }
 
 .ep-session-cta {
@@ -7744,5 +7827,759 @@ dd {
   .today-print-match .today-coach-context,
   .today-print-match .today-coach-link {
     margin-left: 0;
+  }
+}
+
+/* Claude design dark-mode alignment -------------------------------------- */
+body.dark-mode {
+  --ep-bg-app: #07111d;
+  --ep-bg-surface: #111f2e;
+  --ep-bg-surface-2: #142437;
+  --ep-bg-surface-3: #192b40;
+  --ep-bg-sidebar: #07111d;
+  --ep-fg-1: #f0f6fb;
+  --ep-fg-2: #b2c0d1;
+  --ep-fg-3: #8799ae;
+  --ep-fg-on-sidebar: #f0f6fb;
+  --ep-fg-on-sidebar-2: #a0b0c4;
+  --ep-border-1: #24364a;
+  --ep-border-2: #2f4359;
+  --ep-accent-primary: #06b6c4;
+  --ep-accent-primary-hover: #4fd4e1;
+  --bg-app: var(--ep-bg-app);
+  --bg-surface: var(--ep-bg-surface);
+  --bg-surface-2: var(--ep-bg-surface-2);
+  --bg-surface-3: var(--ep-bg-surface-3);
+  --bg-sidebar: var(--ep-bg-sidebar);
+  --bg-inset: #0b1624;
+  --fg-1: var(--ep-fg-1);
+  --fg-2: var(--ep-fg-2);
+  --fg-3: var(--ep-fg-3);
+  --fg-on-sidebar: var(--ep-fg-on-sidebar);
+  --fg-on-sidebar-2: var(--ep-fg-on-sidebar-2);
+  --border-1: var(--ep-border-1);
+  --border-2: var(--ep-border-2);
+  --background: var(--ep-bg-app);
+  --foreground: var(--ep-fg-1);
+  color-scheme: dark;
+}
+
+body.dark-mode,
+body.dark-mode .ep-shell,
+body.dark-mode .ep-main {
+  background: var(--ep-bg-app);
+  color: var(--ep-fg-1);
+}
+
+.ep-brand {
+  border-radius: 8px;
+}
+
+.ep-brand.light {
+  justify-content: center;
+  margin: 0 0 4px;
+  border: 1px solid rgba(215, 222, 231, 0.9);
+  background: #ffffff;
+  box-shadow: 0 12px 24px rgba(5, 13, 25, 0.18);
+  padding: 12px 14px;
+}
+
+.ep-brand.dark {
+  justify-content: flex-start;
+  margin: 0 0 4px;
+  border: 1px solid rgba(6, 182, 196, 0.14);
+  background: transparent;
+  padding: 8px 10px 16px;
+}
+
+.ep-sidebar .ep-brand img,
+.ep-brand img {
+  width: min(100%, 202px);
+  height: auto;
+  max-height: 72px;
+  object-fit: contain;
+}
+
+.ep-brand.dark img {
+  width: min(100%, 196px);
+}
+
+body.dark-mode .ep-sidebar {
+  border-right-color: rgba(36, 54, 74, 0.72);
+  background: var(--ep-bg-sidebar);
+  color: var(--ep-fg-on-sidebar);
+}
+
+body.dark-mode .ep-nav-item {
+  color: var(--ep-fg-on-sidebar-2);
+}
+
+body.dark-mode .ep-nav-item:hover {
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--ep-fg-on-sidebar);
+}
+
+body.dark-mode .ep-nav-item.active {
+  border: 1px solid rgba(6, 182, 196, 0.24);
+  background: rgba(6, 182, 196, 0.12);
+  color: #ffffff;
+}
+
+body.dark-mode .ep-nav-item.active svg {
+  color: var(--ep-accent-primary-hover);
+}
+
+body.dark-mode .ep-session-cta {
+  background: var(--ep-accent-primary);
+  color: #07111d;
+}
+
+body.dark-mode .ep-session-cta:hover {
+  background: var(--ep-accent-primary-hover);
+}
+
+body.dark-mode .ep-profile strong {
+  color: var(--ep-fg-on-sidebar);
+}
+
+body.dark-mode .ep-profile small {
+  color: var(--ep-fg-on-sidebar-2);
+}
+
+body.dark-mode .ep-topbar {
+  border-bottom-color: var(--ep-border-1);
+  background: rgba(17, 31, 46, 0.94);
+  color: var(--ep-fg-1);
+}
+
+body.dark-mode .ep-topbar-actions button,
+body.dark-mode .ep-account-menu,
+body.dark-mode .ep-topbar-actions .ep-auth-button {
+  border-color: var(--ep-border-1);
+  background: transparent;
+  color: var(--ep-fg-2);
+}
+
+body.dark-mode .ep-topbar-actions button:hover {
+  background: var(--ep-bg-surface-2);
+  color: var(--ep-fg-1);
+}
+
+body.dark-mode .ep-account-menu {
+  background: var(--ep-bg-surface);
+}
+
+body.dark-mode .ep-screen-label {
+  color: var(--ep-fg-3);
+}
+
+body.dark-mode .ep-panel,
+body.dark-mode .ep-card,
+body.dark-mode .ep-empty-state,
+body.dark-mode .today-card,
+body.dark-mode .today-commitment,
+body.dark-mode .today-block-row,
+body.dark-mode .today-dialog,
+body.dark-mode .wp-modal,
+body.dark-mode .sidebar-session-modal,
+body.dark-mode .statusCard,
+body.dark-mode .historyPanel,
+body.dark-mode .summaryPanel,
+body.dark-mode .coachPanel,
+body.dark-mode .focusBanner,
+body.dark-mode .capturePanel,
+body.dark-mode .timelinePanel,
+body.dark-mode .passiveCoach {
+  border-color: var(--ep-border-1);
+  background: var(--ep-bg-surface);
+  color: var(--ep-fg-1);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.26);
+}
+
+body.dark-mode .today-print-match .today-card,
+body.dark-mode .today-print-match .today-commitment,
+body.dark-mode .today-print-match .today-block-row,
+body.dark-mode .today-print-match .today-progress-card,
+body.dark-mode .today-print-match .today-coach-card {
+  border-color: var(--ep-border-1);
+  background: var(--ep-bg-surface);
+}
+
+body.dark-mode .today-print-match .today-card-head,
+body.dark-mode .today-print-match .today-commitment,
+body.dark-mode .today-print-match .today-block-row,
+body.dark-mode .today-dialog > header,
+body.dark-mode .today-dialog-foot,
+body.dark-mode .wp-modal header,
+body.dark-mode .wp-modal footer,
+body.dark-mode .sidebar-session-modal header,
+body.dark-mode .sidebar-session-modal footer {
+  border-color: var(--ep-border-1);
+}
+
+body.dark-mode .today-print-match .today-coach-body p,
+body.dark-mode .today-print-match .today-close-button,
+body.dark-mode .today-print-match h1,
+body.dark-mode .today-print-match h2,
+body.dark-mode .today-print-match h3,
+body.dark-mode .ep-page-header h1,
+body.dark-mode .ep-page-header p,
+body.dark-mode .ep-panel h2,
+body.dark-mode .ep-panel h3,
+body.dark-mode .ep-panel strong {
+  color: var(--ep-fg-1);
+}
+
+body.dark-mode .today-print-match p,
+body.dark-mode .today-print-match small,
+body.dark-mode .today-print-match .today-coach-context,
+body.dark-mode .ep-page-header span,
+body.dark-mode .ep-panel span,
+body.dark-mode .ep-panel p {
+  color: var(--ep-fg-2);
+}
+
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea,
+body.dark-mode .field input,
+body.dark-mode .field select,
+body.dark-mode .field textarea,
+body.dark-mode .ep-coach-edit-grid input,
+body.dark-mode .ep-coach-edit-grid textarea,
+body.dark-mode .ep-coach-proposal-row input,
+body.dark-mode .ep-coach-proposal-row textarea,
+body.dark-mode .ep-coach-proposal-row select {
+  border-color: var(--ep-border-2);
+  background: var(--bg-inset);
+  color: var(--ep-fg-1);
+}
+
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder {
+  color: var(--ep-fg-3);
+}
+
+body.dark-mode .tableHeader,
+body.dark-mode .targetTable,
+body.dark-mode .targetRow,
+body.dark-mode .tableRow {
+  border-color: var(--ep-border-1);
+}
+
+body.dark-mode .tableHeader {
+  background: var(--ep-bg-surface-2);
+}
+
+body.dark-mode .ep-button,
+body.dark-mode .textButton,
+body.dark-mode .iconButton,
+body.dark-mode .iconOnlyButton,
+body.dark-mode .today-print-match .today-close-button {
+  border-color: var(--ep-border-1);
+  background: var(--ep-bg-surface);
+  color: var(--ep-fg-1);
+}
+
+body.dark-mode .ep-button.primary,
+body.dark-mode .primary-button,
+body.dark-mode .ep-auth-primary {
+  background: var(--ep-accent-primary);
+  color: #07111d;
+}
+
+body.dark-mode .ep-auth-panel,
+body.dark-mode .ep-auth-context {
+  border-color: var(--ep-border-1);
+  background: var(--ep-bg-surface);
+  color: var(--ep-fg-1);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+}
+
+body.dark-mode .ep-auth-logo-light {
+  display: none;
+}
+
+body.dark-mode .ep-auth-logo-dark {
+  display: block;
+}
+
+body.dark-mode .ep-auth-eyebrow,
+body.dark-mode .ep-auth-context span,
+body.dark-mode .ep-auth-panel p,
+body.dark-mode .ep-auth-context p {
+  color: var(--ep-fg-2);
+}
+
+body.dark-mode .ep-auth-panel h1,
+body.dark-mode .ep-auth-context strong {
+  color: var(--ep-fg-1);
+}
+
+body.dark-mode .ep-button.primary:hover,
+body.dark-mode .primary-button:hover,
+body.dark-mode .ep-auth-primary:hover {
+  background: var(--ep-accent-primary-hover);
+  color: #07111d;
+}
+
+body.dark-mode .scrim,
+body.dark-mode .modalScrim {
+  background: rgba(0, 0, 0, 0.66);
+}
+
+@media (max-width: 720px) {
+  .ep-brand.light,
+  .ep-brand.dark {
+    width: fit-content;
+    max-width: 224px;
+  }
+}
+
+/* Uplinea brand-guide redesign pass -------------------------------------- */
+:root {
+  --ep-sidebar-w: 260px;
+  --sidebar-w: 260px;
+  --ep-radius-md: 14px;
+  --ep-radius-lg: 18px;
+  --topbar-h: 64px;
+}
+
+body:not(.dark-mode) {
+  --ep-bg-app: #f5f7fa;
+  --ep-bg-surface: rgba(255, 255, 255, 0.94);
+  --ep-bg-surface-2: #f8fafc;
+  --ep-bg-sidebar: #0b1d3d;
+  --ep-fg-1: #0b1d3d;
+  --ep-fg-2: #465568;
+  --ep-fg-3: #64748b;
+  --ep-border-1: rgba(100, 116, 139, 0.18);
+  --ep-border-2: rgba(100, 116, 139, 0.26);
+  --bg-app: #f5f7fa;
+  --bg-surface: rgba(255, 255, 255, 0.94);
+  --bg-surface-2: #f8fafc;
+  --bg-sidebar: #0b1d3d;
+  --fg-1: #0b1d3d;
+  --fg-2: #465568;
+  --fg-3: #64748b;
+  --border-1: rgba(100, 116, 139, 0.18);
+  --border-2: rgba(100, 116, 139, 0.26);
+}
+
+.ep-shell {
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  background:
+    radial-gradient(circle at 34% 0%, rgba(6, 182, 196, 0.10), transparent 30%),
+    var(--ep-bg-app);
+}
+
+.ep-sidebar {
+  position: relative;
+  gap: 14px;
+  overflow: hidden;
+  border-right: 1px solid rgba(6, 182, 196, 0.16);
+  background: var(--ep-sidebar-logo-bg);
+  padding: 0 16px 18px;
+}
+
+.ep-sidebar::before {
+  content: "";
+  position: absolute;
+  inset: 128px 0 0;
+  background:
+    linear-gradient(180deg, var(--ep-sidebar-logo-bg) 0%, rgba(11, 90, 152, 0.92) 18%, rgba(7, 63, 105, 0.76) 34%, transparent 54%),
+    radial-gradient(circle at 64px 68px, rgba(6, 182, 196, 0.28), transparent 36%),
+    radial-gradient(circle at 210px 170px, rgba(29, 78, 219, 0.22), transparent 36%),
+    linear-gradient(160deg, var(--ep-sidebar-logo-bg) 0%, var(--ep-sidebar-gradient-start) 18%, var(--ep-sidebar-gradient-mid) 44%, #0b1d3d 74%, #061326 100%);
+  pointer-events: none;
+}
+
+body.dark-mode .ep-sidebar {
+  border-right-color: rgba(36, 54, 74, 0.72);
+  background: var(--ep-sidebar-logo-bg);
+}
+
+body.dark-mode .ep-sidebar::before {
+  background:
+    linear-gradient(180deg, var(--ep-sidebar-logo-bg) 0%, rgba(11, 90, 152, 0.9) 24%, rgba(7, 63, 105, 0.58) 46%, transparent 62%),
+    radial-gradient(circle at 58px 68px, rgba(6, 182, 196, 0.14), transparent 34%),
+    linear-gradient(160deg, var(--ep-sidebar-logo-bg) 0%, var(--ep-sidebar-gradient-start) 18%, #082943 48%, #08111a 74%, #050b12 100%);
+}
+
+.ep-sidebar::after {
+  content: "";
+  position: absolute;
+  inset: auto 18px 96px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(6, 182, 196, 0.32), transparent);
+  pointer-events: none;
+}
+
+.ep-brand,
+.ep-brand.light,
+.ep-brand.dark {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: calc(100% + 32px);
+  min-height: 156px;
+  margin: 0 -16px -10px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(180deg, var(--ep-sidebar-logo-bg) 0%, var(--ep-sidebar-logo-bg) 76%, rgba(11, 90, 152, 0.86) 88%, rgba(11, 90, 152, 0) 100%);
+  box-shadow: none;
+  padding: 10px 46px 12px;
+}
+
+.ep-sidebar > * {
+  position: relative;
+  z-index: 1;
+}
+
+.ep-brand:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.ep-brand::after {
+  display: none;
+}
+
+.ep-sidebar .ep-brand img,
+.ep-brand img,
+.ep-brand.dark img {
+  width: min(100%, 136px) !important;
+  height: auto !important;
+  max-height: 136px;
+  object-fit: contain;
+  display: block;
+}
+
+.ep-session-cta {
+  min-height: 48px;
+  border: 1px solid rgba(6, 182, 196, 0.36);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(6, 182, 196, 0.92), rgba(34, 197, 213, 0.88));
+  color: #061326;
+  font-weight: 700;
+  padding: 0 16px;
+  box-shadow: 0 12px 26px rgba(6, 182, 196, 0.16);
+}
+
+.ep-nav {
+  gap: 5px;
+}
+
+.ep-nav-item {
+  position: relative;
+  min-height: 42px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: rgba(231, 236, 243, 0.72);
+  font-weight: 600;
+  padding: 10px 12px;
+}
+
+.ep-nav-item:hover {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.055);
+  color: #ffffff;
+}
+
+.ep-nav-item.active {
+  border-color: rgba(6, 182, 196, 0.34);
+  background: linear-gradient(135deg, rgba(6, 182, 196, 0.18), rgba(29, 78, 219, 0.10));
+  color: #ffffff;
+  box-shadow: inset 3px 0 0 #06b6c4;
+}
+
+.ep-nav-item.active svg {
+  color: #06b6c4;
+}
+
+.ep-profile {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.045);
+  padding: 12px;
+}
+
+.ep-profile > span {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #06b6c4, #1d4edb);
+  color: #ffffff;
+}
+
+.ep-workspace {
+  background:
+    radial-gradient(circle at 80% -10%, rgba(6, 182, 196, 0.10), transparent 28%),
+    var(--ep-bg-app);
+}
+
+.ep-topbar {
+  border-bottom: 1px solid var(--ep-border-1);
+  background: rgba(245, 247, 250, 0.82);
+  padding: 0 34px;
+  backdrop-filter: blur(18px);
+}
+
+.ep-topbar strong {
+  color: var(--ep-fg-1);
+  font-weight: 700;
+}
+
+.ep-screen-label {
+  border: 1px solid rgba(6, 182, 196, 0.20);
+  border-radius: 999px;
+  background: rgba(6, 182, 196, 0.08);
+  color: #0b1d3d !important;
+  padding: 7px 12px;
+}
+
+.ep-topbar-actions button,
+.ep-account-menu,
+.ep-topbar-actions .ep-auth-button {
+  border: 1px solid var(--ep-border-1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ep-fg-2);
+}
+
+.ep-main {
+  background: transparent;
+  padding: 34px 44px 96px;
+}
+
+.ep-page,
+.today-print-match {
+  gap: 24px;
+}
+
+.today-print-match {
+  max-width: 1120px;
+}
+
+.ep-page-header h1,
+.today-print-match .today-head h1 {
+  color: var(--ep-fg-1);
+  font-size: clamp(30px, 3vw, 42px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.04;
+}
+
+.ep-page-header span,
+.today-print-match .today-head span,
+.ep-panel span {
+  color: var(--ep-fg-3);
+  letter-spacing: 0.12em;
+}
+
+.ep-panel,
+.ep-card,
+.ep-empty-state,
+.today-print-match .today-panel,
+.today-print-match .today-card,
+.today-print-match .today-commitment,
+.today-print-match .today-block-row,
+.today-print-match .today-coach-card,
+.today-print-match .today-progress-card,
+.today-dialog,
+.wp-modal,
+.sidebar-session-modal {
+  border: 1px solid var(--ep-border-1);
+  border-radius: 18px;
+  background: var(--ep-bg-surface);
+  box-shadow: 0 18px 48px rgba(11, 29, 61, 0.07);
+}
+
+.ep-panel,
+.today-print-match .today-panel,
+.today-print-match .today-card {
+  padding: 22px;
+}
+
+.today-print-match .today-card-head,
+.today-print-match .today-dialog > header,
+.today-print-match .today-dialog-foot {
+  border-color: var(--ep-border-1);
+}
+
+.ep-button,
+.today-print-match .ep-button,
+.primary-button,
+.textButton,
+.iconButton,
+.iconOnlyButton {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.ep-button.primary,
+.today-print-match .ep-button.primary,
+.primary-button,
+.ep-auth-primary {
+  border: 0;
+  background: linear-gradient(135deg, #06b6c4, #22c5d5);
+  color: #061326;
+  box-shadow: 0 12px 26px rgba(6, 182, 196, 0.18);
+}
+
+.ep-button.secondary,
+.today-print-match .ep-button.secondary {
+  border-color: var(--ep-border-1);
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--ep-fg-1);
+}
+
+body.dark-mode {
+  --ep-bg-app: #07111d;
+  --ep-bg-surface: #111f2e;
+  --ep-bg-surface-2: #142437;
+  --ep-bg-surface-3: #192b40;
+  --ep-bg-sidebar: #061326;
+  --ep-fg-1: #f0f6fb;
+  --ep-fg-2: #b8c6d8;
+  --ep-fg-3: #8799ae;
+  --ep-border-1: rgba(135, 153, 174, 0.18);
+  --ep-border-2: rgba(135, 153, 174, 0.26);
+  --bg-app: #07111d;
+  --bg-surface: #111f2e;
+  --bg-surface-2: #142437;
+  --bg-sidebar: #061326;
+  --fg-1: #f0f6fb;
+  --fg-2: #b8c6d8;
+  --fg-3: #8799ae;
+  --border-1: rgba(135, 153, 174, 0.18);
+  --border-2: rgba(135, 153, 174, 0.26);
+}
+
+body.dark-mode .ep-workspace,
+body.dark-mode .ep-main,
+body.dark-mode .ep-shell {
+  background:
+    radial-gradient(circle at 80% -10%, rgba(6, 182, 196, 0.12), transparent 30%),
+    #07111d;
+}
+
+body.dark-mode .ep-sidebar {
+  border-right-color: rgba(36, 54, 74, 0.72);
+  background: #111a24;
+}
+
+body.dark-mode .ep-topbar {
+  border-bottom-color: var(--ep-border-1);
+  background: rgba(7, 17, 29, 0.78);
+}
+
+body.dark-mode .ep-screen-label {
+  color: var(--ep-fg-2) !important;
+  background: rgba(6, 182, 196, 0.08);
+}
+
+body.dark-mode .ep-panel,
+body.dark-mode .ep-card,
+body.dark-mode .ep-empty-state,
+body.dark-mode .today-print-match .today-panel,
+body.dark-mode .today-print-match .today-card,
+body.dark-mode .today-print-match .today-commitment,
+body.dark-mode .today-print-match .today-block-row,
+body.dark-mode .today-print-match .today-coach-card,
+body.dark-mode .today-print-match .today-progress-card,
+body.dark-mode .today-dialog,
+body.dark-mode .wp-modal,
+body.dark-mode .sidebar-session-modal {
+  border-color: var(--ep-border-1);
+  background: linear-gradient(180deg, rgba(20, 36, 55, 0.96), rgba(17, 31, 46, 0.96));
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.30);
+}
+
+body.dark-mode .ep-button.secondary,
+body.dark-mode .today-print-match .ep-button.secondary,
+body.dark-mode .ep-topbar-actions button,
+body.dark-mode .ep-account-menu,
+body.dark-mode .ep-topbar-actions .ep-auth-button {
+  border-color: var(--ep-border-1);
+  background: rgba(20, 36, 55, 0.76);
+  color: var(--ep-fg-1);
+}
+
+body.dark-mode .wp-demo-banner {
+  border-color: rgba(217, 138, 0, 0.32);
+  background: linear-gradient(135deg, rgba(217, 138, 0, 0.13), rgba(20, 36, 55, 0.82));
+  color: var(--ep-fg-1);
+}
+
+body.dark-mode .wp-demo-banner strong {
+  color: #f6d58b;
+}
+
+body.dark-mode .wp-demo-banner span,
+body.dark-mode .wp-demo-banner small,
+body.dark-mode .today-print-match .today-head p,
+body.dark-mode .today-print-match .today-head p strong,
+body.dark-mode .today-print-match .today-commitments-card > p,
+body.dark-mode .today-print-match .today-prepare-empty p {
+  color: var(--ep-fg-2);
+}
+
+body.dark-mode .today-print-match .today-card-head h2,
+body.dark-mode .today-print-match .today-commitment-title-row > strong,
+body.dark-mode .today-print-match .today-commitment > strong,
+body.dark-mode .today-print-match .today-block-row strong,
+body.dark-mode .today-print-match .today-coach-body p,
+body.dark-mode .today-print-match .today-coach-link,
+body.dark-mode .today-commitment > strong,
+body.dark-mode .today-block-row > strong {
+  color: var(--ep-fg-1);
+}
+
+body.dark-mode .today-print-match .today-card-head small,
+body.dark-mode .today-print-match .today-commitment-kind small,
+body.dark-mode .today-print-match .today-block-row small,
+body.dark-mode .today-print-match .today-coach small,
+body.dark-mode .today-print-match .today-pace-list small,
+body.dark-mode .today-status-pill {
+  color: var(--ep-fg-3);
+}
+
+body.dark-mode .today-print-match .today-status-pill,
+body.dark-mode .today-print-match .today-commitments-card .today-card-head em,
+body.dark-mode .today-print-match .today-chip,
+body.dark-mode .today-commitment-actions button,
+body.dark-mode .today-close-actions button,
+body.dark-mode .today-mini-toggle {
+  border-color: var(--ep-border-1);
+  background: rgba(7, 17, 29, 0.62);
+  color: var(--ep-fg-2);
+}
+
+body.dark-mode .today-commitment-actions button.active,
+body.dark-mode .today-close-actions button.active,
+body.dark-mode .today-close-actions button:hover {
+  border-color: rgba(6, 182, 196, 0.65);
+  background: rgba(6, 182, 196, 0.18);
+  color: #e8fbff;
+}
+
+body.dark-mode .today-print-match .today-prepare-visual {
+  border-color: var(--ep-border-1);
+  background: rgba(7, 17, 29, 0.44);
+}
+
+body.dark-mode .today-print-match .today-prepare-visual span {
+  background: rgba(6, 182, 196, 0.26);
+}
+
+@media (max-width: 720px) {
+  :root {
+    --ep-sidebar-w: 1fr;
+    --sidebar-w: 1fr;
+  }
+
+  .ep-main {
+    padding: 24px 18px 72px;
   }
 }

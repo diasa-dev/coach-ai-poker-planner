@@ -32,7 +32,35 @@ import { hasClerkConfig, hasPersistenceConfig } from "@/lib/runtime-config";
 
 const demoSessionCtaStorageKey = "uplinea-demo-session-cta-state";
 const demoSessionCtaEvent = "uplinea-demo-session-state-change";
+const qaPreviewStorageKey = "uplinea-local-qa-preview";
+const qaPreviewParam = "qa-preview";
 const todayIsoDate = getTodayIsoDate();
+
+function canUseLocalQaPreview() {
+  if (typeof window === "undefined") return false;
+
+  return (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1" ||
+    window.location.hostname.startsWith("192.168.")
+  );
+}
+
+function readLocalQaPreview(searchParams?: { get(name: string): string | null } | null) {
+  if (typeof window === "undefined" || !canUseLocalQaPreview()) return false;
+
+  if (searchParams?.get(qaPreviewParam) === "1") {
+    window.localStorage.setItem(qaPreviewStorageKey, "1");
+    return true;
+  }
+
+  if (searchParams?.get(qaPreviewParam) === "0") {
+    window.localStorage.removeItem(qaPreviewStorageKey);
+    return false;
+  }
+
+  return window.localStorage.getItem(qaPreviewStorageKey) === "1";
+}
 
 const navItems = [
   { href: "/", label: "Hoje", icon: Sun },
@@ -47,6 +75,15 @@ const navItems = [
 
 function AuthenticatedUplineaShell({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn, user } = useUser();
+
+  useEffect(() => {
+    const storedTheme = window.localStorage.getItem("uplinea-theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const theme = storedTheme === "dark" || (!storedTheme && prefersDark) ? "dark" : "light";
+
+    document.documentElement.dataset.theme = theme;
+    document.body.classList.toggle("dark-mode", theme === "dark");
+  }, []);
 
   if (!isLoaded) {
     return (
@@ -86,6 +123,25 @@ function isActivePath(pathname: string, href: string) {
 }
 
 export function UplineaShell({ children }: { children: ReactNode }) {
+  const [localQaPreview, setLocalQaPreview] = useState(false);
+
+  useEffect(() => {
+    window.requestAnimationFrame(() => {
+      setLocalQaPreview(readLocalQaPreview(new URLSearchParams(window.location.search)));
+    });
+  }, []);
+
+  if (localQaPreview) {
+    return (
+      <UplineaShellFrame
+        forceDemoMode
+        profile={{ displayName: "QA preview", initials: "QA", subtitle: "Sem login" }}
+      >
+        {children}
+      </UplineaShellFrame>
+    );
+  }
+
   if (hasClerkConfig) {
     return <AuthenticatedUplineaShell>{children}</AuthenticatedUplineaShell>;
   }
@@ -96,31 +152,54 @@ export function UplineaShell({ children }: { children: ReactNode }) {
 function UplineaShellFrame({
   children,
   profile = { displayName: "Modo local", initials: "UP", subtitle: "Demo sem sessão" },
+  forceDemoMode = false,
 }: {
   children: ReactNode;
   profile?: { displayName: string; initials: string; subtitle: string };
+  forceDemoMode?: boolean;
 }) {
   const pathname = usePathname();
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window === "undefined") return "light";
+
+    const storedTheme = window.localStorage.getItem("uplinea-theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+    return storedTheme === "dark" || (!storedTheme && prefersDark) ? "dark" : "light";
+  });
   const currentItem =
     navItems.find((item) => isActivePath(pathname, item.href)) ??
     (pathname.startsWith("/settings")
       ? { href: "/settings", label: "Definições", icon: Settings }
       : navItems[0]);
+  const isDark = theme === "dark";
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.body.classList.toggle("dark-mode", isDark);
+    window.localStorage.setItem("uplinea-theme", theme);
+
+    return () => {
+      document.documentElement.removeAttribute("data-theme");
+      document.body.classList.remove("dark-mode");
+    };
+  }, [isDark, theme]);
 
   return (
     <div className="ep-shell">
       <aside className="ep-sidebar" aria-label="Navegação principal">
         <Link className="ep-brand" href="/" aria-label="Ir para Hoje">
           <Image
-            src="/uplinea/logo-horizontal-white.svg"
-            width={184}
-            height={60}
+            src="/uplinea/logo-sidebar-solid-0b5a98.png"
+            width={984}
+            height={985}
             alt="Uplinea"
             priority
+            style={{ width: "100%", height: "auto" }}
           />
         </Link>
 
-        {hasPersistenceConfig ? <PersistedSessionCta /> : <DemoSessionCta />}
+        {hasPersistenceConfig && !forceDemoMode ? <PersistedSessionCta /> : <DemoSessionCta />}
 
         <nav className="ep-nav" aria-label="Navegação principal">
           {navItems.map((item) => {
@@ -170,12 +249,17 @@ function UplineaShellFrame({
             {pathname === "/" ? (
               <strong className="ep-screen-label">02 — HOJE (DEPOIS DE PREPARAR)</strong>
             ) : null}
-            <AuthControls />
+            {!forceDemoMode ? <AuthControls /> : null}
             <button type="button" aria-label="Procurar">
               <Search size={18} aria-hidden="true" />
             </button>
-            <button type="button" aria-label="Tema">
-              <Moon size={18} aria-hidden="true" />
+            <button
+              type="button"
+              aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
+              aria-pressed={isDark}
+              onClick={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
+            >
+              {isDark ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
             </button>
             <button type="button" aria-label="Notificações">
               <Bell size={18} aria-hidden="true" />
@@ -194,11 +278,22 @@ function LoginScreen() {
     <main className="ep-auth-screen">
       <section className="ep-auth-panel" aria-labelledby="auth-title">
         <Image
+          className="ep-auth-logo ep-auth-logo-light"
           src="/uplinea/logo-horizontal.svg"
           width={172}
-          height={56}
+          height={61}
           alt="Uplinea"
           priority
+          style={{ width: "172px", height: "auto" }}
+        />
+        <Image
+          className="ep-auth-logo ep-auth-logo-dark"
+          src="/uplinea/logo-horizontal-white.svg"
+          width={172}
+          height={61}
+          alt="Uplinea"
+          priority
+          style={{ width: "172px", height: "auto" }}
         />
         <div>
           <span className="ep-auth-eyebrow">Uplinea</span>
@@ -291,8 +386,8 @@ function PersistedSessionCta() {
               weeklyFocus: activePlan?.focus ?? "Sem plano semanal ativo.",
               blockLabel: payload.blockLabel,
               maxTables: payload.maxTables,
-              energy: payload.energy,
-              focusScore: payload.focusScore,
+              energy: payload.energy ?? 0,
+              focusScore: payload.focusScore ?? 0,
               tilt: payload.tilt,
               microIntention: payload.microIntention,
             });
@@ -369,7 +464,7 @@ function SessionCta({
   const ctaState = activeSession ? "active" : hasPendingReview ? "pendingReview" : "idle";
   const label =
     activeSession
-      ? `Sessão ativa · ${formatSessionDuration(activeSession.startedAt)}`
+      ? `Voltar à sessão · ${formatSessionDuration(activeSession.startedAt)}`
       : ctaState === "pendingReview"
         ? "Terminar e rever"
         : "Iniciar sessão";

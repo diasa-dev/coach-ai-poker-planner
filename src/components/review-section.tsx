@@ -39,7 +39,7 @@ import { hasPersistenceConfig } from "@/lib/runtime-config";
 import styles from "./review-section.module.css";
 
 type ReviewStatus = "available" | "draft" | "completed" | "skipped";
-type CategoryId = "grind" | "study" | "review" | "sport";
+type CategoryId = "grind" | "study" | "review" | "sport" | "recovery" | "custom";
 type BlockStatus = "planned" | "done" | "adjusted" | "notDone";
 
 type CategorySummary = {
@@ -108,6 +108,11 @@ type MonthlyTargetCategory = CategoryId;
 
 type MonthlyTargetContext = {
   category: MonthlyTargetCategory;
+  metricKey?: string;
+  metricLabel?: string;
+  annualCategory?: string;
+  annualUnit?: string;
+  annualCadence?: string;
   primaryUnit: string;
   targetValue: number;
   optionalSecondaryUnit?: string;
@@ -644,8 +649,8 @@ function ReviewWorkspace({
                 {strategicContext.monthlyTargets.length ? (
                   <div className={styles.monthlyTargetList}>
                     {strategicContext.monthlyTargets.map((target) => (
-                      <div key={target.category}>
-                        <strong>{getCategoryLabel(target.category)}</strong>
+                      <div key={getMonthlyTargetIdentity(target)}>
+                        <strong>{getMonthlyTargetLabel(target)}</strong>
                         <small>{formatMonthlyTarget(target)}</small>
                       </div>
                     ))}
@@ -1243,6 +1248,8 @@ function getCategoryLabel(category: MonthlyTargetCategory) {
     study: "Estudo",
     review: "Review",
     sport: "Sport",
+    recovery: "Recuperação",
+    custom: "Personalizado",
   };
 
   return labels[category];
@@ -1262,13 +1269,21 @@ function formatMonthlyTarget(target: MonthlyTargetContext) {
   return primary;
 }
 
+function getMonthlyTargetIdentity(target: MonthlyTargetContext) {
+  return target.metricKey ?? `legacy:${target.category}`;
+}
+
+function getMonthlyTargetLabel(target: MonthlyTargetContext) {
+  return target.metricLabel?.trim() || getCategoryLabel(target.category);
+}
+
 function buildStrategicReflection(context: StrategicReviewContext, planSummary: CategorySummary[]) {
   const uncoveredTargets = context.monthlyTargets
     .filter((target) => {
       const category = planSummary.find((item) => item.id === target.category);
       return !category || category.completion === 0;
     })
-    .map((target) => getCategoryLabel(target.category));
+    .map(getMonthlyTargetLabel);
   const prompts = [
     "A semana aproximou-te da direção anual ou foi só volume?",
     "Que objetivo mensal ficou mais servido?",

@@ -5,11 +5,11 @@ import {
   ArrowRight,
   Check,
   Hand,
-  Lock,
   Play,
   Search,
   Sparkles,
   Square,
+  Trash2,
 } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useMemo, useState } from "react";
@@ -28,7 +28,7 @@ import { hasPersistenceConfig } from "@/lib/runtime-config";
 import styles from "./poker-sessions.module.css";
 
 type SessionStatus = "active" | "reviewPending" | "reviewed";
-type Modal = "start" | "checkup" | "review" | null;
+type Modal = "start" | "checkup" | "review" | "startConfirm" | "deleteSession" | null;
 type EventType = "started" | "checkup" | "hand" | "note" | "microIntention" | "paused" | "resumed" | "finished";
 
 type SessionView = {
@@ -60,6 +60,7 @@ type SessionView = {
 
 type SessionRow = {
   _id?: Id<"pokerSessions">;
+  dateIso?: string;
   date: string;
   focus: string;
   tournaments: number;
@@ -85,8 +86,7 @@ const todayIsoDate = getTodayIsoDate();
 const demoStartedAt = Date.now() - 84 * 60 * 1000;
 const demoSessionCtaStorageKey = "uplinea-demo-session-cta-state";
 const demoSessionCtaEvent = "uplinea-demo-session-state-change";
-const handTemplates = ["ICM", "Pote grande", "Bluff catch", "All-in marginal", "River difícil", "Exploit / read", "Erro emocional"];
-const microSuggestions = ["Não pagar river sem motivo", "Folda marginais em UTG", "Respira entre mesas", "Não abrir mais mesas", "Pausa às 16:00"];
+const handTemplates = ["Geral", "Pote grande", "ICM", "Bluff catch", "All-in marginal", "River difícil", "Exploit / read", "Erro emocional"];
 const statusCopy: Record<SessionStatus, string> = {
   active: "Em curso",
   reviewPending: "Review pendente",
@@ -144,6 +144,10 @@ function PersistedPokerSessions() {
   const weeklyPlan = useQuery(api.weeklyPlan.getCurrent, canUsePersistence ? { today: todayIsoDate } : "skip");
   const activeSession = useQuery(api.pokerSession.getActive, canUsePersistence ? {} : "skip");
   const sessions = useQuery(api.pokerSession.list, canUsePersistence ? {} : "skip");
+  const sessionCaptureSettings = useQuery(
+    api.userPreferences.getSessionCaptureSettings,
+    canUsePersistence ? {} : "skip",
+  );
   const events = useQuery(
     api.pokerSession.listEvents,
     canUsePersistence && activeSession ? { sessionId: activeSession._id } : "skip",
@@ -152,10 +156,18 @@ function PersistedPokerSessions() {
   const addEvent = useMutation(api.pokerSession.addEvent);
   const updateHandEvent = useMutation(api.pokerSession.updateHandEvent);
   const removeHandEvent = useMutation(api.pokerSession.removeHandEvent);
+  const removeSession = useMutation(api.pokerSession.removeSession);
   const confirmReview = useMutation(api.pokerSession.confirmReview);
   const finishSession = useMutation(api.pokerSession.finish);
 
-  if (auth.kind === "loading" || (canUsePersistence && (weeklyPlan === undefined || activeSession === undefined || sessions === undefined))) {
+  if (
+    auth.kind === "loading" ||
+    (canUsePersistence &&
+      (weeklyPlan === undefined ||
+        activeSession === undefined ||
+        sessions === undefined ||
+        sessionCaptureSettings === undefined))
+  ) {
     return (
       <section className="ep-page">
         <div className="wp-demo-banner">A carregar sessões...</div>
@@ -184,6 +196,7 @@ function PersistedPokerSessions() {
   const grindBlocks = days.find((day) => day.isToday)?.blocks.filter((block) => block.type === "Grind") ?? [];
   const sessionRows = safeSessions.map((session) => ({
     _id: session._id,
+    dateIso: session.date,
     date: session.date === todayIsoDate ? "Hoje" : formatShortDate(session.startedAt),
     focus: session.sessionFocus,
     tournaments: session.tournamentsPlayed ?? 0,
@@ -212,6 +225,9 @@ function PersistedPokerSessions() {
       onRemoveHandEvent={async (eventId) => {
         await removeHandEvent({ eventId });
       }}
+      onRemoveSession={async (sessionId) => {
+        await removeSession({ sessionId });
+      }}
       onStartSession={async (payload) => {
         await startSession({
           date: todayIsoDate,
@@ -221,8 +237,8 @@ function PersistedPokerSessions() {
           weeklyFocus: activePlan?.focus ?? "Sem plano semanal ativo.",
           blockLabel: payload.blockLabel,
           maxTables: payload.maxTables,
-          energy: payload.energy,
-          focusScore: payload.focusScore,
+          energy: payload.energy ?? 0,
+          focusScore: payload.focusScore ?? 0,
           tilt: payload.tilt,
           microIntention: payload.microIntention,
         });
@@ -230,6 +246,8 @@ function PersistedPokerSessions() {
       onUpdateHandEvent={async (eventId, hand) => {
         await updateHandEvent({ eventId, ...hand });
       }}
+      handReviewTemplates={sessionCaptureSettings?.handReviewTemplates ?? handTemplates}
+      enableHandScreenshotUrl={sessionCaptureSettings?.enableHandScreenshotUrl ?? true}
       pendingReviewSession={pendingReviewSession as SessionView | null}
       rows={sessionRows}
     />
@@ -248,12 +266,16 @@ function PokerSessionsDemo({ banner }: { banner?: string }) {
       onConfirmReview={async () => undefined}
       onFinishSession={async () => undefined}
       onRemoveHandEvent={async () => undefined}
+      onRemoveSession={async () => undefined}
       onStartSession={async () => undefined}
       onUpdateHandEvent={async () => undefined}
+      handReviewTemplates={handTemplates}
+      enableHandScreenshotUrl
       pendingReviewSession={demoPendingReviewSession}
       rows={[
         {
           _id: demoPendingReviewSession._id,
+          dateIso: demoPendingReviewSession.date,
           date: "Hoje",
           focus: demoSession.sessionFocus,
           tournaments: 42,
@@ -278,8 +300,11 @@ function SessionsWorkspace({
   onConfirmReview,
   onFinishSession,
   onRemoveHandEvent,
+  onRemoveSession,
   onStartSession,
   onUpdateHandEvent,
+  handReviewTemplates,
+  enableHandScreenshotUrl,
   pendingReviewSession,
   rows,
 }: {
@@ -318,11 +343,14 @@ function SessionsWorkspace({
   ) => Promise<void>;
   onFinishSession: (sessionId: Id<"pokerSessions">) => Promise<void>;
   onRemoveHandEvent: (eventId: Id<"pokerSessionEvents">) => Promise<void>;
+  onRemoveSession: (sessionId: Id<"pokerSessions">) => Promise<void>;
   onStartSession: (payload: StartSessionPayload) => Promise<void>;
   onUpdateHandEvent: (
     eventId: Id<"pokerSessionEvents">,
     hand: { template: string; note?: string },
   ) => Promise<void>;
+  handReviewTemplates: string[];
+  enableHandScreenshotUrl: boolean;
   pendingReviewSession: SessionView | null;
   rows: SessionRow[];
 }) {
@@ -333,14 +361,16 @@ function SessionsWorkspace({
   const [demoPendingReviewSession, setDemoPendingReviewSession] = useState<SessionView | null>(pendingReviewSession);
   const [demoRows, setDemoRows] = useState<SessionRow[]>(rows);
   const [tournamentsPlayed, setTournamentsPlayed] = useState(0);
-  const [decisionQuality, setDecisionQuality] = useState(4);
-  const [finalFocus, setFinalFocus] = useState(4);
-  const [finalEnergy, setFinalEnergy] = useState(3);
-  const [finalTilt, setFinalTilt] = useState(1);
+  const [decisionQuality, setDecisionQuality] = useState<number | null>(4);
+  const [finalFocus, setFinalFocus] = useState<number | null>(4);
+  const [finalEnergy, setFinalEnergy] = useState<number | null>(3);
+  const [finalTilt, setFinalTilt] = useState<number | null>(1);
   const [goodDecision, setGoodDecision] = useState("");
   const [mainLeak, setMainLeak] = useState("");
   const [nextAction, setNextAction] = useState("");
   const [reviewSession, setReviewSession] = useState<SessionView | null>(null);
+  const [pendingStartPayload, setPendingStartPayload] = useState<StartSessionPayload | null>(null);
+  const [deleteSession, setDeleteSession] = useState<SessionRow | null>(null);
   const [actionError, setActionError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -375,7 +405,22 @@ function SessionsWorkspace({
     window.dispatchEvent(new Event(demoSessionCtaEvent));
   }, [demoMode, effectivePendingReviewSession, visibleActiveSession]);
 
-  async function submitStartSession(payload: StartSessionPayload) {
+  async function submitStartSession(payload: StartSessionPayload, bypassTodayGuard = false) {
+    if (visibleActiveSession) {
+      setPendingStartPayload(null);
+      setModal(null);
+      setView("active");
+      return;
+    }
+
+    const todaysSession = effectiveRows.find(isSessionRowFromToday);
+
+    if (todaysSession && !bypassTodayGuard) {
+      setPendingStartPayload(payload);
+      setModal("startConfirm");
+      return;
+    }
+
     await runSessionAction(async () => {
       await onStartSession(payload);
       if (demoMode) {
@@ -385,8 +430,8 @@ function SessionsWorkspace({
           blockLabel: payload.blockLabel,
           maxTables: payload.maxTables,
           currentTables: payload.maxTables,
-          energy: payload.energy,
-          focusScore: payload.focusScore,
+          energy: payload.energy ?? 0,
+          focusScore: payload.focusScore ?? 0,
           tilt: payload.tilt,
           microIntention: payload.microIntention,
           startedAt: Date.now(),
@@ -403,7 +448,21 @@ function SessionsWorkspace({
         ]);
       }
       setModal(null);
+      setPendingStartPayload(null);
       setView("active");
+    });
+  }
+
+  async function confirmDeleteSession() {
+    if (!deleteSession?._id) return;
+
+    await runSessionAction(async () => {
+      await onRemoveSession(deleteSession._id!);
+      if (demoMode) {
+        setDemoRows((current) => current.filter((row) => row._id !== deleteSession._id));
+      }
+      setDeleteSession(null);
+      setModal(null);
     });
   }
 
@@ -522,6 +581,8 @@ function SessionsWorkspace({
               setDemoEventsState((current) => [nextEvent, ...current]);
             }
           }}
+          handReviewTemplates={handReviewTemplates}
+          enableHandScreenshotUrl={enableHandScreenshotUrl}
           session={visibleActiveSession}
         />
       ) : (
@@ -571,6 +632,10 @@ function SessionsWorkspace({
           <div className={styles.sessionLayout}>
             <SessionsTable
               rows={effectiveRows}
+              onDeleteReviewed={(row) => {
+                setDeleteSession(row);
+                setModal("deleteSession");
+              }}
               onOpenActive={() => setView("active")}
               onOpenReview={(sessionId) => {
                 if (effectivePendingReviewSession?._id === sessionId) {
@@ -607,53 +672,133 @@ function SessionsWorkspace({
         </ModalFrame>
       ) : null}
 
+      {modal === "startConfirm" && pendingStartPayload ? (
+        <ModalFrame
+          title="Já existe uma sessão hoje"
+          onClose={() => {
+            setPendingStartPayload(null);
+            setModal("start");
+          }}
+        >
+          <p className={styles.modalCopy}>
+            Hoje já tens uma sessão registada. Confirma antes de criar outra para não duplicar contexto.
+          </p>
+          <div className={styles.confirmSummary}>
+            {effectiveRows
+              .filter(isSessionRowFromToday)
+              .slice(0, 1)
+              .map((row) => (
+                <div key={`${row.date}-${row.focus}`}>
+                  <strong>{row.focus}</strong>
+                  <span>
+                    {statusCopy[row.status]} · {row.duration} · {row.hands} mãos
+                  </span>
+                </div>
+              ))}
+          </div>
+          <div className={styles.modalActions}>
+            <button
+              className="ep-button secondary"
+              type="button"
+              onClick={() => {
+                setPendingStartPayload(null);
+                setModal("start");
+              }}
+            >
+              Cancelar
+            </button>
+            <button
+              className="ep-button primary"
+              disabled={isSubmitting}
+              type="button"
+              onClick={() => {
+                const payload = pendingStartPayload;
+                setPendingStartPayload(null);
+                void submitStartSession(payload, true);
+              }}
+            >
+              Iniciar nova sessão mesmo assim
+            </button>
+          </div>
+          {actionError ? <p className={styles.actionError}>{actionError}</p> : null}
+        </ModalFrame>
+      ) : null}
+
+      {modal === "deleteSession" && deleteSession ? (
+        <ModalFrame
+          title="Remover sessão?"
+          onClose={() => {
+            setDeleteSession(null);
+            setModal(null);
+          }}
+        >
+          <p className={styles.modalCopy}>Queres mesmo remover esta sessão revista? Esta acção não deve ser feita durante a review.</p>
+          <div className={styles.confirmSummary}>
+            <div>
+              <strong>{deleteSession.focus}</strong>
+              <span>
+                {deleteSession.date} · {deleteSession.duration} · Qualidade {deleteSession.quality || "-"}
+              </span>
+            </div>
+          </div>
+          <div className={styles.modalActions}>
+            <button
+              className="ep-button secondary"
+              type="button"
+              onClick={() => {
+                setDeleteSession(null);
+                setModal(null);
+              }}
+            >
+              Cancelar
+            </button>
+            <button className="ep-button primary" disabled={isSubmitting} type="button" onClick={() => void confirmDeleteSession()}>
+              <Trash2 size={14} aria-hidden="true" />
+              {isSubmitting ? "A remover..." : "Remover sessão"}
+            </button>
+          </div>
+          {actionError ? <p className={styles.actionError}>{actionError}</p> : null}
+        </ModalFrame>
+      ) : null}
+
       {visibleActiveSession?._id && modal === "checkup" ? (
         <CheckupModal
           initialEnergy={visibleActiveSession.energy}
           initialFocus={visibleActiveSession.focusScore}
+          initialMicroIntention={visibleActiveSession.microIntention ?? ""}
           initialTables={visibleActiveSession.currentTables}
           initialTilt={visibleActiveSession.tilt}
           onClose={() => setModal(null)}
           onSave={async (payload) => {
+            const microIntention = payload.microIntention.trim();
+            const detail = [
+              formatOptionalRating("Energia", payload.energy),
+              formatOptionalRating("Foco", payload.focusScore),
+              formatOptionalRating("Tilt", payload.tilt),
+              `${payload.tables} mesas`,
+              microIntention ? `Intenção: ${microIntention}` : null,
+            ].filter(Boolean).join(" · ");
+
             await onAddEvent(visibleActiveSession._id!, {
               type: "checkup",
               title: "Quick check-up",
-              detail: `Energia ${payload.energy} · Foco ${payload.focusScore} · Tilt ${payload.tilt} · ${payload.tables} mesas`,
-              energy: payload.energy,
-              focusScore: payload.focusScore,
-              tilt: payload.tilt,
+              detail,
+              energy: payload.energy ?? undefined,
+              focusScore: payload.focusScore ?? undefined,
+              tilt: payload.tilt ?? undefined,
               tables: payload.tables,
-              microIntention: payload.microIntention || undefined,
+              microIntention: microIntention || undefined,
             });
             if (demoMode) {
               setDemoEventsState((current) => [
                 {
                   type: "checkup",
                   title: "Quick check-up",
-                  detail: `Energia ${payload.energy} · Foco ${payload.focusScore} · Tilt ${payload.tilt} · ${payload.tables} mesas`,
+                  detail,
                   createdAt: Date.now(),
                 },
                 ...current,
               ]);
-            }
-            if (payload.microIntention) {
-              await onAddEvent(visibleActiveSession._id!, {
-                type: "microIntention",
-                title: "Micro-intenção",
-                detail: payload.microIntention,
-                microIntention: payload.microIntention,
-              });
-              if (demoMode) {
-                setDemoEventsState((current) => [
-                  {
-                    type: "microIntention",
-                    title: "Micro-intenção",
-                    detail: payload.microIntention,
-                    createdAt: Date.now() + 1,
-                  },
-                  ...current,
-                ]);
-              }
             }
             if (demoMode) {
               setDemoActiveSession((current) =>
@@ -661,10 +806,10 @@ function SessionsWorkspace({
                   ? {
                       ...current,
                       currentTables: payload.tables,
-                      energy: payload.energy,
-                      focusScore: payload.focusScore,
-                      microIntention: payload.microIntention || current.microIntention,
-                      tilt: payload.tilt,
+                      energy: payload.energy ?? current.energy,
+                      focusScore: payload.focusScore ?? current.focusScore,
+                      tilt: payload.tilt ?? current.tilt,
+                      microIntention: microIntention || current.microIntention,
                     }
                   : current,
               );
@@ -676,78 +821,73 @@ function SessionsWorkspace({
 
       {reviewSession?._id && modal === "review" ? (
         <ModalFrame title="Terminar sessão" onClose={() => setModal(null)}>
-          <p className={styles.modalCopy}>Fecha com os sinais mínimos que vão alimentar a review semanal e o Coach.</p>
-          <div className={styles.formGrid}>
-            <label>
-              Duração
-              <input disabled value={formatElapsed(reviewSession.startedAt, reviewSession.endedAt)} />
-            </label>
-            <label>
-              Mãos marcadas
-              <input disabled value={reviewSession.handsToReview} />
-            </label>
-            <label>
-              Torneios jogados
-              <input
-                inputMode="numeric"
-                min={0}
-                value={tournamentsPlayed}
-                onChange={(event) => setTournamentsPlayed(Number(event.target.value) || 0)}
-              />
-            </label>
-            <label>
-              Qualidade decisão
-              <select value={decisionQuality} onChange={(event) => setDecisionQuality(Number(event.target.value))}>
-                {[1, 2, 3, 4, 5].map((value) => (
-                  <option key={value} value={value}>{value}/5</option>
-                ))}
-              </select>
-            </label>
+          <div className={styles.reviewModalBody}>
+            <section className={styles.reviewScorePanel} aria-label="Estado final da sessão">
+              <div className={styles.reviewHero}>
+                <Sparkles size={17} aria-hidden="true" />
+                <div>
+                  <span>Review final</span>
+                  <p>Fecha a sessão com contexto útil para a próxima decisão.</p>
+                </div>
+              </div>
+              <div className={styles.reviewStatGrid}>
+                <div className={styles.reviewStatCard}>
+                  <span>Duração</span>
+                  <strong>{formatElapsed(reviewSession.startedAt, reviewSession.endedAt)}</strong>
+                </div>
+                <div className={styles.reviewStatCard}>
+                  <span>Mãos marcadas</span>
+                  <strong>{reviewSession.handsToReview}</strong>
+                </div>
+              </div>
+              <div className={styles.reviewRatings}>
+                <Rating label="Qualidade de decisão" min={1} value={decisionQuality} onChange={setDecisionQuality} />
+                <Rating label="Energia" min={1} value={finalEnergy} onChange={setFinalEnergy} />
+                <Rating label="Foco" min={1} value={finalFocus} onChange={setFinalFocus} />
+                <Rating label="Tilt" min={0} tone="tilt" value={finalTilt} onChange={setFinalTilt} />
+              </div>
+            </section>
+
+            <section className={styles.reviewDetailPanel} aria-label="Notas da review">
+              <label className={`${styles.inlineField} ${styles.tournamentsField}`}>
+                Torneios jogados
+                <input
+                  inputMode="numeric"
+                  max={60}
+                  min={0}
+                  value={tournamentsPlayed}
+                  onChange={(event) => setTournamentsPlayed(Number(event.target.value) || 0)}
+                />
+                <small>Habitual: 0-60</small>
+              </label>
+              <div className={styles.reviewNotesStack}>
+                <label>
+                  Boa decisão
+                  <textarea
+                    placeholder="Opcional: algo que queres repetir"
+                    value={goodDecision}
+                    onChange={(event) => setGoodDecision(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Principal leak
+                  <textarea
+                    placeholder="Opcional: padrão ou erro principal"
+                    value={mainLeak}
+                    onChange={(event) => setMainLeak(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Próxima ação
+                  <textarea
+                    placeholder="Opcional: rever bloco, estudar spot, reduzir mesas..."
+                    value={nextAction}
+                    onChange={(event) => setNextAction(event.target.value)}
+                  />
+                </label>
+              </div>
+            </section>
           </div>
-          <section className={styles.initialStateBox}>
-            <header>
-              <span>Estado final</span>
-              <small>obrigatório</small>
-            </header>
-            <div className={styles.ratingGrid}>
-              <Rating label="Energia" min={1} value={finalEnergy} onChange={setFinalEnergy} />
-              <Rating label="Foco" min={1} value={finalFocus} onChange={setFinalFocus} />
-              <Rating label="Tilt" min={0} tone="tilt" value={finalTilt} onChange={setFinalTilt} />
-            </div>
-          </section>
-          <div className={styles.formGrid}>
-            <label className={styles.fullField}>
-              Boa decisão
-              <textarea
-                placeholder="Opcional: algo que queres repetir"
-                value={goodDecision}
-                onChange={(event) => setGoodDecision(event.target.value)}
-              />
-            </label>
-            <label className={styles.fullField}>
-              Principal leak
-              <textarea
-                placeholder="Opcional: padrão ou erro principal"
-                value={mainLeak}
-                onChange={(event) => setMainLeak(event.target.value)}
-              />
-            </label>
-            <label className={styles.fullField}>
-              Próxima ação
-              <textarea
-                placeholder="Opcional: rever bloco, estudar spot, reduzir mesas..."
-                value={nextAction}
-                onChange={(event) => setNextAction(event.target.value)}
-              />
-            </label>
-          </div>
-          <section className={styles.financialBox}>
-            <Lock size={16} aria-hidden="true" />
-            <div>
-              <strong>Resultado financeiro · opcional</strong>
-              <p>Ainda não é persistido nesta slice. Mantemos fora do contexto do Coach por agora.</p>
-            </div>
-          </section>
           <div className={styles.modalActions}>
             <button className="ep-button secondary" type="button" onClick={() => setModal(null)}>
               Cancelar
@@ -775,7 +915,7 @@ function SessionsWorkspace({
                         buildSessionRow(nextSession, {
                           tournaments: tournamentsPlayed,
                           quality: 0,
-                          tiltPeak: finalTilt,
+                          tiltPeak: finalTilt ?? 0,
                         }),
                       ),
                     );
@@ -790,16 +930,16 @@ function SessionsWorkspace({
             </button>
             <button
               className="ep-button primary"
-              disabled={isSubmitting}
+              disabled={isSubmitting || decisionQuality === null || finalFocus === null || finalEnergy === null || finalTilt === null}
               type="button"
               onClick={() => {
                 void runSessionAction(async () => {
                   await onConfirmReview(reviewSession._id!, {
                     tournamentsPlayed,
-                    decisionQuality,
-                    finalFocus,
-                    finalEnergy,
-                    finalTilt,
+                    decisionQuality: decisionQuality ?? 0,
+                    finalFocus: finalFocus ?? 0,
+                    finalEnergy: finalEnergy ?? 0,
+                    finalTilt: finalTilt ?? 0,
                     goodDecision: goodDecision.trim() || undefined,
                     mainLeak: mainLeak.trim() || undefined,
                     nextAction: nextAction.trim() || undefined,
@@ -810,10 +950,10 @@ function SessionsWorkspace({
                       status: "reviewed" as const,
                       endedAt: reviewSession.endedAt ?? Date.now(),
                       tournamentsPlayed,
-                      decisionQuality,
-                      finalFocus,
-                      finalEnergy,
-                      finalTilt,
+                      decisionQuality: decisionQuality ?? 0,
+                      finalFocus: finalFocus ?? 0,
+                      finalEnergy: finalEnergy ?? 0,
+                      finalTilt: finalTilt ?? 0,
                       goodDecision: goodDecision.trim() || undefined,
                       mainLeak: mainLeak.trim() || undefined,
                       nextAction: nextAction.trim() || undefined,
@@ -827,8 +967,8 @@ function SessionsWorkspace({
                         current,
                         buildSessionRow(reviewedSession, {
                           tournaments: tournamentsPlayed,
-                          quality: decisionQuality,
-                          tiltPeak: finalTilt,
+                          quality: decisionQuality ?? 0,
+                          tiltPeak: finalTilt ?? 0,
                         }),
                       ),
                     );
@@ -860,6 +1000,7 @@ function buildSessionRow(
 ): SessionRow {
   return {
     _id: session._id,
+    dateIso: session.date,
     date: session.date === todayIsoDate ? "Hoje" : formatShortDate(session.startedAt),
     focus: session.sessionFocus,
     tournaments: overrides.tournaments,
@@ -869,6 +1010,10 @@ function buildSessionRow(
     hands: session.handsToReview,
     status: session.status,
   };
+}
+
+function isSessionRowFromToday(row: SessionRow) {
+  return row.dateIso === todayIsoDate || (!row.dateIso && row.date === "Hoje");
 }
 
 function upsertSessionRow(rows: SessionRow[], nextRow: SessionRow) {
@@ -882,7 +1027,9 @@ function upsertSessionRow(rows: SessionRow[], nextRow: SessionRow) {
 }
 
 function ActiveSession({
+  enableHandScreenshotUrl,
   events,
+  handReviewTemplates,
   isBusy,
   onCapture,
   onFinish,
@@ -892,7 +1039,9 @@ function ActiveSession({
   onQuickNote,
   session,
 }: {
+  enableHandScreenshotUrl: boolean;
   events: SessionEventView[];
+  handReviewTemplates: string[];
   isBusy: boolean;
   onCapture: (modal: Modal) => void;
   onFinish: () => void;
@@ -904,6 +1053,7 @@ function ActiveSession({
 }) {
   const [quickNote, setQuickNote] = useState("");
   const handEvents = events.filter((event) => event.type === "hand");
+  const lastCheckup = events.find((event) => event.type === "checkup");
 
   async function saveQuickNote() {
     const value = quickNote.trim();
@@ -920,16 +1070,22 @@ function ActiveSession({
           <h2>{session.sessionFocus}</h2>
           <p>{session.weeklyFocus}</p>
           {session.blockLabel ? <small>{session.blockLabel}</small> : null}
+          {session.microIntention ? <small>Regra: {session.microIntention}</small> : null}
         </div>
         <div className={styles.timerBox}>
-          <span>{session.isPaused ? "Registada em pausa" : "Em curso"}</span>
+          <span>Em curso</span>
           <strong>{formatElapsed(session.startedAt)}</strong>
-          <small>{formatStartedAt(session.startedAt)} · {getLastCheckupLabel(events)}</small>
+          <small>{formatStartedAt(session.startedAt)}</small>
+        </div>
+        <div className={styles.checkupBox}>
+          <span>Último check-up</span>
+          <strong>{getLastCheckupLabel(events)}</strong>
+          <small>{lastCheckup?.detail ?? "Ainda sem registo nesta sessão."}</small>
         </div>
         <div className={styles.topActions}>
           <button className="ep-button secondary" type="button" onClick={() => onCapture("checkup")}>
             <Activity size={15} aria-hidden="true" />
-            Quick check-up
+            Check-up rápido
           </button>
           <button className={`ep-button primary ${styles.endSessionButton}`} type="button" onClick={onFinish}>
             <Square size={15} aria-hidden="true" />
@@ -939,8 +1095,41 @@ function ActiveSession({
       </article>
 
       <div className={styles.activeLayout}>
+        <section className={styles.activeSide} aria-label="Notas e observação">
+          <label className={styles.quickNoteCard}>
+            <span>Nota rápida</span>
+            <textarea
+              onBlur={saveQuickNote}
+              onChange={(event) => setQuickNote(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" || event.shiftKey) return;
+                event.preventDefault();
+                void saveQuickNote();
+              }}
+              placeholder="Autopilot, tilt, boa decisão..."
+              value={quickNote}
+            />
+            <small>Enter guarda. Shift+Enter cria nova linha.</small>
+          </label>
+          <article className={styles.passiveCoach}>
+            <div>
+              <Sparkles size={15} aria-hidden="true" />
+              <span>Observação do Coach</span>
+              <em>passivo</em>
+            </div>
+            <p>
+              {session.tilt > 1
+                ? "Tilt subiu no último check-up. Mantém-te no plano e evita abrir mais uma mesa nesta hora."
+                : "Estado estável. Continua a registar sinais curtos durante os breaks."}
+            </p>
+            <small>contexto · check-ups da sessão</small>
+          </article>
+        </section>
+
         <HandReviewPanel
+          enableScreenshotUrl={enableHandScreenshotUrl}
           events={handEvents}
+          handReviewTemplates={handReviewTemplates}
           isBusy={isBusy}
           onAdd={onHandAdd}
           onRemove={onHandRemove}
@@ -964,46 +1153,19 @@ function ActiveSession({
             ))}
           </ol>
         </article>
-
-        <aside className={styles.activeSide}>
-          <label className={styles.quickNoteCard}>
-            <span>Nota rápida</span>
-            <textarea
-              onBlur={saveQuickNote}
-              onChange={(event) => setQuickNote(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void saveQuickNote();
-              }}
-              placeholder="Autopilot, tilt, boa decisão..."
-              value={quickNote}
-            />
-            <small>Guarda ao sair do campo. Cmd/Ctrl+Enter também guarda.</small>
-          </label>
-          <article className={styles.passiveCoach}>
-            <div>
-              <Sparkles size={15} aria-hidden="true" />
-              <span>Observação do Coach</span>
-              <em>passivo</em>
-            </div>
-            <p>
-              {session.tilt > 1
-                ? "Tilt subiu no último check-up. Mantém-te no plano e evita abrir mais uma mesa nesta hora."
-                : "Estado estável. Continua a registar sinais curtos durante os breaks."}
-            </p>
-            <small>contexto · check-ups da sessão</small>
-          </article>
-        </aside>
       </div>
     </div>
   );
 }
 
 function SessionsTable({
+  onDeleteReviewed,
   onOpenActive,
   onOpenReview,
   onStartSession,
   rows,
 }: {
+  onDeleteReviewed: (row: SessionRow) => void;
   onOpenActive: () => void;
   onOpenReview: (sessionId: Id<"pokerSessions">) => void;
   onStartSession: () => void;
@@ -1032,15 +1194,16 @@ function SessionsTable({
             <span className={styles.mono}>{row.tiltPeak}/5</span>
             <span className={`${styles.statusPill} ${styles[row.status]}`}>{statusCopy[row.status]}</span>
             <button
-              aria-label={`Abrir sessão de ${row.date}`}
+              aria-label={row.status === "reviewed" ? `Remover sessão de ${row.date}` : `Abrir sessão de ${row.date}`}
               className={styles.iconButton}
               type="button"
               onClick={() => {
+                if (row.status === "reviewed") onDeleteReviewed(row);
                 if (row.status === "active") onOpenActive();
                 if (row.status === "reviewPending" && row._id) onOpenReview(row._id);
               }}
             >
-              <ArrowRight size={15} aria-hidden="true" />
+              {row.status === "reviewed" ? <Trash2 size={15} aria-hidden="true" /> : <ArrowRight size={15} aria-hidden="true" />}
             </button>
           </div>
         ))
@@ -1110,6 +1273,7 @@ function SummaryPanel({
 function CheckupModal({
   initialEnergy,
   initialFocus,
+  initialMicroIntention,
   initialTables,
   initialTilt,
   onClose,
@@ -1117,35 +1281,42 @@ function CheckupModal({
 }: {
   initialEnergy: number;
   initialFocus: number;
+  initialMicroIntention: string;
   initialTables: number;
   initialTilt: number;
   onClose: () => void;
-  onSave: (payload: { energy: number; focusScore: number; tilt: number; tables: number; microIntention: string }) => Promise<void>;
+  onSave: (payload: { energy: number | null; focusScore: number | null; tilt: number | null; tables: number; microIntention: string }) => Promise<void>;
 }) {
-  const [energy, setEnergy] = useState(initialEnergy);
-  const [focusScore, setFocusScore] = useState(initialFocus);
-  const [tilt, setTilt] = useState(initialTilt);
+  const [energy, setEnergy] = useState<number | null>(initialEnergy || null);
+  const [focusScore, setFocusScore] = useState<number | null>(initialFocus || null);
+  const [microIntention, setMicroIntention] = useState(initialMicroIntention);
+  const [tilt, setTilt] = useState<number | null>(initialTilt || null);
   const [tables, setTables] = useState(initialTables);
-  const [microIntention, setMicroIntention] = useState("");
 
   return (
     <ModalFrame title="Quick check-up" onClose={onClose}>
-      <p className={styles.modalCopy}>Demora 10 segundos. Não saias do jogo.</p>
-      <div className={styles.ratingStack}>
-        <Rating label="Energia" min={1} value={energy} onChange={setEnergy} />
-        <Rating label="Foco" min={1} value={focusScore} onChange={setFocusScore} />
-        <Rating label="Tilt" min={0} value={tilt} onChange={setTilt} />
+      <div className={styles.checkupModalBody}>
+        <section className={styles.checkupMetrics} aria-label="Estado actual">
+          <Rating label="Energia" min={1} value={energy} onChange={setEnergy} />
+          <Rating label="Foco" min={1} value={focusScore} onChange={setFocusScore} />
+          <Rating label="Tilt" min={0} tone="tilt" value={tilt} onChange={setTilt} />
+        </section>
+        <section className={styles.checkupDetails} aria-label="Plano para o próximo intervalo">
+          <label className={styles.inlineField}>
+            Nº de mesas
+            <input value={tables} inputMode="numeric" onChange={(event) => setTables(Number(event.target.value) || 1)} />
+          </label>
+          <label className={styles.inlineField}>
+            Intenção
+            <textarea
+              placeholder="Foco para a próxima hora ou intervalo"
+              value={microIntention}
+              onChange={(event) => setMicroIntention(event.target.value)}
+            />
+          </label>
+        </section>
       </div>
-      <label className={styles.inlineField}>
-        Mesas atuais
-        <input value={tables} inputMode="numeric" onChange={(event) => setTables(Number(event.target.value) || 1)} />
-      </label>
-      <label className={styles.inlineField}>
-        Micro-intenção para próxima hora
-        <input value={microIntention} placeholder="Opcional" onChange={(event) => setMicroIntention(event.target.value)} />
-      </label>
-      <TemplatePicker options={microSuggestions} onSelect={setMicroIntention} />
-      <div className={styles.modalActions}>
+      <div className={`${styles.modalActions} ${styles.checkupActions}`}>
         <button className="ep-button secondary" type="button" onClick={onClose}>
           Cancelar
         </button>
@@ -1159,27 +1330,36 @@ function CheckupModal({
 }
 
 function HandReviewPanel({
+  enableScreenshotUrl,
   events,
+  handReviewTemplates,
   isBusy,
   onAdd,
   onRemove,
   onUpdate,
 }: {
+  enableScreenshotUrl: boolean;
   events: SessionEventView[];
+  handReviewTemplates: string[];
   isBusy: boolean;
   onAdd: (payload: { template: string; note: string }) => Promise<void>;
   onRemove: (eventId: Id<"pokerSessionEvents">) => Promise<void>;
   onUpdate: (eventId: Id<"pokerSessionEvents">, payload: { template: string; note?: string }) => Promise<void>;
 }) {
-  const [template, setTemplate] = useState(handTemplates[0]);
+  const safeTemplates = handReviewTemplates.length ? handReviewTemplates : handTemplates;
+  const [template, setTemplate] = useState(safeTemplates[0]);
   const [note, setNote] = useState("");
+  const [screenshotUrl, setScreenshotUrl] = useState("");
   const [editingId, setEditingId] = useState<Id<"pokerSessionEvents"> | null>(null);
-  const [editTemplate, setEditTemplate] = useState(handTemplates[0]);
+  const [editTemplate, setEditTemplate] = useState(safeTemplates[0]);
   const [editNote, setEditNote] = useState("");
+  const selectedTemplate = safeTemplates.includes(template) ? template : safeTemplates[0];
 
   async function addHand() {
-    await onAdd({ template, note: note.trim() });
+    const handNote = buildHandNote({ note, screenshotUrl: enableScreenshotUrl ? screenshotUrl : "" });
+    await onAdd({ template: selectedTemplate, note: handNote });
     setNote("");
+    setScreenshotUrl("");
   }
 
   function startEditing(event: SessionEventView) {
@@ -1201,14 +1381,14 @@ function HandReviewPanel({
         <span>{events.length} marcadas</span>
       </div>
       <div className={styles.handQuickAdd}>
-        <select value={template} onChange={(event) => setTemplate(event.target.value)} aria-label="Tipo de mão">
-          {handTemplates.map((option) => (
+        <select value={selectedTemplate} onChange={(event) => setTemplate(event.target.value)} aria-label="Tipo de mão">
+          {safeTemplates.map((option) => (
             <option key={option} value={option}>{option}</option>
           ))}
         </select>
         <input
-          aria-label="Nota rápida da mão"
-          placeholder="Stack, posição, spot..."
+          aria-label="Contexto curto da mão"
+          placeholder="Contexto curto: stack, posição, spot..."
           value={note}
           onChange={(event) => setNote(event.target.value)}
           onKeyDown={(event) => {
@@ -1220,6 +1400,18 @@ function HandReviewPanel({
           Marcar
         </button>
       </div>
+      {enableScreenshotUrl ? (
+        <input
+          className={styles.handScreenshotInput}
+          aria-label="URL Gyazo ou screenshot"
+          placeholder="Gyazo/screenshot URL"
+          value={screenshotUrl}
+          onChange={(event) => setScreenshotUrl(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void addHand();
+          }}
+        />
+      ) : null}
       <div className={styles.handList}>
         {events.length ? (
           events.map((event) => (
@@ -1227,7 +1419,7 @@ function HandReviewPanel({
               {editingId && event._id === editingId ? (
                 <>
                   <select value={editTemplate} onChange={(input) => setEditTemplate(input.target.value)}>
-                    {handTemplates.map((option) => (
+                    {getTemplateOptions(safeTemplates, editTemplate).map((option) => (
                       <option key={option} value={option}>{option}</option>
                     ))}
                   </select>
@@ -1284,36 +1476,6 @@ function ModalFrame({ children, onClose, title }: { children: React.ReactNode; o
   );
 }
 
-function TemplatePicker({
-  label,
-  onSelect,
-  options,
-  selected,
-}: {
-  label?: string;
-  onSelect: (value: string) => void;
-  options: string[];
-  selected?: string;
-}) {
-  return (
-    <div className={styles.templatePicker}>
-      {label ? <span>{label}</span> : null}
-      <div>
-        {options.map((option) => (
-          <button
-            className={selected === option ? styles.selectedTemplate : ""}
-            key={option}
-            type="button"
-            onClick={() => onSelect(option)}
-          >
-            {option}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function Rating({
   label,
   min,
@@ -1323,9 +1485,9 @@ function Rating({
 }: {
   label: string;
   min: 0 | 1;
-  onChange: (value: number) => void;
+  onChange: (value: number | null) => void;
   tone?: "tilt";
-  value: number;
+  value: number | null;
 }) {
   return (
     <div className={styles.rating}>
@@ -1336,7 +1498,7 @@ function Rating({
             className={item === value ? (tone === "tilt" ? styles.selectedTiltRating : styles.selectedRating) : ""}
             key={item}
             type="button"
-            onClick={() => onChange(item)}
+            onClick={() => onChange(item === value ? null : item)}
           >
             {item}
           </button>
@@ -1409,8 +1571,26 @@ function getLastCheckupLabel(events: SessionEventView[]) {
   return minutes < 1 ? "agora" : `há ${minutes} min`;
 }
 
+function formatOptionalRating(label: string, value: number | null) {
+  return `${label} ${value ?? "-"}`;
+}
+
+function buildHandNote({ note, screenshotUrl }: { note: string; screenshotUrl: string }) {
+  const trimmedNote = note.trim();
+  const trimmedUrl = screenshotUrl.trim();
+
+  if (trimmedNote && trimmedUrl) return `${trimmedNote} · Screenshot: ${trimmedUrl}`;
+  if (trimmedUrl) return `Screenshot: ${trimmedUrl}`;
+  return trimmedNote;
+}
+
+function getTemplateOptions(options: string[], selected: string) {
+  if (!selected || options.includes(selected)) return options;
+  return [selected, ...options];
+}
+
 function getTemplateFromTitle(title: string) {
-  return title.split("—")[1]?.trim() || "Mão";
+  return title.split("—")[1]?.trim() || "Geral";
 }
 
 function getActionErrorMessage(error: unknown) {

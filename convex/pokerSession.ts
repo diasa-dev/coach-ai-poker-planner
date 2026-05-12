@@ -308,6 +308,32 @@ export const removeHandEvent = mutation({
   },
 });
 
+export const removeSession = mutation({
+  args: {
+    sessionId: v.id("pokerSessions"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const session = await ctx.db.get(args.sessionId);
+
+    if (!session || session.userId !== userId || session.status !== "reviewed") {
+      throw new Error("Reviewed session not found");
+    }
+
+    const events = await ctx.db
+      .query("pokerSessionEvents")
+      .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+      .collect();
+
+    for (const event of events) {
+      await ctx.db.delete(event._id);
+    }
+
+    await ctx.db.delete(session._id);
+    return null;
+  },
+});
+
 export const togglePause = mutation({
   args: {
     sessionId: v.id("pokerSessions"),

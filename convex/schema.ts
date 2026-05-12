@@ -18,6 +18,8 @@ export default defineSchema({
   userPreferences: defineTable({
     userId: v.string(),
     weekStartDay: v.number(),
+    handReviewTemplates: v.optional(v.array(v.string())),
+    enableHandScreenshotUrl: v.optional(v.boolean()),
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
 
@@ -70,7 +72,15 @@ export default defineSchema({
       v.literal("study"),
       v.literal("review"),
       v.literal("sport"),
+      v.literal("recovery"),
+      v.literal("custom"),
     ),
+    metricKey: v.optional(v.string()),
+    metricLabel: v.optional(v.string()),
+    annualCategory: v.optional(v.string()),
+    annualUnit: v.optional(v.string()),
+    annualCadence: v.optional(v.string()),
+    annualTargetValue: v.optional(v.number()),
     primaryUnit: v.string(),
     targetValue: v.number(),
     optionalSecondaryUnit: v.optional(v.string()),
@@ -79,7 +89,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user_month", ["userId", "month"])
-    .index("by_user_month_category", ["userId", "month", "category"]),
+    .index("by_user_month_category", ["userId", "month", "category"])
+    .index("by_user_month_metric", ["userId", "month", "metricKey"]),
 
   weeklyPlans: defineTable({
     userId: v.string(),

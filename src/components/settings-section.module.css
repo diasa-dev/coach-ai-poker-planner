@@ -173,6 +173,33 @@
   background: var(--ep-bg-surface-2);
 }
 
+.dangerRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+}
+
+.dangerAction {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid rgba(220, 38, 38, 0.42);
+  border-radius: var(--ep-radius-sm);
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+  padding: 0 15px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.dangerAction:hover {
+  border-color: rgba(220, 38, 38, 0.62);
+  background: rgba(220, 38, 38, 0.18);
+}
+
 .demoMessage {
   margin-top: 12px;
   color: var(--ep-fg-3);
@@ -212,6 +239,53 @@
   font-weight: 600;
 }
 
+.handReviewSettings {
+  display: grid;
+  gap: 16px;
+}
+
+.templateEditor {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+}
+
+.templateRow,
+.addTemplateRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.templateRow input,
+.addTemplateRow input {
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid var(--ep-border-2);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface);
+  color: var(--ep-fg-1);
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.iconAction {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid var(--ep-border-2);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-bg-surface);
+  color: var(--ep-fg-2);
+}
+
+.iconAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .primaryAction {
   display: inline-flex;
   min-height: 38px;
@@ -228,7 +302,8 @@
 }
 
 .primaryAction:disabled,
-.secondaryAction:disabled {
+.secondaryAction:disabled,
+.dangerAction:disabled {
   cursor: not-allowed;
   opacity: 0.52;
 }
@@ -331,7 +406,9 @@
     gap: 14px;
   }
 
-  .settingRow {
+  .settingRow,
+  .dangerRow,
+  .addTemplateRow {
     grid-template-columns: 1fr;
   }
 
@@ -345,7 +422,8 @@
     align-items: flex-start;
   }
 
-  .secondaryAction {
+  .secondaryAction,
+  .dangerAction {
     width: 100%;
   }
 

@@ -6,15 +6,19 @@ const targetCategory = v.union(
   v.literal("study"),
   v.literal("review"),
   v.literal("sport"),
+  v.literal("recovery"),
+  v.literal("custom"),
 );
 
-const categoryOrder = ["grind", "study", "review", "sport"];
+const categoryOrder = ["grind", "study", "review", "sport", "recovery", "custom"];
 
 const allowedPrimaryUnits = {
-  grind: ["sessões"],
+  grind: ["dias", "sessões", "torneios", "horas", "minutos"],
   study: ["horas", "minutos", "sessões"],
-  review: ["mãos", "horas", "minutos"],
-  sport: ["sessões", "blocos", "horas", "minutos"],
+  review: ["mãos", "horas", "minutos", "sessões"],
+  sport: ["dias", "sessões", "blocos", "horas", "minutos"],
+  recovery: ["dias", "sessões", "horas", "minutos"],
+  custom: ["dias", "torneios", "horas", "sessões", "mãos", "minutos", "blocos", "feito"],
 } as const;
 
 async function requireUserId(ctx: {
@@ -59,8 +63,8 @@ function validateTarget({
     throw new Error("Invalid monthly target unit");
   }
 
-  if (!Number.isFinite(targetValue) || targetValue <= 0) {
-    throw new Error("Monthly target requires a positive target value");
+  if (!Number.isFinite(targetValue) || targetValue < 0) {
+    throw new Error("Monthly target requires a non-negative target value");
   }
 
   if (category !== "grind" && (optionalSecondaryUnit || optionalSecondaryTargetValue)) {
@@ -76,6 +80,22 @@ function validateTarget({
     (!Number.isFinite(optionalSecondaryTargetValue) || !optionalSecondaryTargetValue || optionalSecondaryTargetValue <= 0)
   ) {
     throw new Error("Secondary monthly target requires a positive target value");
+  }
+}
+
+function validateMetricTarget({
+  primaryUnit,
+  targetValue,
+}: {
+  primaryUnit: string;
+  targetValue: number;
+}) {
+  if (!primaryUnit) {
+    throw new Error("Monthly metric target requires a unit");
+  }
+
+  if (!Number.isFinite(targetValue) || targetValue < 0) {
+    throw new Error("Monthly target requires a non-negative target value");
   }
 }
 
@@ -140,12 +160,13 @@ export const saveCategory = mutation({
 
     const userId = await requireUserId(ctx);
     const now = Date.now();
-    const existing = await ctx.db
+    const categoryMatches = await ctx.db
       .query("monthlyTargets")
       .withIndex("by_user_month_category", (q) =>
         q.eq("userId", userId).eq("month", args.month).eq("category", args.category),
       )
-      .unique();
+      .collect();
+    const existing = categoryMatches.find((target) => !target.metricKey);
 
     if (existing) {
       await ctx.db.patch(existing._id, {
@@ -180,6 +201,71 @@ export const saveCategory = mutation({
   },
 });
 
+export const saveMetric = mutation({
+  args: {
+    month: v.string(),
+    category: targetCategory,
+    metricKey: v.string(),
+    metricLabel: v.string(),
+    annualCategory: v.optional(v.string()),
+    annualUnit: v.optional(v.string()),
+    annualCadence: v.optional(v.string()),
+    annualTargetValue: v.optional(v.number()),
+    primaryUnit: v.string(),
+    targetValue: v.number(),
+  },
+  handler: async (ctx, args) => {
+    validateMonth(args.month);
+
+    const metricKey = args.metricKey.trim();
+    const metricLabel = args.metricLabel.trim();
+    const primaryUnit = args.primaryUnit.trim();
+
+    if (!metricKey) throw new Error("Monthly target requires a metric key");
+    if (!metricLabel) throw new Error("Monthly target requires a metric label");
+
+    validateMetricTarget({
+      primaryUnit,
+      targetValue: args.targetValue,
+    });
+
+    const userId = await requireUserId(ctx);
+    const now = Date.now();
+    const existing = await ctx.db
+      .query("monthlyTargets")
+      .withIndex("by_user_month_metric", (q) =>
+        q.eq("userId", userId).eq("month", args.month).eq("metricKey", metricKey),
+      )
+      .unique();
+    const payload = {
+      category: args.category,
+      metricKey,
+      metricLabel,
+      annualCategory: args.annualCategory?.trim() || undefined,
+      annualUnit: args.annualUnit?.trim() || undefined,
+      annualCadence: args.annualCadence?.trim() || undefined,
+      annualTargetValue: args.annualTargetValue,
+      primaryUnit,
+      targetValue: args.targetValue,
+      optionalSecondaryUnit: undefined,
+      optionalSecondaryTargetValue: undefined,
+      updatedAt: now,
+    };
+
+    if (existing) {
+      await ctx.db.patch(existing._id, payload);
+      return existing._id;
+    }
+
+    return await ctx.db.insert("monthlyTargets", {
+      userId,
+      month: args.month,
+      ...payload,
+      createdAt: now,
+    });
+  },
+});
+
 export const clearCategory = mutation({
   args: {
     month: v.string(),
@@ -189,10 +275,38 @@ export const clearCategory = mutation({
     validateMonth(args.month);
 
     const userId = await requireUserId(ctx);
-    const existing = await ctx.db
+    const categoryMatches = await ctx.db
       .query("monthlyTargets")
       .withIndex("by_user_month_category", (q) =>
         q.eq("userId", userId).eq("month", args.month).eq("category", args.category),
+      )
+      .collect();
+    const existing = categoryMatches.find((target) => !target.metricKey);
+
+    if (existing) {
+      await ctx.db.delete(existing._id);
+    }
+
+    return null;
+  },
+});
+
+export const clearMetric = mutation({
+  args: {
+    month: v.string(),
+    metricKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    validateMonth(args.month);
+
+    const metricKey = args.metricKey.trim();
+    if (!metricKey) throw new Error("Monthly target requires a metric key");
+
+    const userId = await requireUserId(ctx);
+    const existing = await ctx.db
+      .query("monthlyTargets")
+      .withIndex("by_user_month_metric", (q) =>
+        q.eq("userId", userId).eq("month", args.month).eq("metricKey", metricKey),
       )
       .unique();
 

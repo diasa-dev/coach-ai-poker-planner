@@ -46,6 +46,7 @@ type AnnualPlanRecord = AnnualPlanForm & {
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
 type OperatingTargetCategory = "grind" | "study" | "review" | "sport" | "recovery" | "custom";
 type OperatingTargetCadence = "daily" | "weekly" | "monthly" | "yearly";
+type CustomMetricMode = "quantity" | "habit";
 
 type OperatingTarget = {
   metricKey: string;
@@ -68,6 +69,7 @@ type OperatingTargetDraft = {
   cadence: OperatingTargetCadence;
   targetValue: number;
   effectiveFrom: string;
+  trackingMode?: CustomMetricMode;
 };
 
 type AnnualDirectionWorkspaceProps = {
@@ -140,7 +142,7 @@ const operatingMetricExamples = [
   "Dias de grind por mês",
   "Volume de torneios por mês",
   "Horas de estudo por semana",
-  "Horas de revisão por semana",
+  "Reviews de mãos marcadas por semana",
   "Sessões de treino por mês",
   "Sessões de coaching por mês",
   "Dias off reais por mês",
@@ -175,12 +177,12 @@ const operatingTargetPresets: OperatingTargetDraft[] = [
     effectiveFrom: "",
   },
   {
-    metricKey: "review_hours_weekly",
-    label: "Horas de revisão por semana",
+    metricKey: "marked_hands_review_weekly",
+    label: "Mãos marcadas revistas por semana",
     category: "review",
-    unit: "horas",
+    unit: "mãos",
     cadence: "weekly",
-    targetValue: 3,
+    targetValue: 20,
     effectiveFrom: "",
   },
   {
@@ -218,6 +220,7 @@ const operatingTargetPresets: OperatingTargetDraft[] = [
     cadence: "weekly",
     targetValue: 1,
     effectiveFrom: "",
+    trackingMode: "quantity",
   },
 ];
 
@@ -235,6 +238,13 @@ const cadenceLabels: Record<OperatingTargetCadence, string> = {
   weekly: "por semana",
   monthly: "por mês",
   yearly: "por ano",
+};
+
+const cadencePeriodLabels: Record<OperatingTargetCadence, string> = {
+  daily: "dia",
+  weekly: "semana",
+  monthly: "mês",
+  yearly: "ano",
 };
 
 function normalizePlan(plan: AnnualPlanForm): AnnualPlanForm {
@@ -300,6 +310,9 @@ function createDraftFromPreset(metricKey: string, effectiveFrom: string): Operat
     ...base,
     metricKey: isCustom ? `custom_${Date.now()}` : base.metricKey,
     label: isCustom ? "" : base.label,
+    unit: isCustom ? "" : base.unit,
+    category: isCustom ? "custom" : base.category,
+    trackingMode: isCustom ? "quantity" : undefined,
     effectiveFrom,
   };
 }
@@ -314,6 +327,52 @@ function isCustomMetric(target: Pick<OperatingTargetDraft, "metricKey">) {
   return !isPresetMetric(target.metricKey);
 }
 
+function getCustomMetricMode(target: OperatingTargetDraft | OperatingTarget): CustomMetricMode {
+  if (!isCustomMetric(target)) return "quantity";
+  if ("trackingMode" in target && target.trackingMode) return target.trackingMode;
+  return target.unit === "feito" ? "habit" : "quantity";
+}
+
+function formatOperatingTargetLine(target: OperatingTargetDraft | OperatingTarget) {
+  const mode = getCustomMetricMode(target);
+
+  if (isCustomMetric(target) && mode === "habit") {
+    if (target.cadence === "daily") return "todos os dias";
+    return `feito ${cadenceLabels[target.cadence]}`;
+  }
+
+  return `${target.targetValue} ${target.unit} ${cadenceLabels[target.cadence]}`;
+}
+
+function formatOperatingTargetPreview(target: OperatingTargetDraft | OperatingTarget) {
+  const baseLabel = getOperatingTargetBaseLabel(target);
+  const line = formatOperatingTargetLine(target);
+
+  if (!baseLabel) return line;
+
+  return `${baseLabel}: ${line}`;
+}
+
+function formatOperatingTargetCompactLine(target: OperatingTargetDraft | OperatingTarget) {
+  const mode = getCustomMetricMode(target);
+
+  if (isCustomMetric(target) && mode === "habit") {
+    if (target.cadence === "daily") return "todos os dias";
+    return `feito/${cadencePeriodLabels[target.cadence]}`;
+  }
+
+  return `${target.targetValue} ${target.unit}/${cadencePeriodLabels[target.cadence]}`;
+}
+
+function formatPresetOptionLabel(preset: OperatingTargetDraft) {
+  if (preset.metricKey === "custom") return preset.label;
+  return preset.label.replace(/\s+por\s+(dia|semana|mês|ano)$/i, "");
+}
+
+function getOperatingTargetBaseLabel(target: Pick<OperatingTargetDraft, "label">) {
+  return target.label.replace(/\s+por\s+(dia|semana|mês|ano)$/i, "");
+}
+
 function applyPresetCanonicalFields(target: OperatingTargetDraft): OperatingTargetDraft {
   const preset = operatingTargetPresets.find((item) => item.metricKey === target.metricKey);
 
@@ -321,7 +380,7 @@ function applyPresetCanonicalFields(target: OperatingTargetDraft): OperatingTarg
 
   return {
     ...target,
-    label: preset.label,
+    label: formatPresetOptionLabel(preset),
     category: preset.category,
     unit: preset.unit,
   };
@@ -341,14 +400,18 @@ function getInactiveVersions(targets: OperatingTarget[], metricKey: string) {
 
 function normalizeOperatingTarget(target: OperatingTargetDraft): OperatingTargetDraft {
   const canonicalTarget = applyPresetCanonicalFields(target);
+  const mode = getCustomMetricMode(canonicalTarget);
+  const isHabit = isCustomMetric(canonicalTarget) && mode === "habit";
 
   return {
     ...canonicalTarget,
     metricKey: canonicalTarget.metricKey.trim(),
     label: canonicalTarget.label.trim(),
-    unit: canonicalTarget.unit.trim(),
-    targetValue: Number(canonicalTarget.targetValue),
+    category: isCustomMetric(canonicalTarget) ? "custom" : canonicalTarget.category,
+    unit: isHabit ? "feito" : canonicalTarget.unit.trim(),
+    targetValue: isHabit ? 1 : Number(canonicalTarget.targetValue),
     effectiveFrom: canonicalTarget.effectiveFrom,
+    trackingMode: isCustomMetric(canonicalTarget) ? mode : undefined,
   };
 }
 
@@ -357,8 +420,12 @@ function getOperatingValidationMessage(target: OperatingTargetDraft | null) {
 
   const normalized = normalizeOperatingTarget(target);
 
+  const mode = getCustomMetricMode(normalized);
+
   if (!normalized.label) return "Dá um nome à métrica.";
-  if (!normalized.unit) return "Escolhe a unidade.";
+  if (!(isCustomMetric(normalized) && mode === "habit") && !normalized.unit) {
+    return "Escreve o que estás a contar: livros, mãos, sessões...";
+  }
   if (!normalized.targetValue || normalized.targetValue <= 0) {
     return "Define um valor positivo.";
   }
@@ -382,6 +449,22 @@ function areOperatingTargetsEquivalent(
       current.targetValue === next.targetValue &&
       current.effectiveFrom === next.effectiveFrom &&
       current.active === next.active,
+  );
+}
+
+function areOperatingTargetValuesEquivalent(
+  current: OperatingTarget | undefined,
+  next: OperatingTargetDraft,
+) {
+  return Boolean(
+    current &&
+      current.metricKey === next.metricKey &&
+      current.label === next.label &&
+      current.category === next.category &&
+      current.unit === next.unit &&
+      current.cadence === next.cadence &&
+      current.targetValue === next.targetValue &&
+      current.effectiveFrom === next.effectiveFrom,
   );
 }
 
@@ -494,7 +577,13 @@ function PersistedAnnualDirection() {
         try {
           await saveOperatingTarget({
             year: currentYear,
-            ...target,
+            metricKey: target.metricKey,
+            label: target.label,
+            category: target.category,
+            unit: target.unit,
+            cadence: target.cadence,
+            targetValue: target.targetValue,
+            effectiveFrom: target.effectiveFrom,
           });
           setOperatingSaveState("saved");
         } catch (error) {
@@ -779,7 +868,8 @@ function AnnualDirectionWorkspace({
       unit: target.unit,
       cadence: target.cadence,
       targetValue: target.targetValue,
-      effectiveFrom: getTodayIsoDate(),
+      effectiveFrom: target.effectiveFrom,
+      trackingMode: getCustomMetricMode(target),
     });
     setShowEffectiveFrom(false);
     setLocalOperatingSaveState("dirty");
@@ -794,6 +884,7 @@ function AnnualDirectionWorkspace({
       cadence: target.cadence,
       targetValue: target.targetValue,
       effectiveFrom: getTodayIsoDate(),
+      trackingMode: getCustomMetricMode(target),
     });
     setWizardShowEffectiveFrom(false);
     setLocalOperatingSaveState("dirty");
@@ -821,6 +912,17 @@ function AnnualDirectionWorkspace({
     }
 
     const normalized = normalizeOperatingTarget(operatingDraft);
+    const currentActiveTarget = getActiveTargets(operatingTargets).find(
+      (target) => target.metricKey === normalized.metricKey,
+    );
+
+    if (areOperatingTargetValuesEquivalent(currentActiveTarget, normalized)) {
+      setOperatingDraft(null);
+      setShowEffectiveFrom(false);
+      setLocalOperatingSaveState("idle");
+      return;
+    }
+
     setLocalOperatingSaveState("saving");
 
     if (onSaveOperatingTarget) {
@@ -986,7 +1088,7 @@ function AnnualDirectionWorkspace({
               </button>
             </>
           ) : (
-            <button className="ep-button primary" type="button" onClick={startEditing}>
+            <button className={`ep-button primary ${styles.pagePrimaryCta}`} type="button" onClick={startEditing}>
               <Edit3 size={14} aria-hidden="true" />
               {hasSavedPlan ? "Editar direção" : "Definir direção"}
             </button>
@@ -1007,10 +1109,6 @@ function AnnualDirectionWorkspace({
               <span>Padrão a evitar</span>
               <span>Regra de decisão</span>
             </div>
-            <button className="ep-button primary" type="button" onClick={startEditing}>
-              <Compass size={14} aria-hidden="true" />
-              Definir direção
-            </button>
           </div>
         </article>
       ) : (
@@ -1225,62 +1323,81 @@ function AnnualDirectionWorkspace({
               </p>
 
               {activeOperatingTargets.length ? (
-                <div className={styles.operatingList}>
-                  {activeOperatingTargets.map((target) => {
-                    const Icon = getOperatingTargetIcon(target.category);
-                    const history = getInactiveVersions(operatingTargets, target.metricKey);
+                <>
+                  <div className={styles.operatingSummary}>
+                    <div>
+                      <span>Ritmo guardado</span>
+                      <strong>
+                        {activeOperatingTargets.length}{" "}
+                        {activeOperatingTargets.length === 1 ? "métrica ativa" : "métricas ativas"}
+                      </strong>
+                    </div>
+                    <p>
+                      {activeOperatingTargets
+                        .slice(0, 3)
+                        .map((target) => `${getOperatingTargetBaseLabel(target)}: ${formatOperatingTargetCompactLine(target)}`)
+                        .join(" · ")}
+                      {activeOperatingTargets.length > 3 ? ` · +${activeOperatingTargets.length - 3}` : ""}
+                    </p>
+                  </div>
+                  <div className={styles.operatingList}>
+                    {activeOperatingTargets.map((target) => {
+                      const Icon = getOperatingTargetIcon(target.category);
+                      const history = getInactiveVersions(operatingTargets, target.metricKey);
 
-                    return (
-                      <div className={styles.operatingItem} key={target.metricKey}>
-                        <div className={styles.operatingMain}>
-                          <span className={styles.operatingIcon}>
-                            <Icon size={15} aria-hidden="true" />
-                          </span>
-                          <div>
-                            <strong>{target.label}</strong>
-                            <small>
-                              Atual: {target.targetValue} {target.unit}{" "}
-                              {cadenceLabels[target.cadence]} desde{" "}
-                              {formatDateLabel(target.effectiveFrom)}
-                            </small>
+                      return (
+                        <div className={styles.operatingItem} key={target.metricKey}>
+                          <div className={styles.operatingMain}>
+                            <span className={styles.operatingIcon}>
+                              <Icon size={14} aria-hidden="true" />
+                            </span>
+                            <div>
+                              <strong>{getOperatingTargetBaseLabel(target)}</strong>
+                              <small>
+                                {formatOperatingTargetCompactLine(target)} desde{" "}
+                                {formatDateLabel(target.effectiveFrom)}
+                              </small>
+                            </div>
                           </div>
+                          <span className={styles.categoryTag}>{categoryLabels[target.category]}</span>
+                          <div className={styles.compactActions}>
+                            <button
+                              aria-label={`Ajustar métrica ${getOperatingTargetBaseLabel(target)}`}
+                              className={`${styles.textButton} ${styles.iconAction}`}
+                              title="Ajustar"
+                              type="button"
+                              onClick={() => editOperatingTarget(target)}
+                            >
+                              <Edit3 size={14} aria-hidden="true" />
+                            </button>
+                            <button
+                              aria-label={`Remover métrica ${getOperatingTargetBaseLabel(target)}`}
+                              className={`${styles.dangerButton} ${styles.iconAction}`}
+                              title="Remover"
+                              type="button"
+                              onClick={() => requestDeleteOperatingTarget(target.metricKey, "page")}
+                            >
+                              <Trash2 size={14} aria-hidden="true" />
+                            </button>
+                          </div>
+                          {history.length ? (
+                            <details className={styles.historyDetails}>
+                              <summary>Histórico</summary>
+                              <ul>
+                                {history.map((version) => (
+                                  <li key={`${version.metricKey}-${version.effectiveFrom}-${version.updatedAt}`}>
+                                    {formatOperatingTargetCompactLine(version)} desde{" "}
+                                    {formatDateLabel(version.effectiveFrom)}
+                                  </li>
+                                ))}
+                              </ul>
+                            </details>
+                          ) : null}
                         </div>
-                        <span className={styles.categoryTag}>{categoryLabels[target.category]}</span>
-                        <button
-                          className={styles.textButton}
-                          type="button"
-                          onClick={() => editOperatingTarget(target)}
-                        >
-                          <Edit3 size={14} aria-hidden="true" />
-                          Ajustar
-                        </button>
-                        <button
-                          aria-label={`Remover métrica ${target.label}`}
-                          className={styles.dangerButton}
-                          type="button"
-                          onClick={() => requestDeleteOperatingTarget(target.metricKey, "page")}
-                        >
-                          <Trash2 size={14} aria-hidden="true" />
-                          Remover
-                        </button>
-                        {history.length ? (
-                          <details className={styles.historyDetails}>
-                            <summary>Histórico</summary>
-                            <ul>
-                              {history.map((version) => (
-                                <li key={`${version.metricKey}-${version.effectiveFrom}-${version.updatedAt}`}>
-                                  {version.targetValue} {version.unit}{" "}
-                                  {cadenceLabels[version.cadence]} desde{" "}
-                                  {formatDateLabel(version.effectiveFrom)}
-                                </li>
-                              ))}
-                            </ul>
-                          </details>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                </>
               ) : (
                 <div className={styles.operatingEmpty}>
                   <Gauge size={18} aria-hidden="true" />
@@ -1292,9 +1409,32 @@ function AnnualDirectionWorkspace({
               )}
 
               {operatingDraft ? (
+                <div className={styles.modalLayer} role="presentation">
+                  <button
+                    aria-label="Fechar"
+                    className={styles.modalScrim}
+                    type="button"
+                    onClick={cancelOperatingTarget}
+                  />
+                  <section
+                    aria-labelledby="annual-metric-editor-title"
+                    aria-modal="true"
+                    className={`${styles.modal} ${styles.metricModal}`}
+                    role="dialog"
+                  >
+                    <header className={styles.modalHeader}>
+                      <div>
+                        <span>Métrica anual</span>
+                        <h2 id="annual-metric-editor-title">{getOperatingTargetBaseLabel(operatingDraft) || "Nova métrica"}</h2>
+                      </div>
+                      <button className={styles.iconButton} type="button" aria-label="Fechar" onClick={cancelOperatingTarget}>
+                        <X size={16} aria-hidden="true" />
+                      </button>
+                    </header>
+                    <div className={styles.modalBody}>
                 <div className={styles.operatingForm}>
                   <div className={styles.formGrid}>
-                    <label>
+                    <label className={styles.metricSelectField}>
                       Métrica
                       <select
                         value={
@@ -1308,7 +1448,7 @@ function AnnualDirectionWorkspace({
                       >
                         {operatingTargetPresets.map((preset) => (
                           <option key={preset.metricKey} value={preset.metricKey}>
-                            {preset.label}
+                            {formatPresetOptionLabel(preset)}
                           </option>
                         ))}
                       </select>
@@ -1316,7 +1456,7 @@ function AnnualDirectionWorkspace({
 
                     {isCustomMetric(operatingDraft) ? (
                       <>
-                        <label>
+                        <label className={styles.metricNameField}>
                           Nome
                           <input
                             value={operatingDraft.label}
@@ -1329,7 +1469,7 @@ function AnnualDirectionWorkspace({
                           />
                         </label>
 
-                        <label>
+                        <label className={styles.metricSelectField}>
                           Categoria
                           <select
                             value={operatingDraft.category}
@@ -1354,7 +1494,7 @@ function AnnualDirectionWorkspace({
                       </>
                     ) : null}
 
-                    <label>
+                    <label className={styles.metricValueField}>
                       Valor
                       <input
                         min="1"
@@ -1371,7 +1511,7 @@ function AnnualDirectionWorkspace({
                     </label>
 
                     {isCustomMetric(operatingDraft) ? (
-                      <label>
+                      <label className={styles.metricUnitField}>
                         Unidade
                         <input
                           value={operatingDraft.unit}
@@ -1385,8 +1525,8 @@ function AnnualDirectionWorkspace({
                       </label>
                     ) : null}
 
-                    <label>
-                      Cadência
+                    <label className={styles.metricPeriodField}>
+                      Período
                       <select
                         value={operatingDraft.cadence}
                         onChange={(event) =>
@@ -1400,40 +1540,67 @@ function AnnualDirectionWorkspace({
                           )
                         }
                       >
-                        <option value="daily">por dia</option>
-                        <option value="weekly">por semana</option>
-                        <option value="monthly">por mês</option>
-                        <option value="yearly">por ano</option>
+                        <option value="daily">{cadencePeriodLabels.daily}</option>
+                        <option value="weekly">{cadencePeriodLabels.weekly}</option>
+                        <option value="monthly">{cadencePeriodLabels.monthly}</option>
+                        <option value="yearly">{cadencePeriodLabels.yearly}</option>
                       </select>
                     </label>
+
+                    <div className={styles.metricInlineActions}>
+                      <button
+                        className="ep-button secondary"
+                        disabled={effectiveOperatingSaveState === "saving"}
+                        type="button"
+                        onClick={cancelOperatingTarget}
+                      >
+                        <X size={14} aria-hidden="true" />
+                        Cancelar
+                      </button>
+                      <button
+                        className="ep-button primary"
+                        disabled={effectiveOperatingSaveState === "saving"}
+                        type="button"
+                        onClick={saveOperatingTargetDraft}
+                      >
+                        <Save size={14} aria-hidden="true" />
+                        {effectiveOperatingSaveState === "saving" ? "A guardar..." : "Guardar ritmo"}
+                      </button>
+                    </div>
                   </div>
 
-                  <button
-                    className={styles.textButton}
-                    type="button"
-                    onClick={() => setShowEffectiveFrom((value) => !value)}
-                  >
-                    {showEffectiveFrom ? "Ocultar data de início" : "Alterar data de início"}
-                  </button>
+                  <div className={styles.metricPreview}>
+                    <span>Pré-visualização</span>
+                    <strong>
+                      {formatOperatingTargetPreview(normalizeOperatingTarget(operatingDraft)) ||
+                        "Define a meta para veres a frase final."}
+                    </strong>
+                  </div>
 
-                  {showEffectiveFrom ? (
-                    <label className={styles.dateField}>
-                      Aplicável desde
-                      <input
-                        type="date"
-                        value={operatingDraft.effectiveFrom}
-                        onChange={(event) =>
-                          setOperatingDraft((current) =>
-                            current ? { ...current, effectiveFrom: event.target.value } : current,
-                          )
-                        }
-                      />
-                    </label>
-                  ) : (
-                    <p className={styles.quietText}>
-                      Aplicável desde {formatDateLabel(operatingDraft.effectiveFrom)}.
-                    </p>
-                  )}
+                  <div className={styles.effectiveRow}>
+                    <button
+                      className={styles.textButton}
+                      type="button"
+                      onClick={() => setShowEffectiveFrom((value) => !value)}
+                    >
+                      {showEffectiveFrom ? "Ocultar data" : "Alterar data de início"}
+                    </button>
+
+                    {showEffectiveFrom ? (
+                      <label className={styles.dateField}>
+                        Aplicável desde
+                        <input
+                          type="date"
+                          value={operatingDraft.effectiveFrom}
+                          onChange={(event) =>
+                            setOperatingDraft((current) =>
+                              current ? { ...current, effectiveFrom: event.target.value } : current,
+                            )
+                          }
+                        />
+                      </label>
+                    ) : null}
+                  </div>
 
                   {effectiveOperatingSaveState === "error" ? (
                     <p className={styles.errorText}>
@@ -1442,26 +1609,9 @@ function AnnualDirectionWorkspace({
                     </p>
                   ) : null}
 
-                  <div className={styles.operatingActions}>
-                    <button
-                      className="ep-button secondary"
-                      disabled={effectiveOperatingSaveState === "saving"}
-                      type="button"
-                      onClick={cancelOperatingTarget}
-                    >
-                      <X size={14} aria-hidden="true" />
-                      Cancelar
-                    </button>
-                    <button
-                      className="ep-button primary"
-                      disabled={effectiveOperatingSaveState === "saving"}
-                      type="button"
-                      onClick={saveOperatingTargetDraft}
-                    >
-                      <Save size={14} aria-hidden="true" />
-                      {effectiveOperatingSaveState === "saving" ? "A guardar..." : "Guardar ritmo"}
-                    </button>
-                  </div>
+                </div>
+                    </div>
+                  </section>
                 </div>
               ) : (
                 <button
@@ -1891,7 +2041,7 @@ function AnnualDirectionWizard({
               <PreviewList
                 title="Métricas"
                 items={activeOperatingTargets.map(
-                  (target) => `${target.label}: ${target.targetValue} ${target.unit} ${cadenceLabels[target.cadence]}`,
+                  (target) => `${getOperatingTargetBaseLabel(target)}: ${formatOperatingTargetCompactLine(target)}`,
                 )}
                 empty="Sem métricas anuais definidas."
               />
@@ -2021,8 +2171,8 @@ function PreviewList({ title, items, empty = "Sem itens." }: { title: string; it
       <span>{title}</span>
       {visibleItems.length ? (
         <ul>
-          {visibleItems.map((item) => (
-            <li key={item}>{item}</li>
+          {visibleItems.map((item, index) => (
+            <li key={`${title}-${index}-${item}`}>{item}</li>
           ))}
         </ul>
       ) : (
@@ -2061,6 +2211,10 @@ function OperatingTargetsEditor({
   onSetShowEffectiveFrom: Dispatch<SetStateAction<boolean>>;
   onStartOperatingTarget: (metricKey?: string) => void;
 }) {
+  const isCustomDraft = operatingDraft ? isCustomMetric(operatingDraft) : false;
+  const customMode = operatingDraft ? getCustomMetricMode(operatingDraft) : "quantity";
+  const previewLine = operatingDraft ? formatOperatingTargetPreview(normalizeOperatingTarget(operatingDraft)) : "";
+
   return (
     <section className={styles.metricsStep}>
       {activeOperatingTargets.length ? (
@@ -2073,38 +2227,43 @@ function OperatingTargetsEditor({
               <div className={styles.operatingItem} key={target.metricKey}>
                 <div className={styles.operatingMain}>
                   <span className={styles.operatingIcon}>
-                    <Icon size={15} aria-hidden="true" />
+                    <Icon size={14} aria-hidden="true" />
                   </span>
                   <div>
-                    <strong>{target.label}</strong>
+                    <strong>{getOperatingTargetBaseLabel(target)}</strong>
                     <small>
-                      {target.targetValue} {target.unit} {cadenceLabels[target.cadence]} desde{" "}
-                      {formatDateLabel(target.effectiveFrom)}
+                      {formatOperatingTargetCompactLine(target)} desde {formatDateLabel(target.effectiveFrom)}
                     </small>
                   </div>
                 </div>
                 <span className={styles.categoryTag}>{categoryLabels[target.category]}</span>
-                <button className={styles.textButton} type="button" onClick={() => onEditOperatingTarget(target)}>
-                  <Edit3 size={14} aria-hidden="true" />
-                  Ajustar
-                </button>
-                <button
-                  aria-label={`Remover métrica ${target.label}`}
-                  className={styles.dangerButton}
-                  type="button"
-                  onClick={() => onDeleteOperatingTarget(target.metricKey)}
-                >
-                  <Trash2 size={14} aria-hidden="true" />
-                  Remover
-                </button>
+                <div className={styles.compactActions}>
+                  <button
+                    aria-label={`Ajustar métrica ${getOperatingTargetBaseLabel(target)}`}
+                    className={`${styles.textButton} ${styles.iconAction}`}
+                    title="Ajustar"
+                    type="button"
+                    onClick={() => onEditOperatingTarget(target)}
+                  >
+                    <Edit3 size={14} aria-hidden="true" />
+                  </button>
+                  <button
+                    aria-label={`Remover métrica ${getOperatingTargetBaseLabel(target)}`}
+                    className={`${styles.dangerButton} ${styles.iconAction}`}
+                    title="Remover"
+                    type="button"
+                    onClick={() => onDeleteOperatingTarget(target.metricKey)}
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                  </button>
+                </div>
                 {history.length ? (
                   <details className={styles.historyDetails}>
                     <summary>Histórico</summary>
                     <ul>
                       {history.map((version) => (
                         <li key={`${version.metricKey}-${version.effectiveFrom}-${version.updatedAt}`}>
-                          {version.targetValue} {version.unit} {cadenceLabels[version.cadence]} desde{" "}
-                          {formatDateLabel(version.effectiveFrom)}
+                          {formatOperatingTargetCompactLine(version)} desde {formatDateLabel(version.effectiveFrom)}
                         </li>
                       ))}
                     </ul>
@@ -2117,14 +2276,14 @@ function OperatingTargetsEditor({
       ) : (
         <div className={styles.operatingEmpty}>
           <Gauge size={18} aria-hidden="true" />
-          <p>Adiciona métricas base como grind, estudo, reviews, coaching ou dias off.</p>
+          <p>Adiciona métricas base como volume de torneios, estudo, reviews, coaching ou dias off.</p>
         </div>
       )}
 
       {operatingDraft ? (
         <div className={styles.operatingForm}>
           <div className={styles.formGrid}>
-            <label>
+            <label className={styles.metricSelectField}>
               Métrica
               <select
                 value={
@@ -2136,48 +2295,75 @@ function OperatingTargetsEditor({
               >
                 {operatingTargetPresets.map((preset) => (
                   <option key={preset.metricKey} value={preset.metricKey}>
-                    {preset.label}
+                    {formatPresetOptionLabel(preset)}
                   </option>
                 ))}
               </select>
             </label>
-            {isCustomMetric(operatingDraft) ? (
-              <label>
-                Nome
+            {isCustomDraft ? (
+              <>
+                <label className={styles.metricSelectField}>
+                  Tipo
+                  <select
+                    value={customMode}
+                    onChange={(event) =>
+                      onSetOperatingDraft((current) => {
+                        if (!current) return current;
+                        const trackingMode = event.target.value as CustomMetricMode;
+
+                        return {
+                          ...current,
+                          trackingMode,
+                          category: "custom",
+                          unit: trackingMode === "habit" ? "feito" : current.unit === "feito" ? "" : current.unit,
+                          targetValue: trackingMode === "habit" ? 1 : current.targetValue,
+                        };
+                      })
+                    }
+                  >
+                    <option value="quantity">Quantidade</option>
+                    <option value="habit">Hábito sim/não</option>
+                  </select>
+                </label>
+                <label className={styles.metricNameField}>
+                  Nome
+                  <input
+                    value={operatingDraft.label}
+                    onChange={(event) =>
+                      onSetOperatingDraft((current) => current ? { ...current, label: event.target.value } : current)
+                    }
+                    placeholder={customMode === "habit" ? "Exemplo: Banho de gelo" : "Exemplo: Livros lidos"}
+                  />
+                </label>
+              </>
+            ) : null}
+            {customMode === "quantity" ? (
+              <label className={styles.metricValueField}>
+                Valor
                 <input
-                  value={operatingDraft.label}
+                  min="1"
+                  type="number"
+                  value={operatingDraft.targetValue}
                   onChange={(event) =>
-                    onSetOperatingDraft((current) => current ? { ...current, label: event.target.value } : current)
+                    onSetOperatingDraft((current) => current ? { ...current, targetValue: Number(event.target.value) } : current)
                   }
-                  placeholder="Exemplo: Dias de grind por mês"
                 />
               </label>
             ) : null}
-            <label>
-              Valor
-              <input
-                min="1"
-                type="number"
-                value={operatingDraft.targetValue}
-                onChange={(event) =>
-                  onSetOperatingDraft((current) => current ? { ...current, targetValue: Number(event.target.value) } : current)
-                }
-              />
-            </label>
-            {isCustomMetric(operatingDraft) ? (
-              <label>
+            {isCustomDraft && customMode === "quantity" ? (
+              <label className={styles.metricUnitField}>
                 Unidade
                 <input
                   value={operatingDraft.unit}
                   onChange={(event) =>
                     onSetOperatingDraft((current) => current ? { ...current, unit: event.target.value } : current)
                   }
-                  placeholder="dias, torneios, revisões..."
+                  placeholder="livros, mãos, sessões..."
                 />
               </label>
             ) : null}
-            <label>
-              Cadência
+            <label className={styles.metricPeriodField}>
+              {customMode === "habit" ? "Frequência" : "Período"}
               <select
                 value={operatingDraft.cadence}
                 onChange={(event) =>
@@ -2186,31 +2372,25 @@ function OperatingTargetsEditor({
                   )
                 }
               >
-                <option value="daily">por dia</option>
-                <option value="weekly">por semana</option>
-                <option value="monthly">por mês</option>
-                <option value="yearly">por ano</option>
+                <option value="daily">{customMode === "habit" ? "todos os dias" : cadencePeriodLabels.daily}</option>
+                <option value="weekly">{cadencePeriodLabels.weekly}</option>
+                <option value="monthly">{cadencePeriodLabels.monthly}</option>
+                <option value="yearly">{cadencePeriodLabels.yearly}</option>
               </select>
             </label>
-            {isCustomMetric(operatingDraft) ? (
-              <label>
-                Categoria
-                <select
-                  value={operatingDraft.category}
-                  onChange={(event) =>
-                    onSetOperatingDraft((current) =>
-                      current ? { ...current, category: event.target.value as OperatingTargetCategory } : current,
-                    )
-                  }
-                >
-                  {Object.entries(categoryLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
+            <div className={styles.metricInlineActions}>
+              <button className="ep-button secondary" type="button" onClick={onCancelOperatingTarget}>
+                Cancelar métrica
+              </button>
+              <button className="ep-button primary" type="button" onClick={onSaveOperatingTarget}>
+                <Save size={14} aria-hidden="true" />
+                Guardar métrica
+              </button>
+            </div>
+          </div>
+          <div className={styles.metricPreview}>
+            <span>Pré-visualização</span>
+            <strong>{previewLine || "Define a meta para veres a frase final."}</strong>
           </div>
           <button className={styles.textButton} type="button" onClick={() => onSetShowEffectiveFrom((value) => !value)}>
             {showEffectiveFrom ? "Ocultar data de início" : "Alterar data de início"}
@@ -2234,15 +2414,6 @@ function OperatingTargetsEditor({
               {operatingValidationMessage ?? "Não foi possível guardar esta métrica."}
             </p>
           ) : null}
-          <div className={styles.operatingActions}>
-            <button className="ep-button secondary" type="button" onClick={onCancelOperatingTarget}>
-              Cancelar métrica
-            </button>
-            <button className="ep-button primary" type="button" onClick={onSaveOperatingTarget}>
-              <Save size={14} aria-hidden="true" />
-              Guardar métrica
-            </button>
-          </div>
         </div>
       ) : (
         <button className={styles.addButton} type="button" onClick={() => onStartOperatingTarget()}>

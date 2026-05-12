@@ -16,6 +16,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "convex/_generated/**",
     "docs/design-handoff/**",
+    ".hermes/**",
   ]),
 ]);
 

@@ -22,9 +22,11 @@ import { hasPersistenceConfig } from "@/lib/runtime-config";
 type CommitmentStatus = "planned" | "done" | "adjusted" | "not-done";
 type CommitmentKind = PlanBlockType | "Foco" | "Revisão";
 type TodaySource = "demo" | "active" | "no-active-plan" | "persistence-unavailable";
-type MonthlyTargetCategory = "grind" | "study" | "review" | "sport";
+type MonthlyTargetCategory = "grind" | "study" | "review" | "sport" | "recovery" | "custom";
 type MonthlyTargetContext = {
   category: MonthlyTargetCategory;
+  metricKey?: string;
+  metricLabel?: string;
   primaryUnit: string;
   targetValue: number;
   currentValue?: number;
@@ -443,7 +445,7 @@ function TodayWorkspace({
         </div>
         <div className="today-head-actions">
           {shouldStartWithAnnualDirection ? (
-            <Link className="ep-button primary" href="/annual?setup=annual">
+            <Link className="ep-button primary today-hero-cta" href="/annual?setup=annual">
               <Target size={14} aria-hidden="true" />
               Definir direção anual
             </Link>
@@ -543,9 +545,6 @@ function TodayModeBanner({
             semanal.
           </small>
         </div>
-        <Link className="ep-button primary" href="/annual?setup=annual">
-          Definir direção anual
-        </Link>
       </div>
     );
   }
@@ -657,10 +656,6 @@ function CommitmentsCard({
             <span />
           </div>
           <p>Antes de preparares o dia, define a direção anual que vai dar critério aos objetivos mensais, plano semanal e execução.</p>
-          <Link className="ep-button primary" href="/annual?setup=annual">
-            <Target size={14} aria-hidden="true" />
-            Definir direção anual
-          </Link>
         </div>
       ) : isPrepared ? (
         <>
@@ -819,7 +814,7 @@ function AttentionCard({
           {
             title: "Direção anual em falta",
             detail: "Sem este contexto, o Today ainda não sabe que tipo de decisões deve proteger.",
-            action: "Definir",
+            action: "Pendente",
           },
           {
             title: "Objetivos mensais vêm depois",
@@ -855,9 +850,7 @@ function AttentionCard({
               <strong>{item.title}</strong>
               <p>{item.detail}</p>
             </div>
-            {strategicSetupMissing && item.action === "Definir" ? (
-              <Link href="/annual?setup=annual">{item.action}</Link>
-            ) : (
+            {strategicSetupMissing ? null : (
               <button type="button">{item.action}</button>
             )}
           </div>
@@ -882,9 +875,6 @@ function AnnualContextCard({ annualPlan }: { annualPlan: AnnualPlanContext | nul
       ) : (
         <div className="today-annual-empty">
           <p>Sem direção anual, o Hoje tem menos critério estratégico.</p>
-          <Link className="ep-button secondary" href="/annual?setup=annual">
-            Definir direção
-          </Link>
         </div>
       )}
     </article>
@@ -906,8 +896,8 @@ function MonthlyPaceCard({ targets }: { targets: MonthlyTargetContext[] }) {
 
       {rows.length ? (
         <div className="today-monthly-pace-list">
-          {rows.map((row) => (
-            <div className={`today-monthly-pace-row ${row.status}`} key={row.category}>
+          {rows.map((row, index) => (
+            <div className={`today-monthly-pace-row ${row.status}`} key={`${row.category}-${index}`}>
               <span>{row.label}</span>
               <strong>{row.progressLabel}</strong>
               <small>{row.statusLabel}</small>
@@ -919,11 +909,8 @@ function MonthlyPaceCard({ targets }: { targets: MonthlyTargetContext[] }) {
           <Target size={17} aria-hidden="true" />
           <div>
             <strong>Sem objetivos mensais</strong>
-            <p>O Hoje funciona, mas tem menos contexto de ritmo.</p>
+            <p>Não há objetivos mensais definidos para este mês.</p>
           </div>
-          <Link className="ep-button secondary" href="/monthly">
-            Definir objetivos
-          </Link>
         </div>
       )}
     </article>
@@ -936,6 +923,8 @@ function buildMonthlyPaceRows(targets: MonthlyTargetContext[]) {
     study: "Estudo",
     review: "Review",
     sport: "Sport",
+    recovery: "Recuperação",
+    custom: "Personalizado",
   };
 
   return targets.map((target) => {
@@ -943,8 +932,8 @@ function buildMonthlyPaceRows(targets: MonthlyTargetContext[]) {
     const status = getMonthlyPaceStatus(currentValue, target.targetValue);
 
     return {
-      category: target.category,
-      label: labels[target.category],
+      category: target.metricKey ?? target.category,
+      label: target.metricLabel ?? labels[target.category],
       progressLabel: `${formatMonthlyTargetValue(currentValue, target.primaryUnit)} / ${formatMonthlyTargetValue(target.targetValue, target.primaryUnit)}`,
       status,
       statusLabel: getMonthlyPaceLabel(status),

@@ -12,8 +12,8 @@ export type StartSessionPayload = {
   blockLabel?: string;
   sessionFocus: string;
   maxTables: number;
-  energy: number;
-  focusScore: number;
+  energy: number | null;
+  focusScore: number | null;
   tilt: number;
   microIntention?: string;
 };
@@ -46,14 +46,23 @@ export function StartSessionForm({
   onSubmit,
   variant = "modal",
 }: StartSessionFormProps) {
-  const [sessionFocus, setSessionFocus] = useState(defaultFocus);
-  const [selectedBlockId, setSelectedBlockId] = useState(grindBlocks[0]?.id ?? "none");
-  const [energy, setEnergy] = useState(4);
-  const [focusScore, setFocusScore] = useState(4);
-  const [microIntention, setMicroIntention] = useState("");
+  const suggestedFocus = defaultFocus.trim();
+  const [sessionFocus, setSessionFocus] = useState("");
+  const [selectedBlockId, setSelectedBlockId] = useState("none");
+  const [energy, setEnergy] = useState<number | null>(null);
+  const [focusScore, setFocusScore] = useState<number | null>(null);
+  const [qualityRule, setQualityRule] = useState("");
+  const [qualityRules, setQualityRules] = useState<string[]>([]);
   const selectedBlock = grindBlocks.find((block) => block.id === selectedBlockId);
   const trimmedFocus = sessionFocus.trim();
+  const trimmedQualityRule = qualityRule.trim();
   const Icon = actionIcon === "check" ? Check : Play;
+
+  function addQualityRule() {
+    if (!trimmedQualityRule) return;
+    setQualityRules((currentRules) => [...currentRules, trimmedQualityRule]);
+    setQualityRule("");
+  }
 
   function submit() {
     if (!trimmedFocus) return;
@@ -66,7 +75,7 @@ export function StartSessionForm({
       energy,
       focusScore,
       tilt: neutralTilt,
-      microIntention: microIntention.trim() || undefined,
+      microIntention: qualityRules.join(" · ") || undefined,
     });
   }
 
@@ -79,6 +88,7 @@ export function StartSessionForm({
           autoFocus
           required
           rows={3}
+          placeholder={suggestedFocus || "Define o foco desta sessão"}
           value={sessionFocus}
           onChange={(event) => {
             setSessionFocus(event.target.value);
@@ -86,19 +96,31 @@ export function StartSessionForm({
           }}
         />
       </label>
+      {suggestedFocus ? (
+        <div className={styles.suggestedFocusBox}>
+          <span>Sugestão Coach</span>
+          <p>{suggestedFocus}</p>
+          <button className="ep-button secondary" type="button" onClick={() => setSessionFocus(suggestedFocus)}>
+            Sugestão Coach
+          </button>
+        </div>
+      ) : null}
 
       {grindBlocks.length ? (
-        <label className={variant === "sidebar" ? "field" : styles.inlineField}>
-          Bloco associado <small>opcional</small>
-          <select value={selectedBlockId} onChange={(event) => setSelectedBlockId(event.target.value)}>
-            {grindBlocks.map((block) => (
-              <option key={block.id} value={block.id}>
-                Grind · {block.title}{block.target ? ` (${block.target})` : ""}
-              </option>
-            ))}
-            <option value="none">Sem bloco associado</option>
-          </select>
-        </label>
+        <details className={styles.startDetails}>
+          <summary>Associar ao plano semanal</summary>
+          <label className={variant === "sidebar" ? "field" : styles.inlineField}>
+            Bloco de grind <small>opcional</small>
+            <select value={selectedBlockId} onChange={(event) => setSelectedBlockId(event.target.value)}>
+              <option value="none">Não associar agora</option>
+              {grindBlocks.map((block) => (
+                <option key={block.id} value={block.id}>
+                  Grind · {block.title}{block.target ? ` (${block.target})` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        </details>
       ) : null}
 
       <section className={styles.initialStateBox}>
@@ -112,14 +134,44 @@ export function StartSessionForm({
         </div>
       </section>
 
-      <label className={variant === "sidebar" ? "field" : styles.inlineField}>
-        Micro-intenção <small>opcional</small>
-        <input
-          placeholder="ex: Não pagar river sem motivo"
-          value={microIntention}
-          onChange={(event) => setMicroIntention(event.target.value)}
-        />
-      </label>
+      <section className={styles.startDetails}>
+        <h3>Regra de qualidade opcional</h3>
+        <div className={styles.qualityRuleComposer}>
+          <label className={variant === "sidebar" ? "field" : styles.inlineField}>
+            Regra para proteger a sessão
+            <input
+              placeholder="ex: Não pagar river sem motivo claro"
+              value={qualityRule}
+              onChange={(event) => setQualityRule(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  addQualityRule();
+                }
+              }}
+            />
+          </label>
+          <button className="ep-button secondary" type="button" disabled={!trimmedQualityRule} onClick={addQualityRule}>
+            Adicionar regra
+          </button>
+        </div>
+        {qualityRules.length ? (
+          <ul className={styles.qualityRuleList} aria-label="Regras de qualidade adicionadas">
+            {qualityRules.map((rule, index) => (
+              <li key={`${rule}-${index}`}>
+                <span>{rule}</span>
+                <button
+                  type="button"
+                  onClick={() => setQualityRules((currentRules) => currentRules.filter((_, ruleIndex) => ruleIndex !== index))}
+                >
+                  Remover
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <p className={styles.localOnlyNote}>Fica ligada ao arranque da sessão.</p>
+      </section>
 
       {error ? <p className={variant === "sidebar" ? "sidebar-session-error" : styles.actionError}>{error}</p> : null}
 
@@ -195,8 +247,8 @@ function StartRating({
   value,
 }: {
   label: string;
-  onChange: (value: number) => void;
-  value: number;
+  onChange: (value: number | null) => void;
+  value: number | null;
 }) {
   return (
     <div className={styles.rating}>
@@ -207,7 +259,7 @@ function StartRating({
             className={item === value ? styles.selectedRating : ""}
             key={item}
             type="button"
-            onClick={() => onChange(item)}
+            onClick={() => onChange(item === value ? null : item)}
           >
             {item}
           </button>

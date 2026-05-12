@@ -7,7 +7,18 @@ const hasClerkKeys = Boolean(
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
     process.env.CLERK_SECRET_KEY,
 );
-const isProtectedRoute = createRouteMatcher(["/app(.*)"]);
+const isProtectedRoute = createRouteMatcher([
+  "/",
+  "/annual(.*)",
+  "/coach(.*)",
+  "/monthly(.*)",
+  "/review(.*)",
+  "/session(.*)",
+  "/sessions(.*)",
+  "/settings(.*)",
+  "/study(.*)",
+  "/weekly(.*)",
+]);
 
 export default hasClerkKeys
   ? clerkMiddleware(async (auth, request) => {

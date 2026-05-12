@@ -16,18 +16,23 @@ import {
   X,
 } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
-import type { Dispatch, SetStateAction } from "react";
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { api } from "../../convex/_generated/api";
 import { PersistenceUnavailable } from "@/components/persistence-unavailable";
+import {
+  formatAnnualCadenceLabel,
+  formatDerivedMonthlyContext,
+  getDerivedMonthlyTargetValue,
+  getWholeMonthlyTargetValue,
+} from "@/lib/monthly-target-calculation";
 import { usePersistenceAuth } from "@/lib/persistence-auth";
 import { hasPersistenceConfig } from "@/lib/runtime-config";
 
 import styles from "./monthly-targets.module.css";
 
-type CategoryId = "grind" | "study" | "review" | "sport";
-type PaceStatus = "missing" | "none" | "behind" | "on" | "ahead" | "complete";
+type CategoryId = "grind" | "study" | "review" | "sport" | "recovery" | "custom";
+type PaceStatus = "missing" | "paused" | "none" | "behind" | "on" | "ahead" | "complete";
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 type AnnualPlanContext = {
@@ -38,6 +43,7 @@ type AnnualPlanContext = {
 };
 
 type OperatingTargetContext = {
+  metricKey: string;
   label: string;
   category: "grind" | "study" | "review" | "sport" | "recovery" | "custom";
   unit: string;
@@ -49,6 +55,12 @@ type OperatingTargetContext = {
 
 type MonthlyTargetRecord = {
   category: CategoryId;
+  metricKey?: string;
+  metricLabel?: string;
+  annualCategory?: string;
+  annualUnit?: string;
+  annualCadence?: string;
+  annualTargetValue?: number;
   primaryUnit: string;
   targetValue: number;
   currentValue?: number;
@@ -63,7 +75,14 @@ type SuggestedMonthlyTarget = TargetDraft & {
 };
 
 type TargetRow = {
-  id: CategoryId;
+  id: string;
+  category: CategoryId;
+  metricKey?: string;
+  metricLabel?: string;
+  annualCategory?: string;
+  annualUnit?: string;
+  annualCadence?: string;
+  annualTargetValue?: number;
   label: string;
   description: string;
   icon: typeof Spade;
@@ -83,8 +102,8 @@ type MonthlyTargetsWorkspaceProps = {
   initialOperatingTargets?: OperatingTargetContext[];
   initialTargets?: MonthlyTargetRecord[];
   month: string;
-  onClearCategory?: (payload: { category: CategoryId }) => Promise<void>;
-  onSaveCategory?: (payload: MonthlyTargetRecord) => Promise<void>;
+  onClearTarget?: (payload: { category: CategoryId; metricKey?: string }) => Promise<void>;
+  onSaveTarget?: (payload: MonthlyTargetRecord) => Promise<void>;
   saveState?: SaveState;
 };
 
@@ -126,15 +145,31 @@ const categoryConfig: Record<
     accent: "var(--ep-cat-sport)",
     defaultUnit: "sessões",
   },
+  recovery: {
+    label: "Recuperação",
+    description: "Dias ou sessões para proteger descanso real.",
+    icon: Gauge,
+    accent: "var(--ep-accent-primary-hover)",
+    defaultUnit: "dias",
+  },
+  custom: {
+    label: "Personalizado",
+    description: "Métrica anual definida por ti.",
+    icon: Target,
+    accent: "var(--ep-navy-700)",
+    defaultUnit: "sessões",
+  },
 };
 
-const categoryOrder: CategoryId[] = ["grind", "study", "review", "sport"];
+const categoryOrder: CategoryId[] = ["grind", "study", "review", "sport", "recovery", "custom"];
 
 const unitOptions: Record<CategoryId, string[]> = {
-  grind: ["sessões"],
+  grind: ["dias", "sessões", "torneios", "horas", "minutos"],
   study: ["horas", "minutos", "sessões"],
-  review: ["mãos", "horas", "minutos"],
-  sport: ["sessões", "blocos", "horas", "minutos"],
+  review: ["mãos", "horas", "minutos", "sessões"],
+  sport: ["dias", "sessões", "blocos", "horas", "minutos"],
+  recovery: ["dias", "sessões", "horas", "minutos"],
+  custom: ["dias", "torneios", "horas", "sessões", "mãos", "minutos", "blocos", "feito"],
 };
 
 const secondaryUnitOptions: Partial<Record<CategoryId, string[]>> = {
@@ -143,6 +178,7 @@ const secondaryUnitOptions: Partial<Record<CategoryId, string[]>> = {
 
 const paceLabels: Record<PaceStatus, string> = {
   missing: "Sem meta mensal",
+  paused: "Pausado este mês",
   none: "Sem progresso",
   behind: "Abaixo do ritmo",
   on: "Dentro do ritmo",
@@ -152,6 +188,10 @@ const paceLabels: Record<PaceStatus, string> = {
 
 function getCurrentMonth() {
   return new Date().toISOString().slice(0, 7);
+}
+
+function getTodayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function getDaysInMonth(month: string) {
@@ -167,15 +207,6 @@ function getMonthDay(month: string) {
   return new Date().getDate();
 }
 
-function getRemainingMonthRatio(month: string) {
-  const daysInMonth = getDaysInMonth(month);
-  const day = getMonthDay(month);
-
-  if (month !== getCurrentMonth() || day <= 1) return 1;
-
-  return Math.max(1 / daysInMonth, (daysInMonth - day + 1) / daysInMonth);
-}
-
 function formatMonthHeader(month: string) {
   const [year, monthIndex] = month.split("-").map(Number);
   const date = new Date(year, monthIndex - 1, 1);
@@ -186,6 +217,7 @@ function formatMonthHeader(month: string) {
 }
 
 function getPaceStatus(current: number, target: number, month: string): PaceStatus {
+  if (target === 0) return "paused";
   if (!target) return "missing";
   if (current <= 0) return "none";
   if (current >= target) return "complete";
@@ -205,23 +237,47 @@ function formatValue(value: number, unit: string) {
   return `${value} ${unit}`;
 }
 
-function getWholeTargetValue(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return 1;
+function getBaseMetricLabel(label: string | undefined, fallback: string) {
+  const baseLabel = label
+    ?.replace(/\s*(?:[-–—·]\s*)?(?:por|\/)\s*(?:dia|semana|m[eê]s|ano)\s*$/i, "")
+    .trim();
 
-  return Math.max(1, Math.ceil(value));
+  return baseLabel || fallback;
+}
+
+function getAnnualCadenceName(cadence: string) {
+  if (cadence === "daily") return "dia";
+  if (cadence === "weekly") return "semana";
+  if (cadence === "yearly") return "ano";
+  return "mês";
+}
+
+function formatAnnualReference(value: number, unit: string, cadence: string) {
+  return `${value} ${unit}/${getAnnualCadenceName(cadence)}`;
 }
 
 function buildRows(targets: MonthlyTargetRecord[]): TargetRow[] {
   return [...targets]
-    .sort((a, b) => categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category))
+    .sort((a, b) => {
+      const categorySort = categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category);
+      if (categorySort !== 0) return categorySort;
+      return (a.metricLabel ?? "").localeCompare(b.metricLabel ?? "");
+    })
     .map((target) => {
       const category = target.category;
       const config = categoryConfig[category];
 
       return {
-        id: category,
-        label: config.label,
-        description: config.description,
+        id: target.metricKey ?? category,
+        category,
+        metricKey: target.metricKey,
+        metricLabel: target.metricLabel,
+        annualCategory: target.annualCategory,
+        annualUnit: target.annualUnit,
+        annualCadence: target.annualCadence,
+        annualTargetValue: target.annualTargetValue,
+        label: getBaseMetricLabel(target.metricLabel, config.label),
+        description: target.metricKey ? config.label : config.description,
         icon: config.icon,
         accent: config.accent,
         primaryUnit: target.primaryUnit,
@@ -236,106 +292,69 @@ function buildRows(targets: MonthlyTargetRecord[]): TargetRow[] {
 
 function targetToDraft(target: TargetRow): TargetDraft {
   return {
-    category: target.id,
+    category: target.category,
+    metricKey: target.metricKey,
+    metricLabel: target.metricKey ? target.label : target.metricLabel,
+    annualCategory: target.annualCategory,
+    annualUnit: target.annualUnit,
+    annualCadence: target.annualCadence,
+    annualTargetValue: target.annualTargetValue,
     primaryUnit: target.primaryUnit,
-    targetValue: target.targetValue || 1,
+    targetValue: target.targetValue,
     optionalSecondaryUnit: target.secondaryUnit,
     optionalSecondaryTargetValue: target.secondaryTargetValue,
   };
 }
 
-function getOperatingContextLabel(target: OperatingTargetContext, daysInMonth: number) {
-  if (target.cadence === "daily") {
-    const monthlyEquivalent = Math.round(target.targetValue * daysInMonth * 10) / 10;
-    return `${target.targetValue} ${target.unit}/dia · ≈ ${monthlyEquivalent} ${target.unit}/mês`;
-  }
-
-  if (target.cadence === "monthly") {
-    return `${target.targetValue} ${target.unit}/mês`;
-  }
-
-  if (target.cadence === "yearly") {
-    const monthlyEquivalent = Math.round((target.targetValue / 12) * 10) / 10;
-    return `${target.targetValue} ${target.unit}/ano · ≈ ${monthlyEquivalent} ${target.unit}/mês`;
-  }
-
-  const monthlyEquivalent = Math.round(((target.targetValue * daysInMonth) / 7) * 10) / 10;
-  return `${target.targetValue} ${target.unit}/semana · ≈ ${monthlyEquivalent} ${target.unit}/mês`;
+function getOperatingContextLabel(target: OperatingTargetContext, month: string) {
+  return formatDerivedMonthlyContext(target, month, getTodayIsoDate());
 }
 
 function getMonthlyEquivalentValue(target: OperatingTargetContext, month: string) {
-  const daysInMonth = getDaysInMonth(month);
-  const remainingRatio = getRemainingMonthRatio(month);
-  const monthlyValue = (() => {
-    if (target.cadence === "daily") return target.targetValue * daysInMonth * remainingRatio;
-    if (target.cadence === "weekly") return (target.targetValue * daysInMonth * remainingRatio) / 7;
-    if (target.cadence === "yearly") return (target.targetValue / 12) * remainingRatio;
-    return target.targetValue * remainingRatio;
-  })();
-
-  return getWholeTargetValue(monthlyValue);
+  return getDerivedMonthlyTargetValue(target, month, getTodayIsoDate());
 }
 
 function buildSuggestedMonthlyTargets(
   operatingTargets: OperatingTargetContext[],
   month: string,
 ): SuggestedMonthlyTarget[] {
-  const suggestions = new Map<CategoryId, SuggestedMonthlyTarget>();
-
-  for (const target of operatingTargets) {
-    if (!target.active) continue;
-
-    const monthlyValue = getMonthlyEquivalentValue(target, month);
-    const category = target.category as CategoryId;
-
-    if (!categoryOrder.includes(category)) continue;
-
-    if (category === "grind" && target.unit === "torneios") {
-      const existing = suggestions.get("grind") ?? {
-        category: "grind" as const,
-        primaryUnit: "sessões",
-        targetValue: 1,
-        sourceLabel: target.label,
-      };
-
-      suggestions.set("grind", {
-        ...existing,
-        optionalSecondaryUnit: "torneios",
-        optionalSecondaryTargetValue: monthlyValue,
-        sourceLabel: existing.sourceLabel.includes(target.label)
-          ? existing.sourceLabel
-          : `${existing.sourceLabel} + ${target.label}`,
-      });
-      continue;
-    }
-
-    const unit = normalizeMonthlyUnit(category, target.unit);
-    if (!unit) continue;
-
-    suggestions.set(category, {
-      category,
-      primaryUnit: unit,
-      targetValue: monthlyValue,
-      sourceLabel: target.label,
-      optionalSecondaryUnit: suggestions.get(category)?.optionalSecondaryUnit,
-      optionalSecondaryTargetValue: suggestions.get(category)?.optionalSecondaryTargetValue,
+  return operatingTargets
+    .filter((target) => target.active && categoryOrder.includes(target.category))
+    .map((target) => ({
+      category: target.category,
+      metricKey: target.metricKey,
+      metricLabel: getBaseMetricLabel(target.label, categoryConfig[target.category].label),
+      annualCategory: target.category,
+      annualUnit: target.unit,
+      annualCadence: target.cadence,
+      annualTargetValue: target.targetValue,
+      primaryUnit: normalizeMonthlyUnit(target.category, target.unit),
+      targetValue: getMonthlyEquivalentValue(target, month),
+      sourceLabel: getBaseMetricLabel(target.label, categoryConfig[target.category].label),
+    }))
+    .sort((a, b) => {
+      const categorySort = categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category);
+      if (categorySort !== 0) return categorySort;
+      return a.sourceLabel.localeCompare(b.sourceLabel);
     });
-  }
-
-  return categoryOrder.flatMap((category) => {
-    const suggestion = suggestions.get(category);
-    return suggestion ? [suggestion] : [];
-  });
 }
 
 function normalizeMonthlyUnit(category: CategoryId, unit: string) {
-  if (category === "grind" && (unit === "dias" || unit === "sessões")) return "sessões";
-  if (unitOptions[category].includes(unit)) return unit;
-  if (category === "study" && unit === "horas") return "horas";
-  if (category === "review" && unit === "reviews") return "horas";
-  if (category === "sport" && unit === "dias") return "sessões";
+  const normalizedUnit = unit.trim();
 
-  return null;
+  if (unitOptions[category].includes(normalizedUnit)) return normalizedUnit;
+  if (category === "review" && normalizedUnit === "reviews") return "horas";
+  if (normalizedUnit) return normalizedUnit;
+  return categoryConfig[category].defaultUnit;
+}
+
+function getPrimaryUnitOptions(category: CategoryId, currentUnit: string) {
+  const normalizedUnit = currentUnit.trim();
+  const options = unitOptions[category];
+
+  if (!normalizedUnit || options.includes(normalizedUnit)) return options;
+
+  return [normalizedUnit, ...options];
 }
 
 export function MonthlyTargets() {
@@ -372,7 +391,9 @@ function PersistedMonthlyTargets({ month }: { month: string }) {
     canUsePersistence ? { month } : "skip",
   );
   const saveCategory = useMutation(api.monthlyTarget.saveCategory);
+  const saveMetric = useMutation(api.monthlyTarget.saveMetric);
   const clearCategory = useMutation(api.monthlyTarget.clearCategory);
+  const clearMetric = useMutation(api.monthlyTarget.clearMetric);
   const [saveState, setSaveState] = useState<SaveState>("idle");
 
   if (
@@ -406,8 +427,8 @@ function PersistedMonthlyTargets({ month }: { month: string }) {
     month,
     annualPlan?._id ?? "no-annual-plan",
     annualPlan?.updatedAt ?? 0,
-    monthlyTargets?.map((target) => `${target.category}:${target.updatedAt}`).join("|") ?? "empty",
-    monthlyTargets?.map((target) => `${target.category}:${target.currentValue ?? 0}`).join("|") ?? "progress-empty",
+    monthlyTargets?.map((target) => `${target.metricKey ?? target.category}:${target.updatedAt}`).join("|") ?? "empty",
+    monthlyTargets?.map((target) => `${target.metricKey ?? target.category}:${target.currentValue ?? 0}`).join("|") ?? "progress-empty",
   ].join(":");
 
   return (
@@ -418,22 +439,41 @@ function PersistedMonthlyTargets({ month }: { month: string }) {
       initialOperatingTargets={operatingTargets ?? []}
       initialTargets={monthlyTargets ?? []}
       month={month}
-      onClearCategory={async ({ category }) => {
+      onClearTarget={async ({ category, metricKey }) => {
         setSaveState("saving");
 
         try {
-          await clearCategory({ month, category });
+          if (metricKey) {
+            await clearMetric({ month, metricKey });
+          } else {
+            await clearCategory({ month, category });
+          }
           setSaveState("saved");
         } catch {
           setSaveState("error");
           throw new Error("Could not clear monthly target");
         }
       }}
-      onSaveCategory={async (target) => {
+      onSaveTarget={async (target) => {
         setSaveState("saving");
 
         try {
-          await saveCategory({ month, ...target });
+          if (target.metricKey && target.metricLabel) {
+            await saveMetric({
+              month,
+              category: target.category,
+              metricKey: target.metricKey,
+              metricLabel: target.metricLabel,
+              annualCategory: target.annualCategory,
+              annualUnit: target.annualUnit,
+              annualCadence: target.annualCadence,
+              annualTargetValue: target.annualTargetValue,
+              primaryUnit: target.primaryUnit,
+              targetValue: target.targetValue,
+            });
+          } else {
+            await saveCategory({ month, ...target });
+          }
           setSaveState("saved");
         } catch {
           setSaveState("error");
@@ -450,22 +490,17 @@ function MonthlySetupWizard({
   initialSuggestions,
   month,
   saveState,
-  step,
   onCancel,
   onSave,
-  onStepChange,
 }: {
   annualPlan: AnnualPlanContext | null;
   initialSuggestions: SuggestedMonthlyTarget[];
   month: string;
   saveState: SaveState;
-  step: number;
   onCancel: () => void;
   onSave: (targets: SuggestedMonthlyTarget[]) => Promise<void>;
-  onStepChange: Dispatch<SetStateAction<number>>;
 }) {
   const [suggestions, setSuggestions] = useState<SuggestedMonthlyTarget[]>(initialSuggestions);
-  const steps = ["Contexto", "Objetivos", "Revisão"];
 
   function updateSuggestion(index: number, patch: Partial<SuggestedMonthlyTarget>) {
     setSuggestions((current) =>
@@ -480,12 +515,7 @@ function MonthlySetupWizard({
     );
   }
 
-  async function continueOrSave() {
-    if (step < steps.length - 1) {
-      onStepChange((current) => Math.min(current + 1, steps.length - 1));
-      return;
-    }
-
+  async function saveReview() {
     await onSave(suggestions);
   }
 
@@ -500,33 +530,18 @@ function MonthlySetupWizard({
       >
         <header className={styles.modalHeader}>
           <div>
-            <span>Objetivos mensais · passo {step + 1} de {steps.length}</span>
-            <h2 id="monthly-setup-title">{steps[step]}</h2>
+            <span>Objetivos mensais</span>
+            <h2 id="monthly-setup-title">Rever objetivos sugeridos</h2>
           </div>
           <button className={styles.iconOnlyButton} type="button" aria-label="Fechar" onClick={onCancel}>
             <X size={16} aria-hidden="true" />
           </button>
         </header>
 
-        <div className={styles.stepper} aria-label="Progresso">
-          {steps.map((label, index) => (
-            <button
-              className={index === step ? styles.activeStep : undefined}
-              key={label}
-              type="button"
-              onClick={() => onStepChange(index)}
-            >
-              <span>{index + 1}</span>
-              {label}
-            </button>
-          ))}
-        </div>
-
         <div className={styles.modalBody}>
-          {step === 0 ? (
-            <div className={styles.wizardStack}>
+            <div className={styles.reviewSurface}>
               <div className={styles.wizardIntro}>
-                <h3>Este mês deve servir a direção anual.</h3>
+                <h3>Contexto</h3>
                 <p>Usa isto como critério antes de aceitar ou ajustar as metas sugeridas.</p>
               </div>
               <section className={styles.contextReview}>
@@ -546,22 +561,24 @@ function MonthlySetupWizard({
                   <small>Regra: {annualPlan.decisionRule}</small>
                 ) : null}
               </section>
-            </div>
-          ) : null}
 
-          {step === 1 ? (
-            <div className={styles.wizardStack}>
               <div className={styles.wizardIntro}>
                 <h3>Objetivos sugeridos para {formatMonthHeader(month).split(" · ")[0]}</h3>
-                <p>Valores inteiros, derivados dos ritmos anuais ativos. Ajusta antes de confirmar.</p>
+                <p>Cada métrica anual ativa aparece separada. Usa 0 quando não a vais perseguir neste mês.</p>
               </div>
               {suggestions.length ? (
                 <div className={styles.suggestionList}>
                   {suggestions.map((target, index) => (
-                    <div className={styles.suggestionItem} key={`${target.category}:${target.sourceLabel}`}>
+                    <div className={styles.suggestionItem} key={target.metricKey ?? `${target.category}:${target.sourceLabel}`}>
                       <div>
                         <span>{categoryConfig[target.category].label}</span>
                         <strong>{target.sourceLabel}</strong>
+                        {target.annualTargetValue && target.annualUnit && target.annualCadence ? (
+                          <small>
+                            Referência anual:{" "}
+                            {formatAnnualReference(target.annualTargetValue, target.annualUnit, target.annualCadence)}
+                          </small>
+                        ) : null}
                       </div>
                       <label>
                         Unidade
@@ -569,7 +586,7 @@ function MonthlySetupWizard({
                           value={target.primaryUnit}
                           onChange={(event) => updateSuggestion(index, { primaryUnit: event.target.value })}
                         >
-                          {unitOptions[target.category].map((unit) => (
+                          {getPrimaryUnitOptions(target.category, target.primaryUnit).map((unit) => (
                             <option key={unit} value={unit}>
                               {unit}
                             </option>
@@ -579,12 +596,12 @@ function MonthlySetupWizard({
                       <label>
                         Meta
                         <input
-                          min="1"
+                          min="0"
                           type="number"
                           value={target.targetValue}
                           onChange={(event) =>
                             updateSuggestion(index, {
-                              targetValue: getWholeTargetValue(Number(event.target.value)),
+                              targetValue: getWholeMonthlyTargetValue(Number(event.target.value)),
                             })
                           }
                         />
@@ -593,12 +610,12 @@ function MonthlySetupWizard({
                         <label>
                           {target.optionalSecondaryUnit}
                           <input
-                            min="1"
+                            min="0"
                             type="number"
-                            value={target.optionalSecondaryTargetValue ?? 1}
+                            value={target.optionalSecondaryTargetValue ?? 0}
                             onChange={(event) =>
                               updateSuggestion(index, {
-                                optionalSecondaryTargetValue: getWholeTargetValue(Number(event.target.value)),
+                                optionalSecondaryTargetValue: getWholeMonthlyTargetValue(Number(event.target.value)),
                               })
                             }
                           />
@@ -610,17 +627,18 @@ function MonthlySetupWizard({
               ) : (
                 <div className={styles.wizardEmpty}>
                   <Gauge size={18} aria-hidden="true" />
-                  <p>Não há métricas anuais ativas que mapeiem diretamente para Grind, Estudo, Revisão ou Desporto.</p>
+                  <p>Não há métricas anuais ativas para sugerir este mês.</p>
                 </div>
               )}
-            </div>
-          ) : null}
 
-          {step === 2 ? (
+              <div className={styles.wizardIntro}>
+                <h3>Revisão</h3>
+                <p>Preview do que fica definido para este mês ao confirmar.</p>
+              </div>
             <div className={styles.reviewGrid}>
               {suggestions.length ? (
                 suggestions.map((target) => (
-                  <section className={styles.reviewCard} key={target.category}>
+                  <section className={styles.reviewCard} key={target.metricKey ?? target.category}>
                     <span>{categoryConfig[target.category].label}</span>
                     <strong>{formatValue(target.targetValue, target.primaryUnit)}</strong>
                     {target.optionalSecondaryUnit && target.optionalSecondaryTargetValue ? (
@@ -629,6 +647,12 @@ function MonthlySetupWizard({
                       </small>
                     ) : null}
                     <p>{target.sourceLabel}</p>
+                    {target.annualTargetValue && target.annualUnit && target.annualCadence ? (
+                      <small>
+                        Referência anual:{" "}
+                        {formatAnnualReference(target.annualTargetValue, target.annualUnit, target.annualCadence)}
+                      </small>
+                    ) : null}
                   </section>
                 ))
               ) : (
@@ -638,7 +662,7 @@ function MonthlySetupWizard({
                 </section>
               )}
             </div>
-          ) : null}
+            </div>
         </div>
 
         {saveState === "error" ? (
@@ -649,28 +673,14 @@ function MonthlySetupWizard({
           <button className="ep-button secondary" type="button" onClick={onCancel}>
             Cancelar
           </button>
-          {step > 0 ? (
-            <button className="ep-button secondary" type="button" onClick={() => onStepChange((current) => current - 1)}>
-              Voltar
-            </button>
-          ) : null}
           <button
             className="ep-button primary"
-            disabled={saveState === "saving" || (step === steps.length - 1 && !suggestions.length)}
+            disabled={saveState === "saving" || !suggestions.length}
             type="button"
-            onClick={continueOrSave}
+            onClick={saveReview}
           >
-            {step === steps.length - 1 ? (
-              <>
-                <Save size={14} aria-hidden="true" />
-                {saveState === "saving" ? "A guardar..." : "Confirmar objetivos"}
-              </>
-            ) : (
-              <>
-                Continuar
-                <ArrowRight size={14} aria-hidden="true" />
-              </>
-            )}
+            <Save size={14} aria-hidden="true" />
+            {saveState === "saving" ? "A guardar..." : "Confirmar objetivos"}
           </button>
         </footer>
       </section>
@@ -685,21 +695,20 @@ function MonthlyTargetsWorkspace({
   initialOperatingTargets = [],
   initialTargets = [],
   month,
-  onClearCategory,
-  onSaveCategory,
+  onClearTarget,
+  onSaveTarget,
   saveState = "idle",
 }: MonthlyTargetsWorkspaceProps) {
   const [targets, setTargets] = useState(initialTargets);
-  const [editingId, setEditingId] = useState<CategoryId | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [showAnnualDirection, setShowAnnualDirection] = useState(true);
   const [draft, setDraft] = useState<TargetDraft | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
-  const [wizardStep, setWizardStep] = useState(0);
   const [localSaveState, setLocalSaveState] = useState<SaveState>(saveState);
   const targetRows = useMemo(() => buildRows(targets), [targets]);
   const hasTargets = targets.length > 0;
   const activeOperatingTargets = initialOperatingTargets.filter(
-    (target) => target.active && categoryOrder.includes(target.category as CategoryId),
+    (target) => target.active && categoryOrder.includes(target.category),
   );
   const hasActiveOperatingTargets = activeOperatingTargets.length > 0;
   const suggestedTargets = useMemo(
@@ -721,9 +730,16 @@ function MonthlyTargetsWorkspace({
       suggestedTargets.map((target) => {
         const config = categoryConfig[target.category];
         return {
-          id: target.category,
-          label: config.label,
-          description: target.sourceLabel,
+          id: target.metricKey ?? target.category,
+          category: target.category,
+          metricKey: target.metricKey,
+          metricLabel: target.metricLabel,
+          annualCategory: target.annualCategory,
+          annualUnit: target.annualUnit,
+          annualCadence: target.annualCadence,
+          annualTargetValue: target.annualTargetValue,
+          label: getBaseMetricLabel(target.metricLabel, config.label),
+          description: config.label,
           icon: config.icon,
           accent: config.accent,
           primaryUnit: target.primaryUnit,
@@ -749,8 +765,8 @@ function MonthlyTargetsWorkspace({
       }));
 
   const editingTarget = targetRows.find((target) => target.id === editingId) ?? null;
-  const categoryOperatingTargets = activeOperatingTargets.filter(
-    (target) => target.category === draft?.category,
+  const referenceOperatingTargets = activeOperatingTargets.filter(
+    (target) => (draft?.metricKey ? target.metricKey === draft.metricKey : target.category === draft?.category),
   );
 
   const startEditing = (target: TargetRow) => {
@@ -760,7 +776,6 @@ function MonthlyTargetsWorkspace({
   };
 
   const startMonthlyWizard = () => {
-    setWizardStep(0);
     setWizardOpen(true);
     setLocalSaveState("idle");
   };
@@ -772,7 +787,7 @@ function MonthlyTargetsWorkspace({
   };
 
   const saveDraft = async () => {
-    if (!draft || draft.targetValue <= 0) {
+    if (!draft || draft.targetValue < 0) {
       setLocalSaveState("error");
       return;
     }
@@ -795,15 +810,25 @@ function MonthlyTargetsWorkspace({
 
     try {
       if (hasPersistence) {
-        await onSaveCategory?.(payload);
+        await onSaveTarget?.(payload);
       }
 
       setTargets((current) => {
-        const existing = current.some((target) => target.category === payload.category);
+        const existing = current.some((target) =>
+          payload.metricKey ? target.metricKey === payload.metricKey : !target.metricKey && target.category === payload.category,
+        );
 
         if (!existing) return [...current, payload];
 
-        return current.map((target) => (target.category === payload.category ? payload : target));
+        return current.map((target) =>
+          payload.metricKey
+            ? target.metricKey === payload.metricKey
+              ? payload
+              : target
+            : !target.metricKey && target.category === payload.category
+              ? payload
+              : target,
+        );
       });
       setEditingId(null);
       setDraft(null);
@@ -820,10 +845,14 @@ function MonthlyTargetsWorkspace({
 
     try {
       if (hasPersistence) {
-        await onClearCategory?.({ category: draft.category });
+        await onClearTarget?.({ category: draft.category, metricKey: draft.metricKey });
       }
 
-      setTargets((current) => current.filter((target) => target.category !== draft.category));
+      setTargets((current) =>
+        current.filter((target) =>
+          draft.metricKey ? target.metricKey !== draft.metricKey : target.metricKey || target.category !== draft.category,
+        ),
+      );
       setEditingId(null);
       setDraft(null);
       setLocalSaveState("saved");
@@ -833,17 +862,16 @@ function MonthlyTargetsWorkspace({
   };
 
   const saveWizardTargets = async (nextTargets: SuggestedMonthlyTarget[]) => {
-    const payloads = nextTargets
-      .filter((target) => target.targetValue > 0)
-      .map((target) => ({
+    const payloads = nextTargets.map((target) => ({
         category: target.category,
+        metricKey: target.metricKey,
+        metricLabel: target.metricLabel,
+        annualCategory: target.annualCategory,
+        annualUnit: target.annualUnit,
+        annualCadence: target.annualCadence,
+        annualTargetValue: target.annualTargetValue,
         primaryUnit: target.primaryUnit,
-        targetValue: getWholeTargetValue(target.targetValue),
-        optionalSecondaryUnit: target.category === "grind" ? target.optionalSecondaryUnit : undefined,
-        optionalSecondaryTargetValue:
-          target.category === "grind" && target.optionalSecondaryUnit
-            ? getWholeTargetValue(target.optionalSecondaryTargetValue ?? 0)
-            : undefined,
+        targetValue: getWholeMonthlyTargetValue(target.targetValue),
       }));
 
     if (!payloads.length) {
@@ -856,7 +884,7 @@ function MonthlyTargetsWorkspace({
     try {
       if (hasPersistence) {
         for (const payload of payloads) {
-          await onSaveCategory?.(payload);
+          await onSaveTarget?.(payload);
         }
       }
 
@@ -864,7 +892,9 @@ function MonthlyTargetsWorkspace({
         const next = [...current];
 
         for (const payload of payloads) {
-          const index = next.findIndex((target) => target.category === payload.category);
+          const index = next.findIndex((target) =>
+            payload.metricKey ? target.metricKey === payload.metricKey : !target.metricKey && target.category === payload.category,
+          );
           if (index >= 0) {
             next[index] = payload;
           } else {
@@ -875,7 +905,6 @@ function MonthlyTargetsWorkspace({
         return next;
       });
       setWizardOpen(false);
-      setWizardStep(0);
       setLocalSaveState("saved");
     } catch {
       setLocalSaveState("error");
@@ -893,19 +922,19 @@ function MonthlyTargetsWorkspace({
           <p>Define o ritmo do mês para orientar a semana e o dia.</p>
         </div>
         <div className="ep-page-actions">
-          {hasTargets || hasMonthlySuggestions ? (
+          {hasTargets ? (
             <button
               className="ep-button primary"
               type="button"
-              onClick={hasMonthlySuggestions && !hasTargets ? startMonthlyWizard : () => startEditing(targetRows[0])}
+              onClick={() => startEditing(targetRows[0])}
             >
-              {hasTargets ? "Editar objetivos" : "Rever objetivos sugeridos"}
+              Editar objetivos
             </button>
-          ) : (
+          ) : !hasMonthlySuggestions ? (
             <a className="ep-button primary" href="/annual">
               Definir Direção anual
             </a>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -970,7 +999,7 @@ function MonthlyTargetsWorkspace({
               {hasActiveOperatingTargets
                 ? hasMonthlySuggestions
                   ? "Gerámos uma proposta apenas a partir dos ritmos anuais guardados. Ajusta antes de confirmar."
-                  : "Adiciona ritmos anuais de Grind, Estudo, Revisão ou Desporto para gerar este mês."
+                  : "Confirma que há métricas anuais ativas para gerar este mês."
                 : "Define primeiro os ritmos operacionais na Direção anual para evitar objetivos mensais inventados."}
             </p>
           </div>
@@ -991,10 +1020,33 @@ function MonthlyTargetsWorkspace({
       ) : null}
 
       {hasTargets || hasMonthlySuggestions ? (
+        <>
+        <article className={styles.summaryPanel}>
+          <div className={styles.panelHeading}>
+            <div>
+              <span>Pace mensal</span>
+              <h2>Resumo compacto</h2>
+            </div>
+            <Gauge size={18} aria-hidden="true" />
+          </div>
+          <ul>
+            {summaryRows.map((target) => (
+              <li key={target.id}>
+                <span>{target.label}</span>
+                <strong>{target.paceLabel}</strong>
+                <small>
+                  {formatValue(target.currentValue, target.primaryUnit)} /{" "}
+                  {formatValue(target.targetValue, target.primaryUnit)}
+                </small>
+              </li>
+            ))}
+          </ul>
+        </article>
+
         <div className={styles.monthlyLayout}>
         <article className={styles.targetTable} aria-label="Objetivos mensais por categoria">
           <header className={styles.tableHeader}>
-            <span>Categoria</span>
+            <span>Métrica</span>
             <span>Progresso atual</span>
             <span>Objetivo</span>
             <span>Ritmo</span>
@@ -1032,7 +1084,13 @@ function MonthlyTargetsWorkspace({
                 </div>
 
                 <div className={styles.valueCell}>
-                  {target.targetValue ? formatValue(target.targetValue, target.primaryUnit) : "Por definir"}
+                  {formatValue(target.targetValue, target.primaryUnit)}
+                  {target.annualCadence && target.annualUnit && target.annualTargetValue ? (
+                    <small>
+                      Meta mensal derivada de{" "}
+                      {formatAnnualReference(target.annualTargetValue, target.annualUnit, target.annualCadence)}
+                    </small>
+                  ) : null}
                   {target.secondaryUnit && target.secondaryTargetValue ? (
                     <small>
                       + {target.secondaryTargetValue} {target.secondaryUnit}
@@ -1046,9 +1104,14 @@ function MonthlyTargetsWorkspace({
                   </span>
                 </div>
 
-                <button className={styles.iconButton} type="button" onClick={() => startEditing(target)}>
+                <button
+                  aria-label={`Editar métrica ${target.label}`}
+                  className={`${styles.iconButton} ${styles.iconOnlyButton}`}
+                  title="Editar"
+                  type="button"
+                  onClick={() => startEditing(target)}
+                >
                   <Edit3 size={15} aria-hidden="true" />
-                  <span>Editar categoria</span>
                 </button>
               </div>
             );
@@ -1056,23 +1119,58 @@ function MonthlyTargetsWorkspace({
         </article>
 
         <aside className={styles.sideStack}>
-          <article className={styles.editorPanel}>
+          <article className={styles.operatingPanel}>
             <div className={styles.panelHeading}>
               <div>
-                <span>Editor</span>
-                <h2>{editingTarget ? editingTarget.label : "Categoria"}</h2>
+                <span>Ritmo anual</span>
+                <h2>Referência, não aplicação automática</h2>
               </div>
-              {editingTarget ? <span className={styles.activeDot}>A editar</span> : null}
             </div>
+            {activeOperatingTargets.length ? (
+              <ul>
+                {activeOperatingTargets.map((target) => (
+                  <li key={`${target.metricKey}:${target.effectiveFrom}`}>
+                    <strong>{getBaseMetricLabel(target.label, categoryConfig[target.category].label)}</strong>
+                    <small>{getOperatingContextLabel(target, month)}</small>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>Sem ritmo operacional anual ativo para sugerir este mês.</p>
+            )}
+          </article>
+        </aside>
+        </div>
+        </>
+      ) : null}
 
-            {draft ? (
+      {draft ? (
+        <div className={styles.modalLayer} role="presentation">
+          <button className={styles.modalScrim} type="button" aria-label="Fechar" onClick={cancelEditing} />
+          <section
+            aria-labelledby="monthly-metric-editor-title"
+            aria-modal="true"
+            className={`${styles.modal} ${styles.metricModal}`}
+            role="dialog"
+          >
+            <header className={styles.modalHeader}>
+              <div>
+                <span>Métrica mensal</span>
+                <h2 id="monthly-metric-editor-title">{editingTarget ? editingTarget.label : "Métrica"}</h2>
+              </div>
+              <button className={styles.iconOnlyButton} type="button" aria-label="Fechar" onClick={cancelEditing}>
+                <X size={16} aria-hidden="true" />
+              </button>
+            </header>
+            <div className={styles.modalBody}>
               <div className={styles.editorForm}>
-                {categoryOperatingTargets.length ? (
+                {referenceOperatingTargets.length ? (
                   <div className={styles.referenceBox}>
                     <strong>Ritmo anual como referência</strong>
-                    {categoryOperatingTargets.map((target) => (
-                      <p key={`${target.label}:${target.effectiveFrom}`}>
-                        {target.label}: {getOperatingContextLabel(target, getDaysInMonth(month))}
+                    {referenceOperatingTargets.map((target) => (
+                      <p key={`${target.metricKey}:${target.effectiveFrom}`}>
+                        {getBaseMetricLabel(target.label, categoryConfig[target.category].label)}:{" "}
+                        {formatAnnualCadenceLabel(target)}
                       </p>
                     ))}
                   </div>
@@ -1084,7 +1182,7 @@ function MonthlyTargetsWorkspace({
                     value={draft.primaryUnit}
                     onChange={(event) => setDraft({ ...draft, primaryUnit: event.target.value })}
                   >
-                    {unitOptions[draft.category].map((unit) => (
+                    {getPrimaryUnitOptions(draft.category, draft.primaryUnit).map((unit) => (
                       <option key={unit} value={unit}>
                         {unit}
                       </option>
@@ -1093,9 +1191,9 @@ function MonthlyTargetsWorkspace({
                 </label>
 
                 <label>
-                  Objetivo
+                  Objetivo mensal
                   <input
-                    min="1"
+                    min="0"
                     type="number"
                     value={draft.targetValue}
                     onChange={(event) => setDraft({ ...draft, targetValue: Number(event.target.value) })}
@@ -1144,78 +1242,28 @@ function MonthlyTargetsWorkspace({
                 {localSaveState === "error" ? (
                   <p className={styles.errorText}>Não foi possível guardar os objetivos. Confirma os valores e tenta novamente.</p>
                 ) : null}
-
-                <div className={styles.editorActions}>
-                  <button className="ep-button secondary" type="button" onClick={cancelEditing}>
-                    <X size={14} aria-hidden="true" />
-                    Cancelar
-                  </button>
-                  <button className="ep-button secondary" type="button" onClick={clearDraftCategory}>
-                    <Trash2 size={14} aria-hidden="true" />
-                    Limpar categoria
-                  </button>
-                  <button
-                    className="ep-button primary"
-                    disabled={localSaveState === "saving"}
-                    type="button"
-                    onClick={saveDraft}
-                  >
-                    <Save size={14} aria-hidden="true" />
-                    {localSaveState === "saving" ? "A guardar..." : "Guardar categoria"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className={styles.editorEmpty}>
-                <Edit3 size={18} aria-hidden="true" />
-                <p>Escolhe uma categoria para editar unidade e objetivo.</p>
-              </div>
-            )}
-          </article>
-
-          <article className={styles.summaryPanel}>
-            <div className={styles.panelHeading}>
-              <div>
-                <span>Pace mensal</span>
-                <h2>Resumo compacto</h2>
-              </div>
-              <Gauge size={18} aria-hidden="true" />
-            </div>
-            <ul>
-              {summaryRows.map((target) => (
-                <li key={target.id}>
-                  <span>{target.label}</span>
-                  <strong>{target.paceLabel}</strong>
-                  <small>
-                    {formatValue(target.currentValue, target.primaryUnit)} /{" "}
-                    {target.targetValue ? formatValue(target.targetValue, target.primaryUnit) : "por definir"}
-                  </small>
-                </li>
-              ))}
-            </ul>
-          </article>
-
-          <article className={styles.operatingPanel}>
-            <div className={styles.panelHeading}>
-              <div>
-                <span>Ritmo anual</span>
-                <h2>Referência, não aplicação automática</h2>
               </div>
             </div>
-            {activeOperatingTargets.length ? (
-              <ul>
-                {activeOperatingTargets.map((target) => (
-                  <li key={`${target.label}:${target.effectiveFrom}`}>
-                    <strong>{target.label}</strong>
-                    <small>{getOperatingContextLabel(target, getDaysInMonth(month))}</small>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>Sem ritmo operacional anual ativo para sugerir este mês.</p>
-            )}
-          </article>
-        </aside>
+            <footer className={styles.modalFooter}>
+              <button className="ep-button secondary" type="button" onClick={cancelEditing}>
+                <X size={14} aria-hidden="true" />
+                Cancelar
+              </button>
+              <button className="ep-button secondary" type="button" onClick={clearDraftCategory}>
+                <Trash2 size={14} aria-hidden="true" />
+                Limpar métrica
+              </button>
+              <button
+                className="ep-button primary"
+                disabled={localSaveState === "saving"}
+                type="button"
+                onClick={saveDraft}
+              >
+                <Save size={14} aria-hidden="true" />
+                {localSaveState === "saving" ? "A guardar..." : "Guardar métrica"}
+              </button>
+            </footer>
+          </section>
         </div>
       ) : null}
 
@@ -1242,13 +1290,10 @@ function MonthlyTargetsWorkspace({
           initialSuggestions={suggestedTargets}
           month={month}
           saveState={localSaveState}
-          step={wizardStep}
           onCancel={() => {
             setWizardOpen(false);
-            setWizardStep(0);
           }}
           onSave={saveWizardTargets}
-          onStepChange={setWizardStep}
         />
       ) : null}
     </section>

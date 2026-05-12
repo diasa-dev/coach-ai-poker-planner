@@ -13,8 +13,10 @@ import type * as annualPlan from "../annualPlan.js";
 import type * as coachProposal from "../coachProposal.js";
 import type * as dailyPlan from "../dailyPlan.js";
 import type * as monthlyTarget from "../monthlyTarget.js";
+import type * as planningReset from "../planningReset.js";
 import type * as pokerSession from "../pokerSession.js";
 import type * as studySession from "../studySession.js";
+import type * as userPreferences from "../userPreferences.js";
 import type * as weeklyPlan from "../weeklyPlan.js";
 import type * as weeklyReview from "../weeklyReview.js";
 
@@ -30,8 +32,10 @@ declare const fullApi: ApiFromModules<{
   coachProposal: typeof coachProposal;
   dailyPlan: typeof dailyPlan;
   monthlyTarget: typeof monthlyTarget;
+  planningReset: typeof planningReset;
   pokerSession: typeof pokerSession;
   studySession: typeof studySession;
+  userPreferences: typeof userPreferences;
   weeklyPlan: typeof weeklyPlan;
   weeklyReview: typeof weeklyReview;
 }>;
