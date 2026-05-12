@@ -722,6 +722,7 @@ function MonthlyTargetsWorkspace({
       targetRows.map((target) => ({
         ...target,
         pace: getPaceStatus(target.currentValue, target.targetValue, month),
+        isSuggestion: false,
       })),
     [month, targetRows],
   );
@@ -739,7 +740,7 @@ function MonthlyTargetsWorkspace({
           annualCadence: target.annualCadence,
           annualTargetValue: target.annualTargetValue,
           label: getBaseMetricLabel(target.metricLabel, config.label),
-          description: config.label,
+          description: `${config.label} · sugerido pela direção anual`,
           icon: config.icon,
           accent: config.accent,
           primaryUnit: target.primaryUnit,
@@ -749,20 +750,21 @@ function MonthlyTargetsWorkspace({
           secondaryTargetValue: target.optionalSecondaryTargetValue,
           currentSecondaryValue: target.optionalSecondaryUnit ? 0 : undefined,
           pace: "none" as const,
+          isSuggestion: true,
         };
       }),
     [suggestedTargets],
   );
-  const visibleTargetRows = hasTargets ? paceSummary : suggestedRows;
-  const summaryRows = hasTargets
-    ? paceSummary.map((target) => ({
-        ...target,
-        paceLabel: paceLabels[target.pace],
-      }))
-    : suggestedRows.map((target) => ({
-        ...target,
-        paceLabel: "Sugerido",
-      }));
+  const visibleTargetRows = useMemo(() => {
+    const savedIds = new Set(paceSummary.map((target) => target.id));
+    const missingSuggestions = suggestedRows.filter((target) => !savedIds.has(target.id));
+
+    return [...paceSummary, ...missingSuggestions];
+  }, [paceSummary, suggestedRows]);
+  const summaryRows = visibleTargetRows.map((target) => ({
+    ...target,
+    paceLabel: target.isSuggestion ? "Sugerido" : paceLabels[target.pace],
+  }));
 
   const editingTarget = targetRows.find((target) => target.id === editingId) ?? null;
   const referenceOperatingTargets = activeOperatingTargets.filter(

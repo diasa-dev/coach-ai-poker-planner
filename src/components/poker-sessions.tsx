@@ -163,10 +163,7 @@ function PersistedPokerSessions() {
   if (
     auth.kind === "loading" ||
     (canUsePersistence &&
-      (weeklyPlan === undefined ||
-        activeSession === undefined ||
-        sessions === undefined ||
-        sessionCaptureSettings === undefined))
+      (weeklyPlan === undefined || activeSession === undefined || sessions === undefined))
   ) {
     return (
       <section className="ep-page">
