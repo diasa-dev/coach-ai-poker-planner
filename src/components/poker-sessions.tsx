@@ -160,11 +160,7 @@ function PersistedPokerSessions() {
   const confirmReview = useMutation(api.pokerSession.confirmReview);
   const finishSession = useMutation(api.pokerSession.finish);
 
-  if (
-    auth.kind === "loading" ||
-    (canUsePersistence &&
-      (weeklyPlan === undefined || activeSession === undefined || sessions === undefined))
-  ) {
+  if (auth.kind === "loading") {
     return (
       <section className="ep-page">
         <div className="wp-demo-banner">A carregar sessões...</div>
