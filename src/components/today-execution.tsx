@@ -1,9 +1,9 @@
 "use client";
 
-import { BookOpenCheck, Check, Edit3, Gauge, MoreHorizontal, Sparkles, Target, X } from "lucide-react";
+import { BookOpenCheck, CalendarDays, Check, Edit3, Gauge, MoreHorizontal, Play, Sparkles, Target, X } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import {
@@ -36,6 +36,13 @@ type MonthlyTargetContext = {
 type AnnualPlanContext = {
   primaryDirection: string;
   decisionRule: string;
+};
+
+type TodaySessionState = {
+  status: "idle" | "active" | "reviewPending" | "reviewed";
+  startedAt?: number;
+  focus?: string;
+  handsToReview?: number;
 };
 
 type Commitment = {
@@ -90,9 +97,51 @@ const reasonOptions = [
   "Sem motivo claro",
 ];
 const todayIsoDate = getTodayIsoDate();
+const demoSessionCtaStorageKey = "uplinea-demo-session-cta-state";
+const demoSessionCtaEvent = "uplinea-demo-session-state-change";
 
 function getCurrentMonth() {
   return new Date().toISOString().slice(0, 7);
+}
+
+function readDemoTodaySessionState(): TodaySessionState {
+  if (typeof window === "undefined") return { status: "idle" };
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(demoSessionCtaStorageKey) ?? "{}") as {
+      status?: string;
+      startedAt?: number;
+    };
+
+    if (parsed.status === "active" && parsed.startedAt) {
+      return {
+        status: "active",
+        startedAt: parsed.startedAt,
+        focus: "Disciplina em ICM até bolha",
+        handsToReview: 0,
+      };
+    }
+
+    if (parsed.status === "pendingReview") {
+      return {
+        status: "reviewPending",
+        focus: "Disciplina em ICM até bolha",
+        handsToReview: 3,
+      };
+    }
+
+    if (parsed.status === "reviewed") {
+      return {
+        status: "reviewed",
+        focus: "Disciplina em ICM até bolha",
+        handsToReview: 3,
+      };
+    }
+  } catch {
+    // Ignore corrupt demo state.
+  }
+
+  return { status: "idle" };
 }
 
 function getDemoTodayBlocks() {
@@ -131,18 +180,49 @@ function getStudyBlockHref(blockId: string) {
 
 export function TodayExecution() {
   if (!hasPersistenceConfig) {
-    return (
-      <TodayWorkspace
-        source="demo"
-        sourceMessage="Clerk ou Convex ainda não estão configurados. Today está a usar dados mock."
-        todayBlocks={getDemoTodayBlocks()}
-        weeklyFocus={initialWeeklyFocus}
-        weekLabel="Semana demo"
-      />
-    );
+    return <DemoTodayExecution sourceMessage="Clerk ou Convex ainda não estão configurados. Today está a usar dados mock." />;
   }
 
   return <PersistedTodayExecution />;
+}
+
+function DemoTodayExecution({ sourceMessage }: { sourceMessage: string }) {
+  const [sessionState, setSessionState] = useState<TodaySessionState>({ status: "idle" });
+
+  useEffect(() => {
+    let lastSerializedState = "";
+
+    function syncDemoSessionState() {
+      const nextState = readDemoTodaySessionState();
+      const nextSerializedState = JSON.stringify(nextState);
+
+      if (nextSerializedState !== lastSerializedState) {
+        lastSerializedState = nextSerializedState;
+        setSessionState(nextState);
+      }
+    }
+
+    syncDemoSessionState();
+    const intervalId = window.setInterval(syncDemoSessionState, 500);
+    window.addEventListener(demoSessionCtaEvent, syncDemoSessionState);
+    window.addEventListener("storage", syncDemoSessionState);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener(demoSessionCtaEvent, syncDemoSessionState);
+      window.removeEventListener("storage", syncDemoSessionState);
+    };
+  }, []);
+
+  return (
+    <TodayWorkspace
+      source="demo"
+      sourceMessage={sourceMessage}
+      sessionState={sessionState}
+      todayBlocks={getDemoTodayBlocks()}
+      weeklyFocus={initialWeeklyFocus}
+      weekLabel="Semana demo"
+    />
+  );
 }
 
 function PersistedTodayExecution() {
@@ -165,6 +245,9 @@ function PersistedTodayExecution() {
     api.annualPlan.getCurrent,
     canUsePersistence ? { year: new Date().getFullYear() } : "skip",
   );
+  const activeSession = useQuery(api.pokerSession.getActive, canUsePersistence ? {} : "skip");
+  const pendingReviewSession = useQuery(api.pokerSession.getPendingReview, canUsePersistence ? {} : "skip");
+  const sessions = useQuery(api.pokerSession.list, canUsePersistence ? {} : "skip");
   const prepareDay = useMutation(api.dailyPlan.prepareDay);
   const updateDailyCommitment = useMutation(api.dailyPlan.updateDailyCommitment);
   const closePreparedDay = useMutation(api.dailyPlan.closePreparedDay);
@@ -186,13 +269,7 @@ function PersistedTodayExecution() {
 
   if (auth.kind === "signed-out") {
     return (
-      <TodayWorkspace
-        source="demo"
-        sourceMessage="Sessão não iniciada. Today está a usar dados mock até entrares."
-        todayBlocks={getDemoTodayBlocks()}
-        weeklyFocus={initialWeeklyFocus}
-        weekLabel="Semana demo"
-      />
+      <DemoTodayExecution sourceMessage="Sessão não iniciada. Today está a usar dados mock até entrares." />
     );
   }
 
@@ -205,6 +282,7 @@ function PersistedTodayExecution() {
         todayBlocks={[]}
         weeklyFocus="Dados reais ainda indisponíveis."
         weekLabel="Dados reais indisponíveis"
+        sessionState={{ status: "idle" }}
       />
     );
   }
@@ -231,6 +309,27 @@ function PersistedTodayExecution() {
     reason: commitment.reason,
   }));
   const currentMonthlyTargets = monthlyTargets ?? [];
+  const reviewedTodaySession = sessions?.find((session) => session.status === "reviewed" && session.date === todayIsoDate);
+  const sessionState: TodaySessionState = activeSession
+    ? {
+        status: "active",
+        startedAt: activeSession.startedAt,
+        focus: activeSession.sessionFocus,
+        handsToReview: activeSession.handsToReview,
+      }
+    : pendingReviewSession
+      ? {
+          status: "reviewPending",
+          focus: pendingReviewSession.sessionFocus,
+          handsToReview: pendingReviewSession.handsToReview,
+        }
+      : reviewedTodaySession
+        ? {
+            status: "reviewed",
+            focus: reviewedTodaySession.sessionFocus,
+            handsToReview: reviewedTodaySession.handsToReview,
+          }
+        : { status: "idle" };
 
   return (
     <TodayWorkspace
@@ -240,6 +339,7 @@ function PersistedTodayExecution() {
       initialCommitments={preparedCommitments}
       monthlyTargets={currentMonthlyTargets}
       greetingName={auth.firstName}
+      sessionState={sessionState}
       onCloseDay={
         safePreparedDay.dailyPlan
           ? async () => {
@@ -303,6 +403,7 @@ function TodayWorkspace({
   onCloseDay,
   onPrepareDay,
   onUpdateCommitment,
+  sessionState = { status: "idle" },
   source,
   sourceMessage,
   todayBlocks,
@@ -321,6 +422,7 @@ function TodayWorkspace({
     status: CommitmentStatus,
     reason?: string,
   ) => Promise<void>;
+  sessionState?: TodaySessionState;
   source: TodaySource;
   sourceMessage: string;
   todayBlocks: PlanBlock[];
@@ -360,6 +462,16 @@ function TodayWorkspace({
   const headerContext = shouldStartWithAnnualDirection
     ? "Próximo passo · Direção anual"
     : `Foco da semana · ${weeklyFocus}`;
+  const nextAction = getTodayNextAction({
+    completedCommitments,
+    commitmentsCount: commitments.length,
+    dailyPlanStatus,
+    onPrepare: () => setPrepareOpen(true),
+    sessionState,
+    shouldStartWithAnnualDirection,
+    source,
+    todayBlocks: displayedTodayBlocks,
+  });
 
   async function updateCommitment(id: string, status: CommitmentStatus) {
     const currentCommitment = commitments.find((item) => item.id === id);
@@ -464,6 +576,10 @@ function TodayWorkspace({
         </div>
       </div>
 
+      <TodayNextActionCard action={nextAction} />
+
+      {sessionState.status !== "idle" ? <TodaySessionStatusCard sessionState={sessionState} /> : null}
+
       <div className="today-layout">
         <main className="today-main">
           <CommitmentsCard
@@ -488,7 +604,7 @@ function TodayWorkspace({
         <aside className="today-side">
           <AnnualContextCard annualPlan={annualPlan ?? null} />
           <MonthlyPaceCard targets={monthlyTargets} />
-          <CoachCard />
+          <CoachCard sessionState={sessionState} />
           <button className="today-close-button" type="button" onClick={() => setCloseOpen(true)}>
             <Check size={14} aria-hidden="true" />
             {dailyPlanStatus === "closed" ? "Dia fechado" : "Fechar dia"}
@@ -605,6 +721,228 @@ function getTodayHeaderLabel(weekLabel: string) {
   return `${formatted} · ${weekLabel}`.toUpperCase();
 }
 
+type TodayNextAction = {
+  detail: string;
+  href?: string;
+  icon: "calendar" | "check" | "coach" | "play" | "study" | "target";
+  label: string;
+  onClick?: () => void;
+  title: string;
+};
+
+function getTodayNextAction({
+  completedCommitments,
+  commitmentsCount,
+  dailyPlanStatus,
+  onPrepare,
+  sessionState,
+  shouldStartWithAnnualDirection,
+  source,
+  todayBlocks,
+}: {
+  completedCommitments: number;
+  commitmentsCount: number;
+  dailyPlanStatus?: "prepared" | "closed";
+  onPrepare: () => void;
+  sessionState: TodaySessionState;
+  shouldStartWithAnnualDirection: boolean;
+  source: TodaySource;
+  todayBlocks: PlanBlock[];
+}): TodayNextAction {
+  if (sessionState.status === "active") {
+    return {
+      detail: `Sessão em curso${sessionState.focus ? `: ${sessionState.focus}` : ""}. Volta ao cockpit da sessão para check-ups, notas e mãos marcadas.`,
+      href: "/sessions",
+      icon: "play",
+      label: "Voltar à sessão",
+      title: "Sessão ativa — mantém execução limpa",
+    };
+  }
+
+  if (sessionState.status === "reviewPending") {
+    return {
+      detail: `Fecha a review antes de abrir novo ciclo. ${sessionState.handsToReview ?? 0} mãos marcadas entram no contexto do Coach.`,
+      href: "/sessions?reviewSession=1",
+      icon: "check",
+      label: "Terminar review",
+      title: "Review pendente — fecha o loop",
+    };
+  }
+
+  if (sessionState.status === "reviewed") {
+    return {
+      detail: "Sessão revista. O próximo valor está em pedir leitura ao Coach ou ajustar a semana com base no que aconteceu.",
+      href: "/coach?context=session-review",
+      icon: "coach",
+      label: "Pedir leitura ao Coach",
+      title: "Sessão fechada — transforma em direção",
+    };
+  }
+
+  if (shouldStartWithAnnualDirection) {
+    return {
+      detail: "Define primeiro o critério anual. Depois a app consegue transformar direção em mês, semana e execução.",
+      href: "/annual?setup=annual",
+      icon: "target",
+      label: "Definir direção anual",
+      title: "Começa pelo norte do ano",
+    };
+  }
+
+  if (source === "no-active-plan") {
+    return {
+      detail: "Sem plano semanal ativo, o Hoje ainda não sabe o que proteger na execução.",
+      href: "/weekly",
+      icon: "calendar",
+      label: "Planear semana",
+      title: "Transforma o mês numa semana executável",
+    };
+  }
+
+  if (!commitmentsCount || dailyPlanStatus === "closed") {
+    return {
+      detail: "Escolhe 1 a 3 ações observáveis para hoje. Isto é o cockpit, não uma lista genérica.",
+      icon: "check",
+      label: dailyPlanStatus === "closed" ? "Reabrir preparação" : "Preparar dia",
+      onClick: onPrepare,
+      title: dailyPlanStatus === "closed" ? "Dia fechado — ajusta só se precisares" : "Prepara a execução de hoje",
+    };
+  }
+
+  const plannedStudyBlock = todayBlocks.find(isPlannedStudyBlock);
+  if (plannedStudyBlock) {
+    return {
+      detail: `Há estudo planeado: ${plannedStudyBlock.title}. Regista o bloco para o Coach manter contexto real.`,
+      href: getStudyBlockHref(plannedStudyBlock.id),
+      icon: "study",
+      label: "Registar estudo",
+      title: "Executa o próximo bloco de estudo",
+    };
+  }
+
+  const plannedGrindBlock = todayBlocks.find((block) => block.type === "Grind" && block.status === "Planeado");
+  if (plannedGrindBlock) {
+    return {
+      detail: `Sessão planeada: ${plannedGrindBlock.title}. Entra pela sessão para capturar foco, check-ups e mãos a rever.`,
+      href: "/sessions?startSession=1",
+      icon: "play",
+      label: "Ir para sessão",
+      title: "Executa a sessão com contexto",
+    };
+  }
+
+  if (completedCommitments < commitmentsCount) {
+    return {
+      detail: `${completedCommitments} de ${commitmentsCount} compromissos feitos. Continua a execução e marca o resultado sem overthinking.`,
+      icon: "check",
+      label: "Continuar no cockpit",
+      onClick: () => document.getElementById("today-commitments")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      title: "Ainda há execução para fechar",
+    };
+  }
+
+  return {
+    detail: "Com o dia executado, o melhor próximo passo é pedir uma leitura contextual ao Coach antes de ajustar a semana.",
+    href: "/coach?context=day-close",
+    icon: "coach",
+    label: "Pedir leitura ao Coach",
+    title: "Fecha o loop com Coach AI",
+  };
+}
+
+function TodayNextActionCard({ action }: { action: TodayNextAction }) {
+  const Icon = {
+    calendar: CalendarDays,
+    check: Check,
+    coach: Sparkles,
+    play: Play,
+    study: BookOpenCheck,
+    target: Target,
+  }[action.icon];
+  const content = (
+    <>
+      <span className="today-next-icon"><Icon size={18} aria-hidden="true" /></span>
+      <span className="today-next-copy">
+        <small>Próxima ação recomendada</small>
+        <strong>{action.title}</strong>
+        <em>{action.detail}</em>
+      </span>
+      <span className="today-next-label">{action.label}</span>
+    </>
+  );
+
+  if (action.href) {
+    return (
+      <Link className="today-next-action" href={action.href}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button className="today-next-action" type="button" onClick={action.onClick}>
+      {content}
+    </button>
+  );
+}
+
+function TodaySessionStatusCard({ sessionState }: { sessionState: TodaySessionState }) {
+  const copy = {
+    active: {
+      detail: "Sessão em curso: o Today passa a proteger execução, check-ups, notas rápidas e mãos marcadas.",
+      href: "/sessions",
+      label: "Voltar à sessão",
+      meta: sessionState.startedAt ? `Iniciada ${formatSessionStartedAt(sessionState.startedAt)}` : "Em curso",
+      title: "Sessão ativa",
+    },
+    reviewPending: {
+      detail: "Antes de abrir outra sessão, fecha a review para alimentar o Coach AI com contexto real.",
+      href: "/sessions?reviewSession=1",
+      label: "Terminar review",
+      meta: `${sessionState.handsToReview ?? 0} mãos marcadas`,
+      title: "Review pendente",
+    },
+    reviewed: {
+      detail: "Sessão revista. Agora o Coach já pode transformar execução em sugestões para estudo/semana.",
+      href: "/coach?context=session-review",
+      label: "Abrir Coach",
+      meta: `${sessionState.handsToReview ?? 0} mãos no contexto`,
+      title: "Sessão fechada",
+    },
+    idle: {
+      detail: "Sem sessão em curso.",
+      href: "/sessions?startSession=1",
+      label: "Iniciar sessão",
+      meta: "Idle",
+      title: "Sem sessão ativa",
+    },
+  }[sessionState.status];
+
+  return (
+    <article className="today-panel today-session-status-card">
+      <header className="today-card-head">
+        <div>
+          <Play size={18} aria-hidden="true" />
+          <h2>{copy.title}</h2>
+        </div>
+        <small>{copy.meta}</small>
+      </header>
+      <p>{copy.detail}</p>
+      {sessionState.focus ? <small className="today-coach-context">Foco: {sessionState.focus}</small> : null}
+      <Link className="today-coach-link" href={copy.href}>
+        {copy.label} →
+      </Link>
+    </article>
+  );
+}
+
+function formatSessionStartedAt(timestamp: number) {
+  return new Intl.DateTimeFormat("pt-PT", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+}
+
 function CommitmentsCard({
   commitments,
   completed,
@@ -627,7 +965,7 @@ function CommitmentsCard({
   const isPrepared = commitments.length > 0;
 
   return (
-    <article className="today-panel today-commitments-card">
+    <article className="today-panel today-commitments-card" id="today-commitments">
       <header className="today-card-head">
         <div>
           <span className="today-card-icon">⊙</span>
@@ -964,7 +1302,9 @@ function formatMonthlyTargetValue(value: number, unit: string) {
   return `${value} ${unit}`;
 }
 
-function CoachCard() {
+function CoachCard({ sessionState }: { sessionState: TodaySessionState }) {
+  const copy = getTodayCoachCardCopy(sessionState);
+
   return (
     <article className="today-panel today-coach-card">
       <header className="today-card-head">
@@ -972,21 +1312,58 @@ function CoachCard() {
           <Sparkles size={18} aria-hidden="true" />
           <h2>Coach</h2>
         </div>
-        <small>há 2 min</small>
+        <small>{copy.meta}</small>
       </header>
       <div className="today-coach-body">
         <span>✶</span>
-        <p>
-          Tens uma sessão pendente de revisão e estudo abaixo do ritmo. Antes da grind da noite, posso preparar uma
-          proposta com 30 min de revisão e 25 min de ICM.
-        </p>
+        <p>{copy.body}</p>
       </div>
-      <small className="today-coach-context">Contexto: plano da semana + 3 últimas sessões</small>
-      <Link className="today-coach-link" href="/coach">
-        Pedir ao Coach →
+      <small className="today-coach-context">{copy.context}</small>
+      <Link className="today-coach-link" href={copy.href}>
+        {copy.label} →
       </Link>
     </article>
   );
+}
+
+function getTodayCoachCardCopy(sessionState: TodaySessionState) {
+  if (sessionState.status === "active") {
+    return {
+      body: "Durante a sessão, o Coach fica em modo contexto: foco, check-ups e mãos marcadas primeiro; sugestões só depois da review.",
+      context: sessionState.focus ? `Contexto: sessão ativa · ${sessionState.focus}` : "Contexto: sessão ativa",
+      href: "/sessions",
+      label: "Voltar à sessão",
+      meta: "ao vivo",
+    };
+  }
+
+  if (sessionState.status === "reviewPending") {
+    return {
+      body: "Há uma review por fechar. Fecha esse loop para o Coach conseguir sugerir o próximo ajuste com base em execução real.",
+      context: `Contexto: review pendente · ${sessionState.handsToReview ?? 0} mãos marcadas`,
+      href: "/sessions?reviewSession=1",
+      label: "Terminar review",
+      meta: "pendente",
+    };
+  }
+
+  if (sessionState.status === "reviewed") {
+    return {
+      body: "Sessão revista. Posso transformar o que aconteceu em direção prática: próximo foco, bloco de estudo ou ajuste da semana.",
+      context: sessionState.focus ? `Contexto: sessão revista · ${sessionState.focus}` : "Contexto: sessão revista",
+      href: "/coach?context=session-review",
+      label: "Pedir leitura ao Coach",
+      meta: "pronto",
+    };
+  }
+
+  return {
+    body: "Quando registas sessão, estudo e review, eu consigo ligar execução real ao plano semanal em vez de dar sugestões genéricas.",
+    context: "Contexto: plano da semana + sessões + estudo + review",
+    href: "/coach",
+    label: "Abrir Coach",
+    meta: "contextual",
+  };
 }
 
 function PrepareDayDialog({

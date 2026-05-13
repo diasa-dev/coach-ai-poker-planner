@@ -14,6 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { api } from "../../convex/_generated/api";
@@ -98,8 +99,11 @@ type CoachApplyResult = {
   undoExpiresAt?: number;
 };
 
+type CoachIntent = "default" | "sessionReview" | "dayClose";
+
 type CoachShellProps = {
   context: CoachContext;
+  intent: CoachIntent;
   hasActiveApplication?: boolean;
   activeUndoExpiresAt?: number;
   onApplyProposal?: (payload: CoachPlanApplyPayload) => Promise<CoachApplyResult>;
@@ -148,6 +152,51 @@ const promptChips = [
   "Analisa as últimas sessões",
   "Estou perdido - o que devo fazer hoje?",
 ];
+
+const sessionReviewPromptChips = [
+  "O que ajusto depois desta sessão?",
+  "Transforma a review em estudo",
+  "Que foco levo para a próxima sessão?",
+  "Ajusta a semana com base na execução",
+];
+
+const dayClosePromptChips = [
+  "Fecha o dia em direção prática",
+  "O que passa para amanhã?",
+  "Ajusta a semana sem overplanning",
+  "Que padrão viste hoje?",
+];
+
+function getCoachIntent(value: string | null): CoachIntent {
+  if (value === "session-review") return "sessionReview";
+  if (value === "day-close") return "dayClose";
+  return "default";
+}
+
+function getPromptChips(intent: CoachIntent) {
+  if (intent === "sessionReview") return sessionReviewPromptChips;
+  if (intent === "dayClose") return dayClosePromptChips;
+  return promptChips;
+}
+
+function getCoachUserPrompt(intent: CoachIntent) {
+  if (intent === "sessionReview") return "Revê a sessão que acabei de fechar. O que devo ajustar agora?";
+  if (intent === "dayClose") return "O dia ficou executado. O que devo levar para amanhã e para a semana?";
+  return "Estudo está abaixo do ritmo. O que faço esta semana?";
+}
+
+function getCoachContextKey(context: CoachContext, intent: CoachIntent) {
+  return [
+    intent,
+    context.weeklyPlanScope,
+    context.sessionsState,
+    context.reviewedSessions,
+    context.pendingSessionReviews,
+    context.handsToReview,
+    context.studyPaceState,
+    context.nextActions.join("|"),
+  ].join("::");
+}
 
 const demoCoachContext: CoachContext = {
   isDemo: true,
@@ -230,14 +279,17 @@ const persistenceUnavailableCoachContext: CoachContext = {
 };
 
 export function CoachWorkspace() {
+  const searchParams = useSearchParams();
+  const intent = getCoachIntent(searchParams.get("context"));
+
   if (!hasPersistenceConfig) {
-    return <CoachShell context={demoCoachContext} />;
+    return <CoachShell key={getCoachContextKey(demoCoachContext, intent)} context={demoCoachContext} intent={intent} />;
   }
 
-  return <PersistedCoachWorkspace />;
+  return <PersistedCoachWorkspace intent={intent} />;
 }
 
-function PersistedCoachWorkspace() {
+function PersistedCoachWorkspace({ intent }: { intent: CoachIntent }) {
   const auth = usePersistenceAuth();
   const canUsePersistence = auth.kind === "ready";
   const weeklyPlan = useQuery(api.weeklyPlan.getCurrent, canUsePersistence ? { today: todayIsoDate } : "skip");
@@ -342,7 +394,9 @@ function PersistedCoachWorkspace() {
 
   return (
     <CoachShell
+      key={getCoachContextKey(context, intent)}
       context={context}
+      intent={intent}
       hasActiveApplication={Boolean(activeApplication)}
       activeUndoExpiresAt={activeApplication?.undoExpiresAt}
       onApplyProposal={
@@ -387,12 +441,13 @@ function PersistedCoachWorkspace() {
 
 function CoachShell({
   context,
+  intent,
   hasActiveApplication = false,
   activeUndoExpiresAt,
   onApplyProposal,
   onUndoProposal,
 }: CoachShellProps) {
-  const [proposal, setProposal] = useState(() => buildEditableProposal(context));
+  const [proposal, setProposal] = useState(() => buildEditableProposal(context, intent));
   const [proposalStage, setProposalStage] = useState<ProposalStage>("summary");
   const [actionError, setActionError] = useState("");
   const [isApplying, setIsApplying] = useState(false);
@@ -430,7 +485,7 @@ function CoachShell({
   }
 
   function resetProposal() {
-    setProposal(buildEditableProposal(context));
+    setProposal(buildEditableProposal(context, intent));
     setProposalStage("summary");
     setLocalUndoExpiresAt(undefined);
     setActionError("");
@@ -485,6 +540,7 @@ function CoachShell({
     }
   }
 
+
   useEffect(() => {
     if (currentProposalStage !== "applied" || !undoExpiresAt || undoExpired) return;
 
@@ -512,8 +568,8 @@ function CoachShell({
               <Edit3 size={14} aria-hidden="true" />
             </div>
             <div>
-              <p>Estudo está abaixo do ritmo. O que faço esta semana?</p>
-              <time>Hoje · 10:24</time>
+              <p>{getCoachUserPrompt(intent)}</p>
+              <time>Agora</time>
             </div>
           </article>
 
@@ -522,7 +578,7 @@ function CoachShell({
               <Sparkles size={15} aria-hidden="true" />
             </div>
             <div>
-              <p>{getCoachReply(context)}</p>
+              <p>{getCoachReply(context, intent)}</p>
             </div>
           </article>
 
@@ -723,7 +779,7 @@ function CoachShell({
           </section>
 
           <div className="ep-coach-prompts" aria-label="Prompts sugeridos">
-            {promptChips.map((prompt) => (
+            {getPromptChips(intent).map((prompt) => (
               <button key={prompt} type="button">
                 {prompt}
               </button>
@@ -915,7 +971,19 @@ function getStudyPaceCopy(paceState: CoachContext["studyPaceState"]) {
   return "Sem meta mensal de estudo. O Coach usa só os registos existentes como contexto.";
 }
 
-function getCoachReply(context: CoachContext) {
+function getCoachReply(context: CoachContext, intent: CoachIntent) {
+  if (intent === "sessionReview") {
+    const actionCopy = context.nextActions.length
+      ? `A primeira direção que já deixaste foi: “${context.nextActions[0]}”.`
+      : "Ainda não há próxima ação explícita guardada, por isso vou manter a proposta simples.";
+
+    return `A sessão já está fechada, por isso agora o valor é transformar sinais em direção. ${context.sessionAttention} ${actionCopy} Eu sugeria um ajuste pequeno ao plano: review/estudo curto antes de voltar a aumentar complexidade.`;
+  }
+
+  if (intent === "dayClose") {
+    return `Dia fechado. O objetivo não é criar mais tarefas: é passar uma aprendizagem para amanhã e manter a semana executável. ${context.sessionAttention}`;
+  }
+
   if (context.pendingSessionReviews > 0 || context.handsToReview >= 5) {
     return `${context.sessionAttention} Mantém isto como planeamento: reserva review curto ou fecha as reviews pendentes, sem análise técnica de mãos.`;
   }
@@ -965,9 +1033,73 @@ function getTypeOption(type: StoredBlockType) {
   return typeOptions.find((option) => option.value === type) ?? typeOptions[0];
 }
 
-function buildEditableProposal(context: CoachContext): CoachProposal {
+function buildEditableProposal(context: CoachContext, intent: CoachIntent): CoachProposal {
   const topic = context.studyTopType ? getStudyTypeLabel(context.studyTopType) : "Estudo focado";
   const needsStudyRecovery = context.studyPaceState === "below" || context.studyPaceState === "no-logs";
+
+  if (intent === "sessionReview") {
+    const reviewTopic = context.nextActions[0] ?? context.adjustmentNextWeek ?? "Review da sessão";
+    const items: CoachProposalItem[] = [
+      {
+        dayIndex: 4,
+        dayLabel: "Quinta",
+        time: "09:00",
+        type: "review",
+        typeLabel: "Review",
+        topic: "Mãos marcadas da sessão",
+        targetLabel: "30m",
+        detail: context.handsToReview
+          ? `${context.handsToReview} mãos marcadas entram como prioridade antes da próxima sessão`
+          : "Bloco curto para transformar a review em direção prática",
+      },
+      {
+        dayIndex: 5,
+        dayLabel: "Sexta",
+        time: "09:00",
+        type: "study",
+        typeLabel: "Estudo",
+        topic: reviewTopic,
+        targetLabel: "25m",
+        detail: "Estudo pequeno derivado da execução, não volume genérico",
+      },
+    ];
+
+    return {
+      title: "2 ajustes depois da sessão revista",
+      scope: context.weeklyPlanScope,
+      items,
+    };
+  }
+
+  if (intent === "dayClose") {
+    return {
+      title: "2 ajustes para proteger amanhã",
+      scope: context.weeklyPlanScope,
+      items: [
+        {
+          dayIndex: 4,
+          dayLabel: "Quinta",
+          time: "09:00",
+          type: "review",
+          typeLabel: "Review",
+          topic: "Fecho do dia anterior",
+          targetLabel: "15m",
+          detail: context.nextActions[0] || "Converter o que ficou pendente numa ação observável",
+        },
+        {
+          dayIndex: 5,
+          dayLabel: "Sexta",
+          time: "09:00",
+          type: "study",
+          typeLabel: "Estudo",
+          topic,
+          targetLabel: "25m",
+          detail: "Manter o plano executável sem criar uma lista longa",
+        },
+      ],
+    };
+  }
+
   const items: CoachProposalItem[] = [
     {
       dayIndex: 4,

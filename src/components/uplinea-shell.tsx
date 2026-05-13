@@ -62,16 +62,34 @@ function readLocalQaPreview(searchParams?: { get(name: string): string | null } 
   return window.localStorage.getItem(qaPreviewStorageKey) === "1";
 }
 
-const navItems = [
-  { href: "/", label: "Hoje", icon: Sun },
-  { href: "/weekly", label: "Plano semanal", icon: CalendarDays },
-  { href: "/annual", label: "Direção anual", icon: Compass },
-  { href: "/monthly", label: "Objetivos mensais", icon: Target },
-  { href: "/sessions", label: "Sessões", icon: Spade },
-  { href: "/study", label: "Estudo", icon: BookOpen },
-  { href: "/review", label: "Revisão", icon: MessageSquareText },
-  { href: "/coach", label: "Coach AI", icon: Sparkles },
+const navSections = [
+  {
+    label: "Principal",
+    items: [{ href: "/", label: "Hoje", statusLabel: "cockpit diário", icon: Sun }],
+  },
+  {
+    label: "Execução",
+    items: [
+      { href: "/sessions", label: "Sessões", statusLabel: "jogo e estudo", icon: Spade },
+      { href: "/review", label: "Mãos/revisão", statusLabel: "pendentes", icon: MessageSquareText },
+      { href: "/study", label: "Estudo", statusLabel: "blocos", icon: BookOpen },
+    ],
+  },
+  {
+    label: "Planeamento",
+    items: [
+      { href: "/weekly", label: "Plano semanal", statusLabel: "executar a semana", icon: CalendarDays },
+      { href: "/monthly", label: "Objetivos mensais", statusLabel: "ritmo do mês", icon: Target },
+      { href: "/annual", label: "Direção anual", statusLabel: "norte estratégico", icon: Compass },
+    ],
+  },
+  {
+    label: "Inteligência",
+    items: [{ href: "/coach", label: "Coach AI", statusLabel: "contexto e ajustes", icon: Sparkles }],
+  },
 ];
+
+const navItems = navSections.flatMap((section) => section.items);
 
 function AuthenticatedUplineaShell({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn, user } = useUser();
@@ -195,29 +213,40 @@ function UplineaShellFrame({
             height={985}
             alt="Uplinea"
             priority
-            style={{ width: "100%", height: "auto" }}
+            style={{ width: "70px", height: "auto" }}
           />
         </Link>
 
         {hasPersistenceConfig && !forceDemoMode ? <PersistedSessionCta /> : <DemoSessionCta />}
 
         <nav className="ep-nav" aria-label="Navegação principal">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActivePath(pathname, item.href);
+          {navSections.map((section) => (
+            <section className="ep-nav-section" aria-label={section.label} key={section.label}>
+              <span className="ep-nav-section-label">{section.label}</span>
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const active = isActivePath(pathname, item.href);
 
-            return (
-              <Link
-                aria-current={active ? "page" : undefined}
-                className={active ? "ep-nav-item active" : "ep-nav-item"}
-                href={item.href}
-                key={item.href}
-              >
-                <Icon size={18} aria-hidden="true" />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
+                return (
+                  <Link
+                    aria-current={active ? "page" : undefined}
+                    className={active ? "ep-nav-item active" : "ep-nav-item"}
+                    href={item.href}
+                    key={item.href}
+                  >
+                    <Icon size={18} aria-hidden="true" />
+                    <span className="ep-nav-copy">
+                      <span>{item.label}</span>
+                      <small>{item.statusLabel}</small>
+                    </span>
+                    {item.href === "/" || item.href === "/sessions" ? (
+                      <ShellSessionNavIndicator forceDemoMode={forceDemoMode} target={item.href} />
+                    ) : null}
+                  </Link>
+                );
+              })}
+            </section>
+          ))}
         </nav>
 
         <Link
@@ -270,6 +299,96 @@ function UplineaShellFrame({
         <main className="ep-main">{children}</main>
       </div>
     </div>
+  );
+}
+
+function ShellSessionNavIndicator({
+  forceDemoMode,
+  target,
+}: {
+  forceDemoMode: boolean;
+  target: "/" | "/sessions";
+}) {
+  if (hasPersistenceConfig && !forceDemoMode) {
+    return <PersistedShellSessionNavIndicator target={target} />;
+  }
+
+  return <DemoShellSessionNavIndicator target={target} />;
+}
+
+function DemoShellSessionNavIndicator({ target }: { target: "/" | "/sessions" }) {
+  const [state, setState] = useState<"idle" | "active" | "pendingReview" | "reviewed">("idle");
+
+  useEffect(() => {
+    function readDemoState() {
+      try {
+        const parsed = JSON.parse(window.localStorage.getItem(demoSessionCtaStorageKey) ?? "{}") as { status?: string };
+        if (
+          parsed.status === "active" ||
+          parsed.status === "pendingReview" ||
+          parsed.status === "reviewed" ||
+          parsed.status === "idle"
+        ) {
+          setState(parsed.status);
+          return;
+        }
+      } catch {
+        // Ignore corrupt QA preview state.
+      }
+
+      setState("idle");
+    }
+
+    readDemoState();
+    window.addEventListener(demoSessionCtaEvent, readDemoState);
+    window.addEventListener("storage", readDemoState);
+    return () => {
+      window.removeEventListener(demoSessionCtaEvent, readDemoState);
+      window.removeEventListener("storage", readDemoState);
+    };
+  }, []);
+
+  return <SessionNavIndicator state={state} target={target} />;
+}
+
+function PersistedShellSessionNavIndicator({ target }: { target: "/" | "/sessions" }) {
+  const auth = usePersistenceAuth();
+  const canUsePersistence = auth.kind === "ready";
+  const activeSession = useQuery(api.pokerSession.getActive, canUsePersistence ? {} : "skip");
+  const pendingReviewSession = useQuery(api.pokerSession.getPendingReview, canUsePersistence ? {} : "skip");
+  const sessions = useQuery(api.pokerSession.list, canUsePersistence ? {} : "skip");
+  const reviewedTodaySession = sessions?.find((session) => session.status === "reviewed" && session.date === todayIsoDate);
+  const state = activeSession ? "active" : pendingReviewSession ? "pendingReview" : reviewedTodaySession ? "reviewed" : "idle";
+
+  return <SessionNavIndicator state={state} target={target} />;
+}
+
+function SessionNavIndicator({
+  state,
+  target,
+}: {
+  state: "idle" | "active" | "pendingReview" | "reviewed";
+  target: "/" | "/sessions";
+}) {
+  if (state === "idle") return null;
+
+  const isPrimaryTarget =
+    (target === "/sessions" && (state === "active" || state === "pendingReview")) ||
+    (target === "/" && state === "reviewed");
+
+  const label =
+    state === "active"
+      ? "sessão ativa"
+      : state === "pendingReview"
+        ? "review pendente"
+        : "sessão revista";
+
+  return (
+    <span
+      aria-label={label}
+      className={`ep-nav-state-dot ${state}${isPrimaryTarget ? " primary" : ""}`}
+      title={label}
+    />
   );
 }
 
@@ -371,7 +490,6 @@ function PersistedSessionCta() {
       <SessionCta
         activeSession={activeSession ?? null}
         hasPendingReview={Boolean(pendingReviewSession)}
-        onStartClick={() => setStartModalOpen(true)}
       />
       {startModalOpen && !activeSession && !pendingReviewSession ? (
         <SidebarStartSessionModal
@@ -417,6 +535,8 @@ function DemoSessionCta() {
         const parsed = JSON.parse(rawValue) as { status?: string; startedAt?: number };
         if (parsed.status === "active" || parsed.status === "pendingReview" || parsed.status === "idle") {
           setState({ status: parsed.status, startedAt: parsed.startedAt });
+        } else if (parsed.status === "reviewed") {
+          setState({ status: "idle" });
         }
       } catch {
         setState({ status: "idle" });
@@ -433,9 +553,8 @@ function DemoSessionCta() {
       <SessionCta
         activeSession={state.status === "active" && state.startedAt ? { startedAt: state.startedAt } : null}
         hasPendingReview={state.status === "pendingReview"}
-        onStartClick={() => setStartModalOpen(true)}
       />
-      {startModalOpen && state.status === "idle" ? (
+      {startModalOpen ? (
         <SidebarStartSessionModal
           grindBlocks={[{ id: "demo-grind", type: "Grind", title: "Sessão MTT — manhã", target: "2h", status: "Planeado" }]}
           onClose={() => setStartModalOpen(false)}
@@ -455,11 +574,9 @@ function DemoSessionCta() {
 function SessionCta({
   activeSession,
   hasPendingReview = false,
-  onStartClick,
 }: {
   activeSession: { startedAt: number } | null;
   hasPendingReview?: boolean;
-  onStartClick?: () => void;
 }) {
   const ctaState = activeSession ? "active" : hasPendingReview ? "pendingReview" : "idle";
   const label =
@@ -472,17 +589,15 @@ function SessionCta({
   const className =
     ctaState === "idle" ? "ep-session-cta" : `ep-session-cta ${ctaState === "active" ? "active-session" : "review-pending"}`;
 
-  if (ctaState === "idle" && onStartClick) {
-    return (
-      <button className={className} type="button" onClick={onStartClick}>
-        <Play size={16} aria-hidden="true" />
-        <span>{label}</span>
-      </button>
-    );
-  }
+  const href =
+    ctaState === "idle"
+      ? "/sessions?startSession=1"
+      : ctaState === "pendingReview"
+        ? "/sessions?reviewSession=1"
+        : "/sessions";
 
   return (
-    <Link className={className} href="/sessions">
+    <Link className={className} href={href}>
       <Play size={16} aria-hidden="true" />
       <span>{label}</span>
     </Link>
