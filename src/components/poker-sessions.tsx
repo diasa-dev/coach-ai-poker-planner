@@ -64,6 +64,7 @@ type SessionRow = {
   dateIso?: string;
   date: string;
   focus: string;
+  nextAction?: string;
   tournaments: number;
   duration: string;
   quality: number;
@@ -332,6 +333,7 @@ function readDemoSessionCtaState() {
 
   try {
     const parsed = JSON.parse(window.localStorage.getItem(demoSessionCtaStorageKey) ?? "{}") as {
+      nextAction?: string;
       status?: string;
       startedAt?: number;
     };
@@ -345,7 +347,7 @@ function readDemoSessionCtaState() {
     }
 
     if (parsed.status === "reviewed") {
-      return { status: "reviewed" as const };
+      return { status: "reviewed" as const, nextAction: parsed.nextAction?.trim() || undefined };
     }
   } catch {
     // Ignore corrupt QA preview state and fall back to idle.
@@ -515,6 +517,7 @@ function SessionsWorkspace({
           finalFocus: 4,
           finalEnergy: 3,
           finalTilt: 1,
+          nextAction: demoState.nextAction,
         };
         setDemoActiveSession(null);
         setDemoPendingReviewSession(null);
@@ -551,7 +554,7 @@ function SessionsWorkspace({
       : effectivePendingReviewSession
         ? { status: "pendingReview" }
         : reviewedTodaySession
-          ? { status: "reviewed" }
+          ? { status: "reviewed", nextAction: reviewedTodaySession.nextAction }
           : { status: "idle" };
 
     window.localStorage.setItem(demoSessionCtaStorageKey, JSON.stringify(nextCtaState));
@@ -1172,6 +1175,7 @@ function buildSessionRow(
     dateIso: session.date,
     date: session.date === todayIsoDate ? "Hoje" : formatShortDate(session.startedAt),
     focus: session.sessionFocus,
+    nextAction: session.nextAction,
     tournaments: overrides.tournaments,
     duration: formatElapsed(session.startedAt, session.endedAt),
     quality: overrides.quality,
