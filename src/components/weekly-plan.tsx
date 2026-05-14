@@ -100,6 +100,14 @@ function statusClass(status: PlanBlockStatus) {
   return "planned";
 }
 
+function formatSessionCount(count: number) {
+  return count === 1 ? "1 sessão" : `${count} sessões`;
+}
+
+function formatDayCount(count: number) {
+  return count === 1 ? "1 dia" : `${count} dias`;
+}
+
 function getDayProgress(blocks: PlanBlock[]) {
   const closedBlocks = blocks.filter(
     (block) => block.status === "Feito" || block.status === "Ajustado",
@@ -658,7 +666,7 @@ function WeeklyPlanWorkspace({
       </div>
 
       <div className="wp-totals">
-        <div className="wp-total"><span>Grind</span><strong>{formatPlanMinutes(totals.Grind)}</strong><small>/ 14h</small></div>
+        <div className="wp-total"><span>Grind</span><strong>{formatSessionCount(summary.grindBlocks)}</strong><small>{formatDayCount(summary.grindDays)}</small></div>
         <div className="wp-total"><span>Estudo</span><strong>{formatPlanMinutes(totals.Estudo)}</strong><small>/ 5h</small></div>
         <div className="wp-total"><span>Review</span><strong>{formatPlanMinutes(totals.Review)}</strong><small>/ 2h</small></div>
         <div className="wp-total"><span>Desporto</span><strong>{formatPlanMinutes(totals.Desporto)}</strong><small>/ 3h</small></div>
@@ -793,8 +801,8 @@ function MonthlyPlanContext({
         </div>
       </div>
       <div className="wp-monthly-context-list">
-        {context.rows.map((row) => (
-          <div className={`wp-monthly-context-row ${row.kind}`} key={row.category}>
+        {context.rows.map((row, index) => (
+          <div className={`wp-monthly-context-row ${row.kind}`} key={`${row.category}-${row.label}-${row.targetLabel}-${index}`}>
             <span>{row.label}</span>
             <strong>{row.plannedLabel}</strong>
             <small>{row.targetLabel}</small>
@@ -1021,11 +1029,11 @@ function BlockModal({
             />
           </label>
           <label className="field">
-            Duração
+            Meta do bloco
             <input
               value={block.target ?? ""}
               onChange={(event) => onChange({ ...block, target: event.target.value })}
-              placeholder="ex: 2h"
+              placeholder="ex: 12 torneios, 1 sessão, 45m"
             />
           </label>
         </div>
@@ -1082,8 +1090,8 @@ function ObjectivesModal({
         <div className="drawer-body">
           {context.rows.length ? (
             <div className="wp-objective-list">
-              {context.rows.map((row) => (
-                <div className={`wp-monthly-context-row ${row.kind}`} key={row.category}>
+              {context.rows.map((row, index) => (
+                <div className={`wp-monthly-context-row ${row.kind}`} key={`${row.category}-${row.label}-${row.targetLabel}-${index}`}>
                   <span>{row.label}</span>
                   <strong>{row.plannedLabel}</strong>
                   <small>{row.targetLabel}</small>
@@ -1389,7 +1397,7 @@ function getPresetBlocks(preset: string): { focus: string; days: BlockDraft[][] 
   const study: BlockDraft = { type: "Estudo", title: "Estudo técnico", target: "45m" };
   const review: BlockDraft = { type: "Review", title: "Rever mãos", target: "30m" };
   const sport: BlockDraft = { type: "Desporto", title: "Treino", target: "45m" };
-  const grind: BlockDraft = { type: "Grind", title: "Sessão MTT", target: "3h" };
+  const grind: BlockDraft = { type: "Grind", title: "Sessão MTT", target: "12 torneios" };
 
   if (preset === "Semana equilibrada") {
     return {
@@ -1435,7 +1443,7 @@ function getDefaultTitle(type: PlanBlockType) {
 
 function getDefaultTarget(type: PlanBlockType) {
   return {
-    Grind: "3h",
+    Grind: "12 torneios",
     Estudo: "45m",
     Review: "30m",
     Desporto: "45m",

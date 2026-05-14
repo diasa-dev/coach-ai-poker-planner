@@ -99,7 +99,7 @@ const demoSession: SessionView = {
   date: todayIsoDate,
   sessionFocus: "Disciplina em ICM até bolha",
   weeklyFocus: "Executar com disciplina, não com volume.",
-  blockLabel: "Grind · Sessão MTT — manhã (2h)",
+  blockLabel: "Grind · Sessão MTT — manhã (10 torneios)",
   status: "active",
   maxTables: 6,
   currentTables: 6,
@@ -296,7 +296,7 @@ function PokerSessionsDemo({ banner }: { banner?: string }) {
     <SessionsWorkspace
       activeSession={null}
       events={demoEvents}
-      grindBlocks={[{ id: "demo-grind", type: "Grind", title: "Sessão MTT — manhã", target: "2h", status: "Planeado" }]}
+      grindBlocks={[{ id: "demo-grind", type: "Grind", title: "Sessão MTT — manhã", target: "10 torneios", status: "Planeado" }]}
       banner={banner ?? "Modo demo/mock. Entra para guardar sessões e eventos no Convex."}
       demoMode
       onAddEvent={async () => undefined}
