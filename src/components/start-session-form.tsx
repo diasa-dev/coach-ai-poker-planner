@@ -2,6 +2,7 @@
 
 import { Check, Play, X } from "lucide-react";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 
 import type { Id } from "../../convex/_generated/dataModel";
 import type { PlanBlock } from "@/lib/planning/weekly-plan";
@@ -214,7 +215,7 @@ export function SidebarStartSessionModal({
     }
   }
 
-  return (
+  return createPortal(
     <>
       <button className="scrim" type="button" aria-label="Fechar início de sessão" onClick={onClose} />
       <section className="sidebar-session-modal" role="dialog" aria-modal="true" aria-label="Iniciar sessão">
@@ -237,7 +238,8 @@ export function SidebarStartSessionModal({
           />
         </div>
       </section>
-    </>
+    </>,
+    document.body,
   );
 }
 

@@ -19,7 +19,7 @@ import {
 import { useMutation, useQuery } from "convex/react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import {
@@ -141,13 +141,25 @@ function isActivePath(pathname: string, href: string) {
 }
 
 export function UplineaShell({ children }: { children: ReactNode }) {
+  const [hasMounted, setHasMounted] = useState(false);
   const [localQaPreview, setLocalQaPreview] = useState(false);
 
   useEffect(() => {
-    window.requestAnimationFrame(() => {
+    const frame = window.requestAnimationFrame(() => {
       setLocalQaPreview(readLocalQaPreview(new URLSearchParams(window.location.search)));
+      setHasMounted(true);
     });
+
+    return () => window.cancelAnimationFrame(frame);
   }, []);
+
+  if (!hasMounted) {
+    return (
+      <div className="ep-auth-screen">
+        <span className="ep-auth-loading">A preparar entrada...</span>
+      </div>
+    );
+  }
 
   if (localQaPreview) {
     return (
@@ -468,6 +480,7 @@ function ClerkAuthControls() {
 
 function PersistedSessionCta() {
   const auth = usePersistenceAuth();
+  const router = useRouter();
   const canUsePersistence = auth.kind === "ready";
   const activeSession = useQuery(api.pokerSession.getActive, canUsePersistence ? {} : "skip");
   const pendingReviewSession = useQuery(api.pokerSession.getPendingReview, canUsePersistence ? {} : "skip");
@@ -490,6 +503,7 @@ function PersistedSessionCta() {
       <SessionCta
         activeSession={activeSession ?? null}
         hasPendingReview={Boolean(pendingReviewSession)}
+        onIdleClick={() => setStartModalOpen(true)}
       />
       {startModalOpen && !activeSession && !pendingReviewSession ? (
         <SidebarStartSessionModal
@@ -510,6 +524,7 @@ function PersistedSessionCta() {
               microIntention: payload.microIntention,
             });
             setStartModalOpen(false);
+            router.push("/sessions");
           }}
         />
       ) : null}
@@ -518,6 +533,7 @@ function PersistedSessionCta() {
 }
 
 function DemoSessionCta() {
+  const router = useRouter();
   const [state, setState] = useState<{ status: "idle" | "active" | "pendingReview"; startedAt?: number }>({
     status: "idle",
   });
@@ -553,6 +569,7 @@ function DemoSessionCta() {
       <SessionCta
         activeSession={state.status === "active" && state.startedAt ? { startedAt: state.startedAt } : null}
         hasPendingReview={state.status === "pendingReview"}
+        onIdleClick={() => setStartModalOpen(true)}
       />
       {startModalOpen ? (
         <SidebarStartSessionModal
@@ -564,6 +581,7 @@ function DemoSessionCta() {
             window.dispatchEvent(new Event(demoSessionCtaEvent));
             setState(nextState);
             setStartModalOpen(false);
+            router.push("/sessions");
           }}
         />
       ) : null}
@@ -574,9 +592,11 @@ function DemoSessionCta() {
 function SessionCta({
   activeSession,
   hasPendingReview = false,
+  onIdleClick,
 }: {
   activeSession: { startedAt: number } | null;
   hasPendingReview?: boolean;
+  onIdleClick: () => void;
 }) {
   const ctaState = activeSession ? "active" : hasPendingReview ? "pendingReview" : "idle";
   const label =
@@ -589,12 +609,16 @@ function SessionCta({
   const className =
     ctaState === "idle" ? "ep-session-cta" : `ep-session-cta ${ctaState === "active" ? "active-session" : "review-pending"}`;
 
-  const href =
-    ctaState === "idle"
-      ? "/sessions?startSession=1"
-      : ctaState === "pendingReview"
-        ? "/sessions?reviewSession=1"
-        : "/sessions";
+  if (ctaState === "idle") {
+    return (
+      <button className={className} type="button" onClick={onIdleClick}>
+        <Play size={16} aria-hidden="true" />
+        <span>{label}</span>
+      </button>
+    );
+  }
+
+  const href = ctaState === "pendingReview" ? "/sessions?reviewSession=1" : "/sessions";
 
   return (
     <Link className={className} href={href}>
