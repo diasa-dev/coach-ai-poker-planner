@@ -556,7 +556,7 @@ function DemoSessionCta() {
       />
       {startModalOpen ? (
         <SidebarStartSessionModal
-          grindBlocks={[{ id: "demo-grind", type: "Grind", title: "Sessão MTT — manhã", target: "2h", status: "Planeado" }]}
+          grindBlocks={[{ id: "demo-grind", type: "Grind", title: "Sessão MTT — manhã", target: "10 torneios", status: "Planeado" }]}
           onClose={() => setStartModalOpen(false)}
           onStart={async () => {
             const nextState = { status: "active" as const, startedAt: Date.now() };

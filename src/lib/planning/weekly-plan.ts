@@ -124,7 +124,7 @@ export const initialPlanDays: PlanDay[] = [
   {
     date: "12 Mai",
     label: "Seg",
-    summary: "45m estudo · 1 grind",
+    summary: "45m estudo · 1 sessão",
     isPast: true,
     blocks: [
       {
@@ -138,7 +138,7 @@ export const initialPlanDays: PlanDay[] = [
         id: "mon-grind",
         type: "Grind",
         title: "Sessão MTT — noite",
-        target: "3h",
+        target: "12 torneios",
         status: "Feito",
       },
     ],
@@ -146,7 +146,7 @@ export const initialPlanDays: PlanDay[] = [
   {
     date: "13 Mai",
     label: "Ter",
-    summary: "30m review · 45m estudo · 1 grind",
+    summary: "30m review · 45m estudo · 1 sessão",
     isPast: true,
     blocks: [
       {
@@ -167,7 +167,7 @@ export const initialPlanDays: PlanDay[] = [
         id: "tue-grind",
         type: "Grind",
         title: "Sessão MTT — noite",
-        target: "3h",
+        target: "12 torneios",
         status: "Planeado",
       },
     ],
@@ -175,7 +175,7 @@ export const initialPlanDays: PlanDay[] = [
   {
     date: "14 Mai",
     label: "Qua",
-    summary: "45m estudo · 2 grind · 30m review · 40m desporto",
+    summary: "45m estudo · 2 sessões · 30m review · 40m desporto",
     isToday: true,
     blocks: [
       {
@@ -189,7 +189,7 @@ export const initialPlanDays: PlanDay[] = [
         id: "wed-grind",
         type: "Grind",
         title: "Sessão MTT — manhã",
-        target: "2h",
+        target: "8 torneios",
         status: "Feito",
       },
       {
@@ -210,7 +210,7 @@ export const initialPlanDays: PlanDay[] = [
         id: "wed-grind-night",
         type: "Grind",
         title: "Sessão MTT — noite",
-        target: "3h",
+        target: "12 torneios",
         status: "Planeado",
       },
     ],
@@ -218,7 +218,7 @@ export const initialPlanDays: PlanDay[] = [
   {
     date: "15 Mai",
     label: "Qui",
-    summary: "45m estudo · 1 grind",
+    summary: "45m estudo · 1 sessão",
     blocks: [
       {
         id: "thu-study",
@@ -231,7 +231,7 @@ export const initialPlanDays: PlanDay[] = [
         id: "thu-grind",
         type: "Grind",
         title: "Sessão MTT — noite",
-        target: "3h",
+        target: "12 torneios",
         status: "Planeado",
       },
     ],
@@ -254,13 +254,13 @@ export const initialPlanDays: PlanDay[] = [
   {
     date: "17 Mai",
     label: "Sáb",
-    summary: "1 grind · 45m review",
+    summary: "1 sessão · 45m review",
     blocks: [
       {
         id: "sat-grind",
         type: "Grind",
         title: "Sessão MTT — tarde",
-        target: "4h",
+        target: "14 torneios",
         status: "Planeado",
       },
       {
@@ -470,7 +470,10 @@ export function getDaySummary(blocks: PlanBlock[]) {
   return blockTypes
     .filter((type) => grouped[type].count > 0)
     .map((type) => {
-      if (type === "Grind") return `${grouped[type].count} grind`;
+      if (type === "Grind") {
+        const count = grouped[type].count;
+        return count === 1 ? "1 sessão" : `${count} sessões`;
+      }
       if (type === "Descanso") return "off";
       return `${formatPlanMinutes(grouped[type].minutes)} ${type.toLowerCase()}`;
     })
