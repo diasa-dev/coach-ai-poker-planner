@@ -458,17 +458,16 @@ function TodayWorkspace({
   );
   const completedCommitments = commitments.filter((commitment) => commitment.status === "done").length;
   const doneBlocks = displayedTodayBlocks.filter((block) => block.status === "Feito").length;
-  const shouldStartWithAnnualDirection = source === "no-active-plan" && !annualPlan;
-  const headerContext = shouldStartWithAnnualDirection
+  const annualDirectionMissing = source !== "demo" && source !== "persistence-unavailable" && !annualPlan;
+  const headerContext = annualDirectionMissing
     ? "Próximo passo · Direção anual"
     : `Foco da semana · ${weeklyFocus}`;
   const nextAction = getTodayNextAction({
+    annualDirectionMissing,
     completedCommitments,
     commitmentsCount: commitments.length,
-    dailyPlanStatus,
     onPrepare: () => setPrepareOpen(true),
     sessionState,
-    shouldStartWithAnnualDirection,
     source,
     todayBlocks: displayedTodayBlocks,
   });
@@ -556,22 +555,11 @@ function TodayWorkspace({
           </p>
         </div>
         <div className="today-head-actions">
-          {shouldStartWithAnnualDirection ? (
-            <Link className="ep-button primary today-hero-cta" href="/annual?setup=annual">
-              <Target size={14} aria-hidden="true" />
-              Definir direção anual
+          {annualDirectionMissing || source === "no-active-plan" || source === "persistence-unavailable" ? null : (
+            <Link className="ep-button secondary" href="/weekly">
+              <Edit3 size={14} aria-hidden="true" />
+              Editar foco
             </Link>
-          ) : (
-            <>
-              <Link className="ep-button secondary" href="/weekly">
-                <Edit3 size={14} aria-hidden="true" />
-                Editar foco
-              </Link>
-              <button className="ep-button primary" type="button" onClick={() => setPrepareOpen(true)}>
-                <Check size={14} aria-hidden="true" />
-                {dailyPlanStatus === "closed" ? "Editar dia" : "Preparar dia"}
-              </button>
-            </>
           )}
         </div>
       </div>
@@ -586,8 +574,7 @@ function TodayWorkspace({
             commitments={commitments}
             completed={completedCommitments}
             dailyPlanStatus={dailyPlanStatus}
-            strategicSetupMissing={shouldStartWithAnnualDirection}
-            onPrepare={() => setPrepareOpen(true)}
+            strategicSetupMissing={annualDirectionMissing}
             onReasonChange={updateReason}
             onStatusChange={updateCommitment}
             updatingCommitmentIds={updatingCommitmentIds}
@@ -596,9 +583,9 @@ function TodayWorkspace({
             blocks={displayedTodayBlocks}
             doneBlocks={doneBlocks}
             source={source}
-            strategicSetupMissing={shouldStartWithAnnualDirection}
+            strategicSetupMissing={annualDirectionMissing}
           />
-          <AttentionCard source={source} strategicSetupMissing={shouldStartWithAnnualDirection} />
+          <AttentionCard source={source} strategicSetupMissing={annualDirectionMissing} />
         </main>
 
         <aside className="today-side">
@@ -725,27 +712,26 @@ type TodayNextAction = {
   detail: string;
   href?: string;
   icon: "calendar" | "check" | "coach" | "play" | "study" | "target";
+  kind: "annual" | "weekly" | "prepare" | "session" | "review" | "study" | "cockpit" | "adjust" | "coach";
   label: string;
   onClick?: () => void;
   title: string;
 };
 
 function getTodayNextAction({
+  annualDirectionMissing,
   completedCommitments,
   commitmentsCount,
-  dailyPlanStatus,
   onPrepare,
   sessionState,
-  shouldStartWithAnnualDirection,
   source,
   todayBlocks,
 }: {
+  annualDirectionMissing: boolean;
   completedCommitments: number;
   commitmentsCount: number;
-  dailyPlanStatus?: "prepared" | "closed";
   onPrepare: () => void;
   sessionState: TodaySessionState;
-  shouldStartWithAnnualDirection: boolean;
   source: TodaySource;
   todayBlocks: PlanBlock[];
 }): TodayNextAction {
@@ -754,6 +740,7 @@ function getTodayNextAction({
       detail: `Sessão em curso${sessionState.focus ? `: ${sessionState.focus}` : ""}. Volta ao cockpit da sessão para check-ups, notas e mãos marcadas.`,
       href: "/sessions",
       icon: "play",
+      kind: "session",
       label: "Voltar à sessão",
       title: "Sessão ativa — mantém execução limpa",
     };
@@ -764,26 +751,18 @@ function getTodayNextAction({
       detail: `Fecha a review antes de abrir novo ciclo. ${sessionState.handsToReview ?? 0} mãos marcadas entram no contexto do Coach.`,
       href: "/sessions?reviewSession=1",
       icon: "check",
+      kind: "review",
       label: "Terminar review",
       title: "Review pendente — fecha o loop",
     };
   }
 
-  if (sessionState.status === "reviewed") {
-    return {
-      detail: "Sessão revista. O próximo valor está em pedir leitura ao Coach ou ajustar a semana com base no que aconteceu.",
-      href: "/coach?context=session-review",
-      icon: "coach",
-      label: "Pedir leitura ao Coach",
-      title: "Sessão fechada — transforma em direção",
-    };
-  }
-
-  if (shouldStartWithAnnualDirection) {
+  if (annualDirectionMissing) {
     return {
       detail: "Define primeiro o critério anual. Depois a app consegue transformar direção em mês, semana e execução.",
       href: "/annual?setup=annual",
       icon: "target",
+      kind: "annual",
       label: "Definir direção anual",
       title: "Começa pelo norte do ano",
     };
@@ -794,29 +773,31 @@ function getTodayNextAction({
       detail: "Sem plano semanal ativo, o Hoje ainda não sabe o que proteger na execução.",
       href: "/weekly",
       icon: "calendar",
+      kind: "weekly",
       label: "Planear semana",
       title: "Transforma o mês numa semana executável",
     };
   }
 
-  if (!commitmentsCount || dailyPlanStatus === "closed") {
+  if (sessionState.status === "reviewed") {
     return {
-      detail: "Escolhe 1 a 3 ações observáveis para hoje. Isto é o cockpit, não uma lista genérica.",
-      icon: "check",
-      label: dailyPlanStatus === "closed" ? "Reabrir preparação" : "Preparar dia",
-      onClick: onPrepare,
-      title: dailyPlanStatus === "closed" ? "Dia fechado — ajusta só se precisares" : "Prepara a execução de hoje",
+      detail: "Sessão revista. O próximo valor está em ajustar a semana com base no que aconteceu.",
+      href: "/weekly",
+      icon: "calendar",
+      kind: "adjust",
+      label: "Ajustar semana",
+      title: "Sessão fechada — transforma em direção",
     };
   }
 
-  const plannedStudyBlock = todayBlocks.find(isPlannedStudyBlock);
-  if (plannedStudyBlock) {
+  if (!commitmentsCount) {
     return {
-      detail: `Há estudo planeado: ${plannedStudyBlock.title}. Regista o bloco para o Coach manter contexto real.`,
-      href: getStudyBlockHref(plannedStudyBlock.id),
-      icon: "study",
-      label: "Registar estudo",
-      title: "Executa o próximo bloco de estudo",
+      detail: "Escolhe 1 a 3 ações observáveis para hoje. Isto é o cockpit, não uma lista genérica.",
+      icon: "check",
+      kind: "prepare",
+      label: "Preparar dia",
+      onClick: onPrepare,
+      title: "Prepara a execução de hoje",
     };
   }
 
@@ -826,8 +807,21 @@ function getTodayNextAction({
       detail: `Sessão planeada: ${plannedGrindBlock.title}. Entra pela sessão para capturar foco, check-ups e mãos a rever.`,
       href: "/sessions?startSession=1",
       icon: "play",
+      kind: "session",
       label: "Ir para sessão",
       title: "Executa a sessão com contexto",
+    };
+  }
+
+  const plannedStudyBlock = todayBlocks.find(isPlannedStudyBlock);
+  if (plannedStudyBlock) {
+    return {
+      detail: `Há estudo planeado: ${plannedStudyBlock.title}. Regista o bloco para o Coach manter contexto real.`,
+      href: getStudyBlockHref(plannedStudyBlock.id),
+      icon: "study",
+      kind: "study",
+      label: "Registar estudo",
+      title: "Executa o próximo bloco de estudo",
     };
   }
 
@@ -835,6 +829,7 @@ function getTodayNextAction({
     return {
       detail: `${completedCommitments} de ${commitmentsCount} compromissos feitos. Continua a execução e marca o resultado sem overthinking.`,
       icon: "check",
+      kind: "cockpit",
       label: "Continuar no cockpit",
       onClick: () => document.getElementById("today-commitments")?.scrollIntoView({ behavior: "smooth", block: "start" }),
       title: "Ainda há execução para fechar",
@@ -845,6 +840,7 @@ function getTodayNextAction({
     detail: "Com o dia executado, o melhor próximo passo é pedir uma leitura contextual ao Coach antes de ajustar a semana.",
     href: "/coach?context=day-close",
     icon: "coach",
+    kind: "coach",
     label: "Pedir leitura ao Coach",
     title: "Fecha o loop com Coach AI",
   };
@@ -948,7 +944,6 @@ function CommitmentsCard({
   completed,
   dailyPlanStatus,
   strategicSetupMissing,
-  onPrepare,
   onReasonChange,
   onStatusChange,
   updatingCommitmentIds,
@@ -957,7 +952,6 @@ function CommitmentsCard({
   completed: number;
   dailyPlanStatus?: "prepared" | "closed";
   strategicSetupMissing?: boolean;
-  onPrepare: () => void;
   onReasonChange: (id: string, reason: string) => void;
   onStatusChange: (id: string, status: CommitmentStatus) => void;
   updatingCommitmentIds: string[];
@@ -1067,11 +1061,7 @@ function CommitmentsCard({
             <span />
             <span />
           </div>
-          <p>Em 60 segundos, escolhe 1 a 3 ações práticas que tornam este dia bem executado.</p>
-          <button className="ep-button primary" type="button" onClick={onPrepare}>
-            <Check size={14} aria-hidden="true" />
-            Preparar dia
-          </button>
+          <p>A próxima ação recomendada acima concentra a preparação do dia. Aqui aparecem os compromissos depois de escolhidos.</p>
         </div>
       )}
     </article>
