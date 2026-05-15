@@ -356,6 +356,17 @@ function readDemoSessionCtaState() {
   return { status: "idle" as const };
 }
 
+function writeDemoSessionCtaState(state: {
+  nextAction?: string;
+  startedAt?: number;
+  status: "idle" | "active" | "pendingReview" | "reviewed";
+}) {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.setItem(demoSessionCtaStorageKey, JSON.stringify(state));
+  window.dispatchEvent(new Event(demoSessionCtaEvent));
+}
+
 function SessionsWorkspace({
   activeSession,
   banner,
@@ -549,7 +560,7 @@ function SessionsWorkspace({
     if (!demoMode || !demoStateHydrated) return;
 
     const reviewedTodaySession = effectiveRows.find((row) => row.status === "reviewed" && isSessionRowFromToday(row));
-    const nextCtaState = visibleActiveSession
+    const nextCtaState: Parameters<typeof writeDemoSessionCtaState>[0] = visibleActiveSession
       ? { status: "active", startedAt: visibleActiveSession.startedAt }
       : effectivePendingReviewSession
         ? { status: "pendingReview" }
@@ -557,8 +568,7 @@ function SessionsWorkspace({
           ? { status: "reviewed", nextAction: reviewedTodaySession.nextAction }
           : { status: "idle" };
 
-    window.localStorage.setItem(demoSessionCtaStorageKey, JSON.stringify(nextCtaState));
-    window.dispatchEvent(new Event(demoSessionCtaEvent));
+    writeDemoSessionCtaState(nextCtaState);
   }, [demoMode, demoPendingReviewSession, demoStateHydrated, effectivePendingReviewSession, effectiveRows, visibleActiveSession]);
 
   async function submitStartSession(payload: StartSessionPayload, bypassTodayGuard = false) {
@@ -1091,6 +1101,7 @@ function SessionsWorkspace({
                         }),
                       ),
                     );
+                    writeDemoSessionCtaState({ status: "pendingReview" });
                   }
                   setModal(null);
                   setReviewSession(null);
@@ -1106,6 +1117,12 @@ function SessionsWorkspace({
               type="button"
               onClick={() => {
                 void runSessionAction(async () => {
+                  if (reviewSession.status === "active") {
+                    await onFinishSession(reviewSession._id!);
+                  }
+
+                  const trimmedNextAction = nextAction.trim() || undefined;
+
                   await onConfirmReview(reviewSession._id!, {
                     tournamentsPlayed,
                     decisionQuality: decisionQuality ?? 0,
@@ -1114,7 +1131,7 @@ function SessionsWorkspace({
                     finalTilt: finalTilt ?? 0,
                     goodDecision: goodDecision.trim() || undefined,
                     mainLeak: mainLeak.trim() || undefined,
-                    nextAction: nextAction.trim() || undefined,
+                    nextAction: trimmedNextAction,
                   });
                   if (demoMode) {
                     const reviewedSession = {
@@ -1128,7 +1145,7 @@ function SessionsWorkspace({
                       finalTilt: finalTilt ?? 0,
                       goodDecision: goodDecision.trim() || undefined,
                       mainLeak: mainLeak.trim() || undefined,
-                      nextAction: nextAction.trim() || undefined,
+                      nextAction: trimmedNextAction,
                     };
                     setDemoActiveSession(null);
                     setDemoPendingReviewSession((current) =>
@@ -1144,6 +1161,7 @@ function SessionsWorkspace({
                         }),
                       ),
                     );
+                    writeDemoSessionCtaState({ status: "reviewed", nextAction: trimmedNextAction });
                   }
                   setModal(null);
                   setReviewSession(null);
