@@ -1,4 +1,4 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 const isTemporaryProductionDevClerk = Boolean(
@@ -17,18 +17,6 @@ const shouldCanonicalizeLocalhost = Boolean(
   process.env.NODE_ENV === "development" &&
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_"),
 );
-const isProtectedRoute = createRouteMatcher([
-  "/",
-  "/annual(.*)",
-  "/coach(.*)",
-  "/monthly(.*)",
-  "/review(.*)",
-  "/session(.*)",
-  "/sessions(.*)",
-  "/settings(.*)",
-  "/study(.*)",
-  "/weekly(.*)",
-]);
 
 function canonicalizeLocalDevelopmentHost(request: Request) {
   if (!shouldCanonicalizeLocalhost) {
@@ -45,16 +33,7 @@ function canonicalizeLocalDevelopmentHost(request: Request) {
 }
 
 export default hasClerkKeys
-  ? clerkMiddleware(async (auth, request) => {
-      const canonicalRedirect = canonicalizeLocalDevelopmentHost(request);
-      if (canonicalRedirect) {
-        return canonicalRedirect;
-      }
-
-      if (isProtectedRoute(request)) {
-        await auth.protect();
-      }
-    })
+  ? clerkMiddleware((_, request) => canonicalizeLocalDevelopmentHost(request) ?? NextResponse.next())
   : (request: Request) => canonicalizeLocalDevelopmentHost(request) ?? NextResponse.next();
 
 export const config = {
