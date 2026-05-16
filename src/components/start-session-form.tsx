@@ -17,6 +17,7 @@ export type StartSessionPayload = {
   focusScore: number | null;
   tilt: number;
   microIntention?: string;
+  replaceActive?: boolean;
 };
 
 type StartSessionFormProps = {

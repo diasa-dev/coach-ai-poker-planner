@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Component, useEffect, useMemo, useState, type ErrorInfo, type ReactNode } from "react";
+import { Component, useEffect, useMemo, useRef, useState, type ErrorInfo, type ReactNode } from "react";
 
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -64,6 +64,7 @@ type SessionRow = {
   dateIso?: string;
   date: string;
   focus: string;
+  nextAction?: string;
   tournaments: number;
   duration: string;
   quality: number;
@@ -86,6 +87,7 @@ const todayIsoDate = getTodayIsoDate();
 
 const demoStartedAt = Date.now() - 84 * 60 * 1000;
 const demoSessionCtaStorageKey = "uplinea-demo-session-cta-state";
+const demoSessionsStorageKey = "uplinea-demo-sessions-state";
 const demoSessionCtaEvent = "uplinea-demo-session-state-change";
 const handTemplates = ["Geral", "Pote grande", "ICM", "Bluff catch", "All-in marginal", "River difícil", "Exploit / read", "Erro emocional"];
 const statusCopy: Record<SessionStatus, string> = {
@@ -186,8 +188,8 @@ function PersistedPokerSessions() {
   const auth = usePersistenceAuth();
   const canUsePersistence = auth.kind === "ready";
   const weeklyPlan = useQuery(api.weeklyPlan.getCurrent, canUsePersistence ? { today: todayIsoDate } : "skip");
-  const activeSession = useQuery(api.pokerSession.getActive, canUsePersistence ? {} : "skip");
   const sessions = useQuery(api.pokerSession.list, canUsePersistence ? {} : "skip");
+  const activeSession = sessions?.find((session) => session.status === "active") ?? null;
   const sessionCaptureSettings = useQuery(
     api.userPreferences.getSessionCaptureSettings,
     canUsePersistence ? {} : "skip",
@@ -278,6 +280,7 @@ function PersistedPokerSessions() {
           focusScore: payload.focusScore ?? 0,
           tilt: payload.tilt,
           microIntention: payload.microIntention,
+          replaceActive: payload.replaceActive,
         });
       }}
       onUpdateHandEvent={async (eventId, hand) => {
@@ -332,6 +335,7 @@ function readDemoSessionCtaState() {
 
   try {
     const parsed = JSON.parse(window.localStorage.getItem(demoSessionCtaStorageKey) ?? "{}") as {
+      nextAction?: string;
       status?: string;
       startedAt?: number;
     };
@@ -345,13 +349,60 @@ function readDemoSessionCtaState() {
     }
 
     if (parsed.status === "reviewed") {
-      return { status: "reviewed" as const };
+      return { status: "reviewed" as const, nextAction: parsed.nextAction?.trim() || undefined };
     }
   } catch {
     // Ignore corrupt QA preview state and fall back to idle.
   }
 
   return { status: "idle" as const };
+}
+
+function writeDemoSessionCtaState(state: {
+  nextAction?: string;
+  startedAt?: number;
+  status: "idle" | "active" | "pendingReview" | "reviewed";
+}) {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.setItem(demoSessionCtaStorageKey, JSON.stringify(state));
+  window.dispatchEvent(new Event(demoSessionCtaEvent));
+}
+
+function readDemoSessionsState() {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(demoSessionsStorageKey) ?? "null") as {
+      activeSession?: SessionView | null;
+      events?: SessionEventView[];
+      pendingReviewSession?: SessionView | null;
+      rows?: SessionRow[];
+    } | null;
+
+    if (!parsed || !Array.isArray(parsed.rows)) return null;
+
+    return {
+      activeSession: parsed.activeSession ?? null,
+      events: Array.isArray(parsed.events) ? parsed.events : [],
+      pendingReviewSession: parsed.pendingReviewSession ?? null,
+      rows: parsed.rows,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeDemoSessionsState(state: {
+  activeSession: SessionView | null;
+  events: SessionEventView[];
+  pendingReviewSession: SessionView | null;
+  rows: SessionRow[];
+}) {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.setItem(demoSessionsStorageKey, JSON.stringify(state));
+  window.dispatchEvent(new Event(demoSessionCtaEvent));
 }
 
 function SessionsWorkspace({
@@ -446,6 +497,7 @@ function SessionsWorkspace({
   const [deleteSession, setDeleteSession] = useState<SessionRow | null>(null);
   const [actionError, setActionError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const allowEmptyDemoPersistRef = useRef(false);
 
   const effectivePendingReviewSession = demoMode ? demoPendingReviewSession : pendingReviewSession;
   const effectiveEvents = demoMode ? demoEventsState : events;
@@ -469,31 +521,18 @@ function SessionsWorkspace({
     if (!demoMode) return;
 
     window.setTimeout(() => {
+      const persistedState = readDemoSessionsState();
+      if (persistedState) {
+        setDemoActiveSession(persistedState.activeSession);
+        setDemoPendingReviewSession(persistedState.pendingReviewSession);
+        setDemoRows(persistedState.rows);
+        setDemoEventsState(persistedState.events);
+        setView(persistedState.activeSession ? "active" : "history");
+        setDemoStateHydrated(true);
+        return;
+      }
+
       const demoState = readDemoSessionCtaState();
-
-      if (demoState.status === "active") {
-        const nextActiveSession = {
-          ...demoSession,
-          startedAt: demoState.startedAt,
-          endedAt: undefined,
-          status: "active" as const,
-        };
-        setDemoActiveSession(nextActiveSession);
-        setDemoPendingReviewSession(null);
-        setDemoRows([buildSessionRow(nextActiveSession, { tournaments: 0, quality: 0, tiltPeak: nextActiveSession.tilt })]);
-        setView("active");
-        setDemoStateHydrated(true);
-        return;
-      }
-
-      if (demoState.status === "pendingReview") {
-        setDemoActiveSession(null);
-        setDemoPendingReviewSession(pendingReviewSession);
-        setDemoRows(rows);
-        setView("history");
-        setDemoStateHydrated(true);
-        return;
-      }
 
       if (demoState.status === "reviewed") {
         const baseReviewSession = demoPendingReviewSession ?? pendingReviewSession;
@@ -515,6 +554,7 @@ function SessionsWorkspace({
           finalFocus: 4,
           finalEnergy: 3,
           finalTilt: 1,
+          nextAction: demoState.nextAction,
         };
         setDemoActiveSession(null);
         setDemoPendingReviewSession(null);
@@ -546,23 +586,41 @@ function SessionsWorkspace({
     if (!demoMode || !demoStateHydrated) return;
 
     const reviewedTodaySession = effectiveRows.find((row) => row.status === "reviewed" && isSessionRowFromToday(row));
-    const nextCtaState = visibleActiveSession
+    const nextCtaState: Parameters<typeof writeDemoSessionCtaState>[0] = visibleActiveSession
       ? { status: "active", startedAt: visibleActiveSession.startedAt }
       : effectivePendingReviewSession
         ? { status: "pendingReview" }
         : reviewedTodaySession
-          ? { status: "reviewed" }
+          ? { status: "reviewed", nextAction: reviewedTodaySession.nextAction }
           : { status: "idle" };
 
-    window.localStorage.setItem(demoSessionCtaStorageKey, JSON.stringify(nextCtaState));
-    window.dispatchEvent(new Event(demoSessionCtaEvent));
+    writeDemoSessionCtaState(nextCtaState);
   }, [demoMode, demoPendingReviewSession, demoStateHydrated, effectivePendingReviewSession, effectiveRows, visibleActiveSession]);
 
+  useEffect(() => {
+    if (!demoMode || !demoStateHydrated) return;
+
+    const nextState = {
+      activeSession: demoActiveSession,
+      events: demoEventsState,
+      pendingReviewSession: demoPendingReviewSession,
+      rows: demoRows,
+    };
+    const isEmptyState = !nextState.activeSession && !nextState.pendingReviewSession && nextState.rows.length === 0;
+    const persistedState = readDemoSessionsState();
+
+    if (isEmptyState && persistedState && persistedState.rows.length > 0 && !allowEmptyDemoPersistRef.current) {
+      return;
+    }
+
+    allowEmptyDemoPersistRef.current = false;
+    writeDemoSessionsState(nextState);
+  }, [demoActiveSession, demoEventsState, demoMode, demoPendingReviewSession, demoRows, demoStateHydrated]);
+
   async function submitStartSession(payload: StartSessionPayload, bypassTodayGuard = false) {
-    if (visibleActiveSession) {
-      setPendingStartPayload(null);
-      setModal(null);
-      setView("active");
+    if (visibleActiveSession && !bypassTodayGuard) {
+      setPendingStartPayload(payload);
+      setModal("startConfirm");
       return;
     }
 
@@ -575,7 +633,7 @@ function SessionsWorkspace({
     }
 
     await runSessionAction(async () => {
-      await onStartSession(payload);
+      await onStartSession({ ...payload, replaceActive: Boolean(visibleActiveSession) && bypassTodayGuard });
       if (demoMode) {
         const startedAt = Date.now();
         const nextActiveSession: SessionView = {
@@ -595,26 +653,53 @@ function SessionsWorkspace({
           status: "active",
         };
 
-        setDemoActiveSession(nextActiveSession);
-        setDemoPendingReviewSession(null);
-        setDemoRows((current) =>
-          upsertSessionRow(
-            current,
-            buildSessionRow(nextActiveSession, {
-              tournaments: 0,
-              quality: 0,
-              tiltPeak: nextActiveSession.tilt,
+        let nextRows = demoRows;
+        let nextPendingReviewSession = demoPendingReviewSession;
+
+        if (visibleActiveSession && bypassTodayGuard) {
+          const closedSession: SessionView = {
+            ...visibleActiveSession,
+            status: "reviewPending",
+            endedAt: visibleActiveSession.endedAt ?? startedAt,
+          };
+          nextPendingReviewSession = closedSession;
+          nextRows = upsertSessionRow(
+            nextRows,
+            buildSessionRow(closedSession, {
+              tournaments: closedSession.tournamentsPlayed ?? 0,
+              quality: closedSession.decisionQuality ?? 0,
+              tiltPeak: closedSession.finalTilt ?? closedSession.tilt,
             }),
-          ),
+          );
+        }
+
+        nextRows = upsertSessionRow(
+          nextRows,
+          buildSessionRow(nextActiveSession, {
+            tournaments: 0,
+            quality: 0,
+            tiltPeak: nextActiveSession.tilt,
+          }),
         );
-        setDemoEventsState([
+        const nextEvents: SessionEventView[] = [
           {
             type: "started",
             title: "Sessão iniciada",
             detail: `Foco · ${payload.sessionFocus}`,
             createdAt: startedAt,
           },
-        ]);
+        ];
+
+        setDemoActiveSession(nextActiveSession);
+        setDemoPendingReviewSession(nextPendingReviewSession);
+        setDemoRows(nextRows);
+        setDemoEventsState(nextEvents);
+        writeDemoSessionsState({
+          activeSession: nextActiveSession,
+          events: nextEvents,
+          pendingReviewSession: nextPendingReviewSession,
+          rows: nextRows,
+        });
       }
       setModal(null);
       setPendingStartPayload(null);
@@ -628,7 +713,19 @@ function SessionsWorkspace({
     await runSessionAction(async () => {
       await onRemoveSession(deleteSession._id!);
       if (demoMode) {
-        setDemoRows((current) => current.filter((row) => row._id !== deleteSession._id));
+        const nextRows = demoRows.filter((row) => row._id !== deleteSession._id);
+        const nextActiveSession = demoActiveSession?._id === deleteSession._id ? null : demoActiveSession;
+        const nextPendingReviewSession = demoPendingReviewSession?._id === deleteSession._id ? null : demoPendingReviewSession;
+        allowEmptyDemoPersistRef.current = nextRows.length === 0 && !nextActiveSession && !nextPendingReviewSession;
+        setDemoRows(nextRows);
+        setDemoActiveSession(nextActiveSession);
+        setDemoPendingReviewSession(nextPendingReviewSession);
+        writeDemoSessionsState({
+          activeSession: nextActiveSession,
+          events: demoEventsState,
+          pendingReviewSession: nextPendingReviewSession,
+          rows: nextRows,
+        });
       }
       setDeleteSession(null);
       setModal(null);
@@ -850,7 +947,9 @@ function SessionsWorkspace({
           }}
         >
           <p className={styles.modalCopy}>
-            Hoje já tens uma sessão registada. Confirma antes de criar outra para não duplicar contexto.
+            {visibleActiveSession
+              ? "Já tens uma sessão ativa. Se iniciares uma nova, a sessão atual fica fechada e pendente de review."
+              : "Hoje já tens uma sessão registada. Confirma antes de criar outra para não duplicar contexto."}
           </p>
           <div className={styles.confirmSummary}>
             {effectiveRows
@@ -1088,6 +1187,7 @@ function SessionsWorkspace({
                         }),
                       ),
                     );
+                    writeDemoSessionCtaState({ status: "pendingReview" });
                   }
                   setModal(null);
                   setReviewSession(null);
@@ -1103,6 +1203,12 @@ function SessionsWorkspace({
               type="button"
               onClick={() => {
                 void runSessionAction(async () => {
+                  if (reviewSession.status === "active") {
+                    await onFinishSession(reviewSession._id!);
+                  }
+
+                  const trimmedNextAction = nextAction.trim() || undefined;
+
                   await onConfirmReview(reviewSession._id!, {
                     tournamentsPlayed,
                     decisionQuality: decisionQuality ?? 0,
@@ -1111,7 +1217,7 @@ function SessionsWorkspace({
                     finalTilt: finalTilt ?? 0,
                     goodDecision: goodDecision.trim() || undefined,
                     mainLeak: mainLeak.trim() || undefined,
-                    nextAction: nextAction.trim() || undefined,
+                    nextAction: trimmedNextAction,
                   });
                   if (demoMode) {
                     const reviewedSession = {
@@ -1125,22 +1231,28 @@ function SessionsWorkspace({
                       finalTilt: finalTilt ?? 0,
                       goodDecision: goodDecision.trim() || undefined,
                       mainLeak: mainLeak.trim() || undefined,
-                      nextAction: nextAction.trim() || undefined,
+                      nextAction: trimmedNextAction,
                     };
+                    const nextRows = upsertSessionRow(
+                      demoRows,
+                      buildSessionRow(reviewedSession, {
+                        tournaments: tournamentsPlayed,
+                        quality: decisionQuality ?? 0,
+                        tiltPeak: finalTilt ?? 0,
+                      }),
+                    );
+                    const nextPendingReviewSession = demoPendingReviewSession?._id === reviewedSession._id ? null : demoPendingReviewSession;
+
                     setDemoActiveSession(null);
-                    setDemoPendingReviewSession((current) =>
-                      current?._id === reviewedSession._id ? null : current,
-                    );
-                    setDemoRows((current) =>
-                      upsertSessionRow(
-                        current,
-                        buildSessionRow(reviewedSession, {
-                          tournaments: tournamentsPlayed,
-                          quality: decisionQuality ?? 0,
-                          tiltPeak: finalTilt ?? 0,
-                        }),
-                      ),
-                    );
+                    setDemoPendingReviewSession(nextPendingReviewSession);
+                    setDemoRows(nextRows);
+                    writeDemoSessionCtaState({ status: "reviewed", nextAction: trimmedNextAction });
+                    writeDemoSessionsState({
+                      activeSession: null,
+                      events: demoEventsState,
+                      pendingReviewSession: nextPendingReviewSession,
+                      rows: nextRows,
+                    });
                   }
                   setModal(null);
                   setReviewSession(null);
@@ -1172,6 +1284,7 @@ function buildSessionRow(
     dateIso: session.date,
     date: session.date === todayIsoDate ? "Hoje" : formatShortDate(session.startedAt),
     focus: session.sessionFocus,
+    nextAction: session.nextAction,
     tournaments: overrides.tournaments,
     duration: formatElapsed(session.startedAt, session.endedAt),
     quality: overrides.quality,

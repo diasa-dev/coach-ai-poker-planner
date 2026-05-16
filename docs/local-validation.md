@@ -143,6 +143,7 @@ npm run dev:coach:status
 
 The expected authenticated smoke target is always `http://localhost:3100`.
 Do not run authenticated smoke against the demo smoke server on port `3103`.
+Using `127.0.0.1` requires explicit Clerk dashboard allowed-origin support.
 
 For authenticated Coach smoke, run the normal authenticated dev server on
 localhost, then store a Clerk session once in the persistent Playwright profile

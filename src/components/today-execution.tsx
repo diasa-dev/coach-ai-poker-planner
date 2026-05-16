@@ -43,6 +43,14 @@ type TodaySessionState = {
   startedAt?: number;
   focus?: string;
   handsToReview?: number;
+  nextAction?: string;
+};
+
+type CarryOverAction = {
+  action: string;
+  date: string;
+  href: string;
+  source: "sessionReview";
 };
 
 type Commitment = {
@@ -109,6 +117,7 @@ function readDemoTodaySessionState(): TodaySessionState {
 
   try {
     const parsed = JSON.parse(window.localStorage.getItem(demoSessionCtaStorageKey) ?? "{}") as {
+      nextAction?: string;
       status?: string;
       startedAt?: number;
     };
@@ -135,6 +144,7 @@ function readDemoTodaySessionState(): TodaySessionState {
         status: "reviewed",
         focus: "Disciplina em ICM até bolha",
         handsToReview: 3,
+        nextAction: parsed.nextAction,
       };
     }
   } catch {
@@ -142,6 +152,30 @@ function readDemoTodaySessionState(): TodaySessionState {
   }
 
   return { status: "idle" };
+}
+
+function readDemoCarryOverAction(): CarryOverAction | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(demoSessionCtaStorageKey) ?? "{}") as {
+      nextAction?: string;
+      reviewedAt?: number;
+      status?: string;
+    };
+    const action = parsed.nextAction?.trim();
+
+    if (parsed.status !== "reviewed" || !action) return null;
+
+    return {
+      action,
+      date: todayIsoDate,
+      href: getCarryOverActionHref(action),
+      source: "sessionReview",
+    };
+  } catch {
+    return null;
+  }
 }
 
 function getDemoTodayBlocks() {
@@ -188,6 +222,7 @@ export function TodayExecution() {
 
 function DemoTodayExecution({ sourceMessage }: { sourceMessage: string }) {
   const [sessionState, setSessionState] = useState<TodaySessionState>({ status: "idle" });
+  const [carryOverAction, setCarryOverAction] = useState<CarryOverAction | null>(null);
 
   useEffect(() => {
     let lastSerializedState = "";
@@ -199,6 +234,7 @@ function DemoTodayExecution({ sourceMessage }: { sourceMessage: string }) {
       if (nextSerializedState !== lastSerializedState) {
         lastSerializedState = nextSerializedState;
         setSessionState(nextState);
+        setCarryOverAction(readDemoCarryOverAction());
       }
     }
 
@@ -217,6 +253,7 @@ function DemoTodayExecution({ sourceMessage }: { sourceMessage: string }) {
     <TodayWorkspace
       source="demo"
       sourceMessage={sourceMessage}
+      carryOverAction={carryOverAction}
       sessionState={sessionState}
       todayBlocks={getDemoTodayBlocks()}
       weeklyFocus={initialWeeklyFocus}
@@ -245,9 +282,9 @@ function PersistedTodayExecution() {
     api.annualPlan.getCurrent,
     canUsePersistence ? { year: new Date().getFullYear() } : "skip",
   );
-  const activeSession = useQuery(api.pokerSession.getActive, canUsePersistence ? {} : "skip");
-  const pendingReviewSession = useQuery(api.pokerSession.getPendingReview, canUsePersistence ? {} : "skip");
   const sessions = useQuery(api.pokerSession.list, canUsePersistence ? {} : "skip");
+  const activeSession = sessions?.find((session) => session.status === "active") ?? null;
+  const pendingReviewSession = sessions?.find((session) => session.status === "reviewPending") ?? null;
   const prepareDay = useMutation(api.dailyPlan.prepareDay);
   const updateDailyCommitment = useMutation(api.dailyPlan.updateDailyCommitment);
   const closePreparedDay = useMutation(api.dailyPlan.closePreparedDay);
@@ -310,6 +347,7 @@ function PersistedTodayExecution() {
   }));
   const currentMonthlyTargets = monthlyTargets ?? [];
   const reviewedTodaySession = sessions?.find((session) => session.status === "reviewed" && session.date === todayIsoDate);
+  const carryOverAction = getLatestSessionCarryOverAction(sessions ?? []);
   const sessionState: TodaySessionState = activeSession
     ? {
         status: "active",
@@ -335,6 +373,7 @@ function PersistedTodayExecution() {
     <TodayWorkspace
       key={`${safeWeeklyPlan.weekStartDate}:${activePlan?._id ?? "no-active"}:${activePlan?.updatedAt ?? 0}:${todayBlocks.length}:${safePreparedDay.dailyPlan?._id ?? "unprepared"}:${safePreparedDay.dailyPlan?.updatedAt ?? 0}:${preparedCommitments.length}:${currentMonthlyTargets.map((target) => `${target.category}:${target.updatedAt}:${target.currentValue ?? 0}`).join("|")}:${annualPlan?._id ?? "no-annual-plan"}:${annualPlan?.updatedAt ?? 0}`}
       annualPlan={annualPlan ?? null}
+      carryOverAction={carryOverAction}
       dailyPlanStatus={safePreparedDay.dailyPlan?.status}
       initialCommitments={preparedCommitments}
       monthlyTargets={currentMonthlyTargets}
@@ -397,6 +436,7 @@ function PersistedTodayExecution() {
 
 function TodayWorkspace({
   annualPlan,
+  carryOverAction,
   dailyPlanStatus,
   initialCommitments,
   monthlyTargets = [],
@@ -412,6 +452,7 @@ function TodayWorkspace({
   greetingName,
 }: {
   annualPlan?: AnnualPlanContext | null;
+  carryOverAction?: CarryOverAction | null;
   dailyPlanStatus?: "prepared" | "closed";
   initialCommitments?: Commitment[];
   monthlyTargets?: MonthlyTargetContext[];
@@ -470,6 +511,7 @@ function TodayWorkspace({
     sessionState,
     source,
     todayBlocks: displayedTodayBlocks,
+    carryOverAction,
   });
 
   async function updateCommitment(id: string, status: CommitmentStatus) {
@@ -712,14 +754,61 @@ type TodayNextAction = {
   detail: string;
   href?: string;
   icon: "calendar" | "check" | "coach" | "play" | "study" | "target";
-  kind: "annual" | "weekly" | "prepare" | "session" | "review" | "study" | "cockpit" | "adjust" | "coach";
+  kind: "annual" | "weekly" | "prepare" | "session" | "review" | "study" | "cockpit" | "adjust" | "coach" | "carryOver";
   label: string;
   onClick?: () => void;
   title: string;
 };
 
+type SessionCarryOverCandidate = {
+  date: string;
+  endedAt?: number;
+  nextAction?: string;
+  reviewedAt?: number;
+  startedAt: number;
+  status: "active" | "reviewPending" | "reviewed";
+};
+
+function getLatestSessionCarryOverAction(sessions: SessionCarryOverCandidate[]): CarryOverAction | null {
+  const todayStart = Date.parse(`${todayIsoDate}T00:00:00.000Z`);
+  const recentWindowStart = todayStart - 6 * 24 * 60 * 60 * 1000;
+
+  const session = sessions
+    .filter((item) => {
+      const action = item.nextAction?.trim();
+      const sessionDay = Date.parse(`${item.date}T00:00:00.000Z`);
+
+      return item.status === "reviewed" && Boolean(action) && sessionDay >= recentWindowStart && sessionDay <= todayStart;
+    })
+    .sort((a, b) => (b.reviewedAt ?? b.endedAt ?? b.startedAt) - (a.reviewedAt ?? a.endedAt ?? a.startedAt))[0];
+
+  const action = session?.nextAction?.trim();
+  if (!session || !action) return null;
+
+  return {
+    action,
+    date: session.date,
+    href: getCarryOverActionHref(action),
+    source: "sessionReview",
+  };
+}
+
+function getCarryOverActionHref(action: string) {
+  const normalized = action
+    .toLocaleLowerCase("pt-PT")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+  if (normalized.includes("semana") || normalized.includes("plano")) return "/weekly";
+  if (normalized.includes("estudo") || normalized.includes("estudar") || normalized.includes("solver")) return "/study";
+  if (normalized.includes("review") || normalized.includes("mao") || normalized.includes("maos")) return "/sessions";
+
+  return "/sessions";
+}
+
 function getTodayNextAction({
   annualDirectionMissing,
+  carryOverAction,
   completedCommitments,
   commitmentsCount,
   onPrepare,
@@ -728,6 +817,7 @@ function getTodayNextAction({
   todayBlocks,
 }: {
   annualDirectionMissing: boolean;
+  carryOverAction?: CarryOverAction | null;
   completedCommitments: number;
   commitmentsCount: number;
   onPrepare: () => void;
@@ -780,6 +870,17 @@ function getTodayNextAction({
   }
 
   if (sessionState.status === "reviewed") {
+    if (carryOverAction) {
+      return {
+        detail: `Da última review: ${carryOverAction.action}`,
+        href: carryOverAction.href,
+        icon: carryOverAction.href === "/study" ? "study" : carryOverAction.href === "/weekly" ? "calendar" : "check",
+        kind: "carryOver",
+        label: carryOverAction.href === "/weekly" ? "Ajustar semana" : carryOverAction.href === "/study" ? "Ir para estudo" : "Abrir sessões",
+        title: carryOverAction.date === todayIsoDate ? "Última próxima ação" : "Carry-over para hoje",
+      };
+    }
+
     return {
       detail: "Sessão revista. O próximo valor está em ajustar a semana com base no que aconteceu.",
       href: "/weekly",
@@ -787,6 +888,17 @@ function getTodayNextAction({
       kind: "adjust",
       label: "Ajustar semana",
       title: "Sessão fechada — transforma em direção",
+    };
+  }
+
+  if (carryOverAction) {
+    return {
+      detail: `Da última review: ${carryOverAction.action}`,
+      href: carryOverAction.href,
+      icon: carryOverAction.href === "/study" ? "study" : carryOverAction.href === "/weekly" ? "calendar" : "check",
+      kind: "carryOver",
+      label: carryOverAction.href === "/weekly" ? "Ajustar semana" : carryOverAction.href === "/study" ? "Ir para estudo" : "Abrir sessões",
+      title: carryOverAction.date === todayIsoDate ? "Última próxima ação" : "Carry-over para hoje",
     };
   }
 

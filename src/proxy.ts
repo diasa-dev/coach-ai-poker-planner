@@ -13,6 +13,10 @@ const hasClerkKeys = Boolean(
     process.env.CLERK_SECRET_KEY &&
     !isTemporaryProductionDevClerk,
 );
+const shouldCanonicalizeLocalhost = Boolean(
+  process.env.NODE_ENV === "development" &&
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_"),
+);
 const isProtectedRoute = createRouteMatcher([
   "/",
   "/annual(.*)",
@@ -26,13 +30,32 @@ const isProtectedRoute = createRouteMatcher([
   "/weekly(.*)",
 ]);
 
+function canonicalizeLocalDevelopmentHost(request: Request) {
+  if (!shouldCanonicalizeLocalhost) {
+    return null;
+  }
+
+  const url = new URL(request.url);
+  if (url.hostname !== "127.0.0.1") {
+    return null;
+  }
+
+  url.hostname = "localhost";
+  return NextResponse.redirect(url);
+}
+
 export default hasClerkKeys
   ? clerkMiddleware(async (auth, request) => {
+      const canonicalRedirect = canonicalizeLocalDevelopmentHost(request);
+      if (canonicalRedirect) {
+        return canonicalRedirect;
+      }
+
       if (isProtectedRoute(request)) {
         await auth.protect();
       }
     })
-  : () => NextResponse.next();
+  : (request: Request) => canonicalizeLocalDevelopmentHost(request) ?? NextResponse.next();
 
 export const config = {
   matcher: [
