@@ -138,6 +138,7 @@ export const start = mutation({
     focusScore: v.number(),
     tilt: v.number(),
     microIntention: v.optional(v.string()),
+    replaceActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
@@ -149,8 +150,26 @@ export const start = mutation({
       throw new Error("Session focus is required");
     }
 
-    if (existingActive) {
-      return existingActive._id;
+    if (existingActive && !args.replaceActive) {
+      throw new Error("Já existe uma sessão ativa. Termina-a ou confirma que queres iniciar uma nova.");
+    }
+
+    if (existingActive && args.replaceActive) {
+      await ctx.db.patch(existingActive._id, {
+        status: "reviewPending",
+        endedAt: existingActive.endedAt ?? now,
+        isPaused: false,
+        updatedAt: now,
+      });
+
+      await insertEvent(ctx, {
+        userId,
+        sessionId: existingActive._id,
+        type: "finished",
+        title: "Sessão fechada automaticamente",
+        detail: "Fechada ao iniciar uma nova sessão.",
+        createdAt: now,
+      });
     }
 
     const sessionId = await ctx.db.insert("pokerSessions", {

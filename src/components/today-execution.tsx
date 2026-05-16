@@ -282,9 +282,9 @@ function PersistedTodayExecution() {
     api.annualPlan.getCurrent,
     canUsePersistence ? { year: new Date().getFullYear() } : "skip",
   );
-  const activeSession = useQuery(api.pokerSession.getActive, canUsePersistence ? {} : "skip");
-  const pendingReviewSession = useQuery(api.pokerSession.getPendingReview, canUsePersistence ? {} : "skip");
   const sessions = useQuery(api.pokerSession.list, canUsePersistence ? {} : "skip");
+  const activeSession = sessions?.find((session) => session.status === "active") ?? null;
+  const pendingReviewSession = sessions?.find((session) => session.status === "reviewPending") ?? null;
   const prepareDay = useMutation(api.dailyPlan.prepareDay);
   const updateDailyCommitment = useMutation(api.dailyPlan.updateDailyCommitment);
   const closePreparedDay = useMutation(api.dailyPlan.closePreparedDay);

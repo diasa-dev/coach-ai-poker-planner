@@ -31,6 +31,7 @@ import { usePersistenceAuth } from "@/lib/persistence-auth";
 import { hasClerkConfig, hasPersistenceConfig } from "@/lib/runtime-config";
 
 const demoSessionCtaStorageKey = "uplinea-demo-session-cta-state";
+const demoSessionsStorageKey = "uplinea-demo-sessions-state";
 const demoSessionCtaEvent = "uplinea-demo-session-state-change";
 const qaPreviewStorageKey = "uplinea-local-qa-preview";
 const qaPreviewParam = "qa-preview";
@@ -229,7 +230,7 @@ function UplineaShellFrame({
           />
         </Link>
 
-        {hasPersistenceConfig && !forceDemoMode ? <PersistedSessionCta /> : <DemoSessionCta />}
+        {hasPersistenceConfig ? <PersistenceAwareSessionCta forceDemoMode={forceDemoMode} /> : <DemoSessionCta />}
 
         <nav className="ep-nav" aria-label="Navegação principal">
           {navSections.map((section) => (
@@ -321,11 +322,77 @@ function ShellSessionNavIndicator({
   forceDemoMode: boolean;
   target: "/" | "/sessions";
 }) {
-  if (hasPersistenceConfig && !forceDemoMode) {
+  if (hasPersistenceConfig) {
+    return <PersistenceAwareShellSessionNavIndicator forceDemoMode={forceDemoMode} target={target} />;
+  }
+
+  return <DemoShellSessionNavIndicator target={target} />;
+}
+
+function PersistenceAwareSessionCta({ forceDemoMode }: { forceDemoMode: boolean }) {
+  const auth = usePersistenceAuth();
+
+  if (!forceDemoMode || auth.kind === "ready") {
+    return <PersistedSessionCta />;
+  }
+
+  return <DemoSessionCta />;
+}
+
+function PersistenceAwareShellSessionNavIndicator({
+  forceDemoMode,
+  target,
+}: {
+  forceDemoMode: boolean;
+  target: "/" | "/sessions";
+}) {
+  const auth = usePersistenceAuth();
+
+  if (!forceDemoMode || auth.kind === "ready") {
     return <PersistedShellSessionNavIndicator target={target} />;
   }
 
   return <DemoShellSessionNavIndicator target={target} />;
+}
+
+function getDemoSessionCtaFallback(): { status: "idle" | "active" | "pendingReview" | "reviewed"; startedAt?: number } {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(demoSessionCtaStorageKey) ?? "{}") as {
+      status?: string;
+      startedAt?: number;
+    };
+
+    if (parsed.status === "reviewed") return { status: "reviewed" };
+  } catch {
+    // Ignore corrupt QA preview state.
+  }
+
+  return { status: "idle" };
+}
+
+function readDemoSessionShellState(): { status: "idle" | "active" | "pendingReview" | "reviewed"; startedAt?: number } {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(demoSessionsStorageKey) ?? "null") as {
+      activeSession?: { startedAt?: number } | null;
+      pendingReviewSession?: unknown | null;
+      rows?: Array<{ date?: string; dateIso?: string; status?: string }>;
+    } | null;
+
+    if (parsed && Array.isArray(parsed.rows)) {
+      if (parsed.activeSession?.startedAt) return { status: "active", startedAt: parsed.activeSession.startedAt };
+      if (parsed.pendingReviewSession) return { status: "pendingReview" };
+
+      const hasReviewedToday = parsed.rows.some(
+        (row) => row.status === "reviewed" && (row.dateIso === todayIsoDate || row.date === todayIsoDate || row.date === "Hoje"),
+      );
+
+      return { status: hasReviewedToday ? "reviewed" : "idle" };
+    }
+  } catch {
+    // Ignore corrupt unified demo state and fall back to legacy CTA state.
+  }
+
+  return getDemoSessionCtaFallback();
 }
 
 function DemoShellSessionNavIndicator({ target }: { target: "/" | "/sessions" }) {
@@ -333,22 +400,7 @@ function DemoShellSessionNavIndicator({ target }: { target: "/" | "/sessions" })
 
   useEffect(() => {
     function readDemoState() {
-      try {
-        const parsed = JSON.parse(window.localStorage.getItem(demoSessionCtaStorageKey) ?? "{}") as { status?: string };
-        if (
-          parsed.status === "active" ||
-          parsed.status === "pendingReview" ||
-          parsed.status === "reviewed" ||
-          parsed.status === "idle"
-        ) {
-          setState(parsed.status);
-          return;
-        }
-      } catch {
-        // Ignore corrupt QA preview state.
-      }
-
-      setState("idle");
+      setState(readDemoSessionShellState().status);
     }
 
     readDemoState();
@@ -366,9 +418,9 @@ function DemoShellSessionNavIndicator({ target }: { target: "/" | "/sessions" })
 function PersistedShellSessionNavIndicator({ target }: { target: "/" | "/sessions" }) {
   const auth = usePersistenceAuth();
   const canUsePersistence = auth.kind === "ready";
-  const activeSession = useQuery(api.pokerSession.getActive, canUsePersistence ? {} : "skip");
-  const pendingReviewSession = useQuery(api.pokerSession.getPendingReview, canUsePersistence ? {} : "skip");
   const sessions = useQuery(api.pokerSession.list, canUsePersistence ? {} : "skip");
+  const activeSession = sessions?.find((session) => session.status === "active") ?? null;
+  const pendingReviewSession = sessions?.find((session) => session.status === "reviewPending") ?? null;
   const reviewedTodaySession = sessions?.find((session) => session.status === "reviewed" && session.date === todayIsoDate);
   const state = activeSession ? "active" : pendingReviewSession ? "pendingReview" : reviewedTodaySession ? "reviewed" : "idle";
 
@@ -482,11 +534,12 @@ function PersistedSessionCta() {
   const auth = usePersistenceAuth();
   const router = useRouter();
   const canUsePersistence = auth.kind === "ready";
-  const activeSession = useQuery(api.pokerSession.getActive, canUsePersistence ? {} : "skip");
-  const pendingReviewSession = useQuery(api.pokerSession.getPendingReview, canUsePersistence ? {} : "skip");
+  const sessions = useQuery(api.pokerSession.list, canUsePersistence ? {} : "skip");
   const weeklyPlan = useQuery(api.weeklyPlan.getCurrent, canUsePersistence ? { today: todayIsoDate } : "skip");
   const startSession = useMutation(api.pokerSession.start);
   const [startModalOpen, setStartModalOpen] = useState(false);
+  const activeSession = sessions?.find((session) => session.status === "active") ?? null;
+  const pendingReviewSession = sessions?.find((session) => session.status === "reviewPending") ?? null;
   const safeWeeklyPlan = weeklyPlan ?? { currentPlan: null, currentBlocks: [], weekStartDate: todayIsoDate };
   const activePlan = safeWeeklyPlan.currentPlan?.status === "active" ? safeWeeklyPlan.currentPlan : null;
   const days = activePlan
@@ -522,6 +575,7 @@ function PersistedSessionCta() {
               focusScore: payload.focusScore ?? 0,
               tilt: payload.tilt,
               microIntention: payload.microIntention,
+              replaceActive: payload.replaceActive,
             });
             setStartModalOpen(false);
             router.push("/sessions");
@@ -534,34 +588,23 @@ function PersistedSessionCta() {
 
 function DemoSessionCta() {
   const router = useRouter();
-  const [state, setState] = useState<{ status: "idle" | "active" | "pendingReview"; startedAt?: number }>({
+  const [state, setState] = useState<{ status: "idle" | "active" | "pendingReview" | "reviewed"; startedAt?: number }>({
     status: "idle",
   });
   const [startModalOpen, setStartModalOpen] = useState(false);
 
   useEffect(() => {
     function readDemoState() {
-      const rawValue = window.localStorage.getItem(demoSessionCtaStorageKey);
-      if (!rawValue) {
-        setState({ status: "idle" });
-        return;
-      }
-
-      try {
-        const parsed = JSON.parse(rawValue) as { status?: string; startedAt?: number };
-        if (parsed.status === "active" || parsed.status === "pendingReview" || parsed.status === "idle") {
-          setState({ status: parsed.status, startedAt: parsed.startedAt });
-        } else if (parsed.status === "reviewed") {
-          setState({ status: "idle" });
-        }
-      } catch {
-        setState({ status: "idle" });
-      }
+      setState(readDemoSessionShellState());
     }
 
     readDemoState();
     window.addEventListener(demoSessionCtaEvent, readDemoState);
-    return () => window.removeEventListener(demoSessionCtaEvent, readDemoState);
+    window.addEventListener("storage", readDemoState);
+    return () => {
+      window.removeEventListener(demoSessionCtaEvent, readDemoState);
+      window.removeEventListener("storage", readDemoState);
+    };
   }, []);
 
   return (
@@ -575,8 +618,54 @@ function DemoSessionCta() {
         <SidebarStartSessionModal
           grindBlocks={[{ id: "demo-grind", type: "Grind", title: "Sessão MTT — manhã", target: "10 torneios", status: "Planeado" }]}
           onClose={() => setStartModalOpen(false)}
-          onStart={async () => {
-            const nextState = { status: "active" as const, startedAt: Date.now() };
+          onStart={async (payload) => {
+            const startedAt = Date.now();
+            const sessionId = `demo-session-${startedAt}`;
+            const nextState = { status: "active" as const, startedAt };
+            const nextActiveSession = {
+              _id: sessionId,
+              date: todayIsoDate,
+              sessionFocus: payload.sessionFocus,
+              weeklyFocus: "Sem plano semanal ativo.",
+              blockLabel: payload.blockLabel,
+              status: "active",
+              maxTables: payload.maxTables,
+              currentTables: payload.maxTables,
+              energy: payload.energy ?? 0,
+              focusScore: payload.focusScore ?? 0,
+              tilt: payload.tilt,
+              handsToReview: 0,
+              microIntention: payload.microIntention,
+              isPaused: false,
+              startedAt,
+            };
+            const nextEvents = [
+              {
+                type: "started",
+                title: "Sessão iniciada",
+                detail: `Foco · ${payload.sessionFocus}`,
+                createdAt: startedAt,
+              },
+            ];
+            const nextRows = [
+              {
+                _id: sessionId,
+                dateIso: todayIsoDate,
+                date: "Hoje",
+                focus: payload.sessionFocus,
+                tournaments: 0,
+                duration: "0m",
+                quality: 0,
+                tiltPeak: payload.tilt,
+                hands: 0,
+                status: "active",
+              },
+            ];
+
+            window.localStorage.setItem(
+              demoSessionsStorageKey,
+              JSON.stringify({ activeSession: nextActiveSession, events: nextEvents, pendingReviewSession: null, rows: nextRows }),
+            );
             window.localStorage.setItem(demoSessionCtaStorageKey, JSON.stringify(nextState));
             window.dispatchEvent(new Event(demoSessionCtaEvent));
             setState(nextState);
