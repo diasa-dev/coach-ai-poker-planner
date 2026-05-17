@@ -289,14 +289,7 @@ function PersistedTodayExecution() {
   const updateDailyCommitment = useMutation(api.dailyPlan.updateDailyCommitment);
   const closePreparedDay = useMutation(api.dailyPlan.closePreparedDay);
 
-  if (
-    auth.kind === "loading" ||
-    (canUsePersistence &&
-      (weeklyPlan === undefined ||
-        preparedDay === undefined ||
-        monthlyTargets === undefined ||
-        annualPlan === undefined))
-  ) {
+  if (auth.kind === "loading") {
     return (
       <section className="ep-page today-page today-print-match">
         <div className="wp-demo-banner">A carregar plano de hoje...</div>
