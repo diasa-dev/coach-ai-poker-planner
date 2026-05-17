@@ -1,16 +1,14 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-const isDeployedWithDevelopmentClerk = Boolean(
-  process.env.VERCEL_ENV && process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_"),
-);
+const isUsingDevelopmentClerk = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_"));
 
 const hasClerkKeys = Boolean(
   process.env.UPLINEA_DISABLE_AUTH !== "1" &&
     process.env.NEXT_PUBLIC_UPLINEA_DISABLE_AUTH !== "1" &&
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
     process.env.CLERK_SECRET_KEY &&
-    !isDeployedWithDevelopmentClerk,
+    !isUsingDevelopmentClerk,
 );
 const shouldCanonicalizeLocalhost = Boolean(
   process.env.NODE_ENV === "development" &&
