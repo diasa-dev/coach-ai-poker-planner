@@ -25,7 +25,8 @@
     "smoke:coach:auth": "node scripts/smoke-authenticated-coach-flow.mjs",
     "smoke:mvp:auth": "node scripts/smoke-authenticated-mvp-flow.mjs",
     "smoke:study:auth": "node scripts/smoke-authenticated-study-flow.mjs",
-    "smoke:empty:auth": "node scripts/smoke-authenticated-empty-state.mjs"
+    "smoke:empty:auth": "node scripts/smoke-authenticated-empty-state.mjs",
+    "check:auth-loading-guards": "node scripts/check-auth-loading-guards.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.2.9",

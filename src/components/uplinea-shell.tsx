@@ -36,6 +36,20 @@ const demoSessionCtaEvent = "uplinea-demo-session-state-change";
 const qaPreviewStorageKey = "uplinea-local-qa-preview";
 const qaPreviewParam = "qa-preview";
 const todayIsoDate = getTodayIsoDate();
+const AUTH_LOADING_TIMEOUT_MS = 8000;
+
+function useLoadingTimeout(enabled: boolean, timeoutMs = AUTH_LOADING_TIMEOUT_MS) {
+  const [timedOut, setTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const timeoutId = window.setTimeout(() => setTimedOut(true), timeoutMs);
+    return () => window.clearTimeout(timeoutId);
+  }, [enabled, timeoutMs]);
+
+  return enabled && timedOut;
+}
 
 function canUseLocalQaPreview() {
   if (typeof window === "undefined") return false;
@@ -94,6 +108,7 @@ const navItems = navSections.flatMap((section) => section.items);
 
 function AuthenticatedUplineaShell({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn, user } = useUser();
+  const authLoadingTimedOut = useLoadingTimeout(!isLoaded);
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem("uplinea-theme");
@@ -103,6 +118,10 @@ function AuthenticatedUplineaShell({ children }: { children: ReactNode }) {
     document.documentElement.dataset.theme = theme;
     document.body.classList.toggle("dark-mode", theme === "dark");
   }, []);
+
+  if (!isLoaded && authLoadingTimedOut) {
+    return <AuthRecoveryScreen />;
+  }
 
   if (!isLoaded) {
     return (
@@ -495,6 +514,59 @@ function LoginScreen() {
         <span>Contexto usado pelo Coach</span>
         <strong>Plano semanal + sessões + reviews</strong>
         <p>Nada é aplicado sem confirmação. Tu manténs controlo sobre o plano.</p>
+      </aside>
+    </main>
+  );
+}
+
+function AuthRecoveryScreen() {
+  return (
+    <main className="ep-auth-screen">
+      <section className="ep-auth-panel" aria-labelledby="auth-recovery-title">
+        <Image
+          className="ep-auth-logo ep-auth-logo-light"
+          src="/uplinea/logo-horizontal.svg"
+          width={172}
+          height={61}
+          alt="Uplinea"
+          priority
+          style={{ width: "172px", height: "auto" }}
+        />
+        <Image
+          className="ep-auth-logo ep-auth-logo-dark"
+          src="/uplinea/logo-horizontal-white.svg"
+          width={172}
+          height={61}
+          alt="Uplinea"
+          priority
+          style={{ width: "172px", height: "auto" }}
+        />
+        <div>
+          <span className="ep-auth-eyebrow">Uplinea</span>
+          <h1 id="auth-recovery-title">Não conseguimos confirmar a sessão</h1>
+          <p>
+            A entrada demorou demasiado tempo. Recarrega a página; se continuar igual, limpa a sessão local e entra novamente.
+          </p>
+        </div>
+        <button className="ep-auth-primary" type="button" onClick={() => window.location.reload()}>
+          Recarregar
+        </button>
+        <button
+          className="ep-auth-button"
+          type="button"
+          onClick={() => {
+            window.localStorage.clear();
+            window.sessionStorage.clear();
+            window.location.assign("/");
+          }}
+        >
+          Limpar sessão local
+        </button>
+      </section>
+      <aside className="ep-auth-context" aria-label="Diagnóstico da entrada">
+        <span>Diagnóstico</span>
+        <strong>Clerk não terminou o arranque</strong>
+        <p>A app já não fica presa num loading infinito; mostra este ecrã de recuperação.</p>
       </aside>
     </main>
   );
