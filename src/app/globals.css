@@ -5656,7 +5656,7 @@ dd {
   padding: 8px;
 }
 
-.wp-week-preview > div {
+.wp-week-preview > button {
   display: grid;
   min-width: 0;
   gap: 4px;
@@ -5664,11 +5664,33 @@ dd {
   border-radius: 5px;
   background: var(--bg-surface);
   padding: 7px;
+  text-align: left;
+  cursor: pointer;
 }
 
-.wp-week-preview > div.active {
+.wp-week-preview > button:disabled {
+  cursor: default;
+}
+
+.wp-week-preview > button.active {
   border-color: var(--ep-teal-500);
   box-shadow: 0 0 0 1px rgba(6, 182, 196, 0.16) inset;
+}
+
+.wpp-day-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wpp-day-shortcuts button {
+  border: 1px solid var(--border-1);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--fg-2);
+  cursor: pointer;
+  font: var(--t-label);
+  padding: 6px 10px;
 }
 
 .wp-week-preview strong {

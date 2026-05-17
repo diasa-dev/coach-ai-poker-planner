@@ -125,6 +125,8 @@ export default defineSchema({
     targetValue: v.optional(v.number()),
     studyType: v.optional(v.string()),
     source: v.optional(v.literal("coachProposal")),
+    metricKey: v.optional(v.string()),
+    metricLabel: v.optional(v.string()),
     status: v.union(
       v.literal("planned"),
       v.literal("done"),

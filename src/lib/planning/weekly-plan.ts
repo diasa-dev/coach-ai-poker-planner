@@ -14,6 +14,8 @@ export type PlanBlock = {
   title: string;
   target?: string;
   source?: "coachProposal";
+  metricKey?: string;
+  metricLabel?: string;
   status: PlanBlockStatus;
   reason?: string;
 };
@@ -30,7 +32,7 @@ export type PlanDay = {
   blocks: PlanBlock[];
 };
 
-export type BlockDraft = Pick<PlanBlock, "type" | "title" | "target">;
+export type BlockDraft = Pick<PlanBlock, "type" | "title" | "target" | "metricKey" | "metricLabel">;
 
 export const blockTypes: PlanBlockType[] = [
   "Grind",
@@ -67,6 +69,8 @@ export type StoredWeeklyPlanBlock = {
   title: string;
   targetLabel?: string;
   source?: "coachProposal";
+  metricKey?: string;
+  metricLabel?: string;
   status: StoredBlockStatus;
   statusReason?: string;
   order: number;
@@ -341,6 +345,8 @@ export function buildPlanDaysFromStoredBlocks({
         title: block.title,
         target: block.targetLabel,
         source: block.source,
+        metricKey: block.metricKey,
+        metricLabel: block.metricLabel,
         status: storedToUiStatus[block.status],
         reason: block.statusReason,
       }));
@@ -377,6 +383,8 @@ export function toStoredPlanBlocks(days: PlanDay[]) {
       title: block.title,
       targetLabel: block.target,
       source: block.source,
+      metricKey: block.metricKey,
+      metricLabel: block.metricLabel,
       status: uiToStoredStatus[block.status],
       order,
     })),

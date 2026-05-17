@@ -15,21 +15,18 @@ import {
 } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import {
-  blockTypes,
   buildPlanDaysFromStoredBlocks,
   createCleanDraftFromDays,
   createEmptyPlanDays,
-  createEmptyBlockDraft,
   createPlanBlock,
   formatWeekRange,
   formatPlanMinutes,
   getBlockClassName,
   getDaySummary,
   getTodayIsoDate,
-  getWeeklyTimeTotals,
   initialPlanDays,
   initialWeeklyFocus,
   parsePlanTarget,
@@ -53,11 +50,25 @@ type PlanStatus = "draft" | "active" | "reviewed" | "archived";
 type MonthlyTargetCategory = "grind" | "study" | "review" | "sport" | "recovery" | "custom";
 type MonthlyTargetContext = {
   category: MonthlyTargetCategory;
+  metricKey?: string;
   metricLabel?: string;
   primaryUnit: string;
   targetValue: number;
   optionalSecondaryUnit?: string;
   optionalSecondaryTargetValue?: number;
+  updatedAt?: number;
+};
+
+type PlanningOption = {
+  key: string;
+  label: string;
+  type: PlanBlockType;
+  title: string;
+  target: string;
+  metricKey?: string;
+  metricLabel?: string;
+  unit?: string;
+  isOff?: boolean;
 };
 type AnnualPlanContext = {
   primaryDirection: string;
@@ -98,10 +109,6 @@ function statusClass(status: PlanBlockStatus) {
   if (status === "Ajustado") return "adj";
   if (status === "Não feito") return "nd";
   return "planned";
-}
-
-function formatSessionCount(count: number) {
-  return count === 1 ? "1 sessão" : `${count} sessões`;
 }
 
 function formatDayCount(count: number) {
@@ -248,8 +255,9 @@ function PersistedWeeklyPlan() {
             previousWeekStartDate: weeklyPlan.previousWeekStartDate,
           });
           setSaveState("saved");
-        } catch {
+        } catch (error) {
           setSaveState("error");
+          throw error;
         }
       }}
       onSavePlan={async ({ days, focus, status }) => {
@@ -262,8 +270,9 @@ function PersistedWeeklyPlan() {
             blocks: toStoredPlanBlocks(days),
           });
           setSaveState("saved");
-        } catch {
+        } catch (error) {
           setSaveState("error");
+          throw error;
         }
       }}
       saveState={saveState}
@@ -295,8 +304,9 @@ function WeeklyPlanWorkspace({
   const [weeklyFocus, setWeeklyFocus] = useState(initialFocus);
   const [planStatus, setPlanStatus] = useState<PlanStatus>(initialPlanStatus);
   const [days, setDays] = useState(initialDays);
+  const [savedSnapshot, setSavedSnapshot] = useState(() => getPlanSnapshot(initialDays, initialFocus));
   const [addingDay, setAddingDay] = useState<string | null>(null);
-  const [draftBlock, setDraftBlock] = useState(createEmptyBlockDraft);
+  const [draftBlock, setDraftBlock] = useState(() => createDefaultDraftBlock(monthlyTargets));
   const [editing, setEditing] = useState<{ dayDate: string; block: PlanBlock } | null>(null);
   const [objectivesOpen, setObjectivesOpen] = useState(false);
   const [coachContextOpen, setCoachContextOpen] = useState(false);
@@ -307,17 +317,31 @@ function WeeklyPlanWorkspace({
     const todayIndex = days.findIndex((day) => day.isToday);
     return todayIndex >= 0 ? days.slice(todayIndex) : days;
   }, [days, view]);
-  const totals = useMemo(() => getWeeklyTimeTotals(days), [days]);
   const summary = useMemo(() => getWeeklySummary(days), [days]);
+  const planningOptions = useMemo(() => buildPlanningOptions(monthlyTargets), [monthlyTargets]);
   const monthlyPlanContext = useMemo(
-    () => buildMonthlyPlanContext(monthlyTargets, summary, annualPlan ?? null),
-    [annualPlan, monthlyTargets, summary],
+    () => buildMonthlyPlanContext(monthlyTargets, days, summary, annualPlan ?? null),
+    [annualPlan, days, monthlyTargets, summary],
   );
+  const hasUnsavedChanges = getPlanSnapshot(days, weeklyFocus) !== savedSnapshot;
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   function updateDay(dayDate: string, getNextDay: (day: PlanDay) => PlanDay) {
     setDays((currentDays) =>
       currentDays.map((day) => (day.date === dayDate ? getNextDay(day) : day)),
     );
+    setPlanStatus("draft");
   }
 
   async function handleCopyPreviousWeek() {
@@ -337,33 +361,49 @@ function WeeklyPlanWorkspace({
     if (!weeklyFocus.trim()) return;
 
     if (onSavePlan) {
-      await onSavePlan({ days, focus: weeklyFocus.trim(), status });
+      try {
+        await onSavePlan({ days, focus: weeklyFocus.trim(), status });
+      } catch {
+        return;
+      }
     }
 
-    setWeeklyFocus(weeklyFocus.trim());
+    const cleanFocus = weeklyFocus.trim();
+    setWeeklyFocus(cleanFocus);
+    setSavedSnapshot(getPlanSnapshot(days, cleanFocus));
     setPlanStatus(status);
     setMode("execution");
   }
 
-  function addBlock(dayDate: string, blockType?: PlanBlockType) {
-    const baseDraft: BlockDraft = blockType
-      ? {
-          type: blockType,
-          title: getDefaultTitle(blockType),
-          target: getDefaultTarget(blockType),
-        }
-      : draftBlock;
+  function addBlock(dayDates: string[]) {
+    const baseDraft = draftBlock;
     const title = baseDraft.title.trim();
+    const targetDates = dayDates.length ? dayDates : addingDay ? [addingDay] : [];
 
-    if (!title) return;
+    if (!title || !targetDates.length) return;
 
-    updateDay(dayDate, (day) => ({
-      ...day,
-      isOff: false,
-      blocks: [...day.blocks, createPlanBlock(dayDate, { ...baseDraft, title })],
-    }));
+    setDays((currentDays) =>
+      currentDays.map((day) => {
+        if (!targetDates.includes(day.date)) return day;
+
+        if (baseDraft.type === "Descanso") {
+          return {
+            ...day,
+            isOff: true,
+            blocks: [createPlanBlock(day.date, { ...baseDraft, title })],
+          };
+        }
+
+        return {
+          ...day,
+          isOff: false,
+          blocks: [...day.blocks, createPlanBlock(day.date, { ...baseDraft, title })],
+        };
+      }),
+    );
+    setPlanStatus("draft");
     setAddingDay(null);
-    setDraftBlock(createEmptyBlockDraft());
+    setDraftBlock(createDefaultDraftBlock(monthlyTargets));
   }
 
   function removeBlock(dayDate: string, blockId: string) {
@@ -465,6 +505,7 @@ function WeeklyPlanWorkspace({
         <PlanModeBanner
           demoReason={demoReason}
           hasPersistence={hasPersistence}
+          hasUnsavedChanges={hasUnsavedChanges}
           isFirstUse={isFirstUse}
           saveState={saveState}
           weekStartDay={weekStartDay}
@@ -564,9 +605,10 @@ function WeeklyPlanWorkspace({
             block={draftBlock}
             day={days.find((day) => day.date === addingDay)}
             days={days}
+            options={planningOptions}
             onChange={setDraftBlock}
             onClose={() => setAddingDay(null)}
-            onSave={() => addBlock(addingDay)}
+            onSave={addBlock}
             title="Adicionar bloco"
           />
         ) : null}
@@ -576,11 +618,12 @@ function WeeklyPlanWorkspace({
             block={editing.block}
             day={days.find((day) => day.date === editing.dayDate)}
             days={days}
+            options={planningOptions}
             onChange={(block) =>
               setEditing((current) => (current ? { ...current, block: block as PlanBlock } : current))
             }
             onClose={() => setEditing(null)}
-            onSave={saveEditedBlock}
+            onSave={() => saveEditedBlock()}
             title="Editar bloco"
           />
         ) : null}
@@ -666,10 +709,18 @@ function WeeklyPlanWorkspace({
       </div>
 
       <div className="wp-totals">
-        <div className="wp-total"><span>Grind</span><strong>{formatSessionCount(summary.grindBlocks)}</strong><small>{formatDayCount(summary.grindDays)}</small></div>
-        <div className="wp-total"><span>Estudo</span><strong>{formatPlanMinutes(totals.Estudo)}</strong><small>/ 5h</small></div>
-        <div className="wp-total"><span>Review</span><strong>{formatPlanMinutes(totals.Review)}</strong><small>/ 2h</small></div>
-        <div className="wp-total"><span>Desporto</span><strong>{formatPlanMinutes(totals.Desporto)}</strong><small>/ 3h</small></div>
+        {monthlyPlanContext.rows.length ? (
+          monthlyPlanContext.rows.slice(0, 4).map((row) => (
+            <div className="wp-total" key={`${row.category}-${row.label}`}>
+              <span>{row.label}</span>
+              <strong>{row.plannedLabel.replace("Semana: ", "")}</strong>
+              <small>{row.targetLabel.replace("Meta mensal: ", "/ ")}</small>
+            </div>
+          ))
+        ) : (
+          <div className="wp-total"><span>Objetivos mensais</span><strong>—</strong><small>define métricas para planear</small></div>
+        )}
+        <div className="wp-total"><span>Dia off</span><strong>{formatDayCount(summary.offDays)}</strong><small>sempre disponível</small></div>
         <div className="wp-total-meta">
           {view === "full" && days.some((day) => day.isPast) ? (
             <button className="wp-collapse-btn" type="button" onClick={() => setCollapsedPast((value) => !value)}>
@@ -714,9 +765,10 @@ function WeeklyPlanWorkspace({
           block={draftBlock}
           day={days.find((day) => day.date === addingDay)}
           days={days}
+          options={planningOptions}
           onChange={setDraftBlock}
           onClose={() => setAddingDay(null)}
-          onSave={() => addBlock(addingDay)}
+          onSave={addBlock}
           title="Adicionar bloco"
         />
       ) : null}
@@ -736,12 +788,14 @@ function WeeklyPlanWorkspace({
 function PlanModeBanner({
   demoReason,
   hasPersistence,
+  hasUnsavedChanges,
   isFirstUse,
   saveState,
   weekStartDay,
 }: {
   demoReason?: string;
   hasPersistence: boolean;
+  hasUnsavedChanges?: boolean;
   isFirstUse?: boolean;
   saveState: SaveState;
   weekStartDay: number;
@@ -761,7 +815,7 @@ function PlanModeBanner({
         </span>
       </div>
       <div className="wp-demo-actions">
-        <small>{getSaveStateLabel(saveState)}</small>
+        <small>{hasUnsavedChanges ? "Alterações por guardar" : getSaveStateLabel(saveState)}</small>
       </div>
     </div>
   );
@@ -861,7 +915,7 @@ function DayRow({
             <div className={`${getBlockClassName(block.type)} wp-row-like st-${statusClass(block.status)}`} key={block.id}>
               <div>
                 <span>
-                  {block.type}
+                  {block.metricLabel ?? block.type}
                   {block.source === "coachProposal" ? <em className="ep-origin-badge">Coach</em> : null}
                 </span>
                 <strong>{block.title}</strong>
@@ -953,7 +1007,7 @@ function PlanningDayRow({
               onClick={() => setEditing({ dayDate: day.date, block: { ...block } })}
             >
               <span>
-                {block.type}
+                {block.metricLabel ?? block.type}
                 {block.source === "coachProposal" ? <em className="ep-origin-badge">Coach</em> : null}
               </span>
               <strong>{block.title}</strong>
@@ -981,6 +1035,7 @@ function BlockModal({
   block,
   day,
   days,
+  options,
   onChange,
   onClose,
   onSave,
@@ -989,11 +1044,47 @@ function BlockModal({
   block: BlockDraft | PlanBlock;
   day?: PlanDay;
   days: PlanDay[];
+  options: PlanningOption[];
   onChange: (block: BlockDraft | PlanBlock) => void;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (dayDates: string[]) => void;
   title: string;
 }) {
+  const [selectedDays, setSelectedDays] = useState(() => (day ? [day.date] : []));
+  const blockOptionKey = getBlockOptionKey(block);
+  const selectedOptionKey = options.some((option) => option.key === blockOptionKey)
+    ? blockOptionKey
+    : options[0]?.key;
+
+  function selectOption(optionKey: string) {
+    const option = options.find((item) => item.key === optionKey);
+    if (!option) return;
+
+    onChange({
+      ...block,
+      type: option.type,
+      title: option.title,
+      target: option.target,
+      metricKey: option.metricKey,
+      metricLabel: option.metricLabel,
+    });
+  }
+
+  function toggleSelectedDay(dayDate: string) {
+    setSelectedDays((current) =>
+      current.includes(dayDate)
+        ? current.filter((item) => item !== dayDate)
+        : [...current, dayDate],
+    );
+  }
+
+  function setShortcut(kind: "weekdays" | "weekend" | "all" | "clear") {
+    if (kind === "clear") return setSelectedDays([]);
+    if (kind === "all") return setSelectedDays(days.map((item) => item.date));
+    if (kind === "weekdays") return setSelectedDays(days.slice(0, 5).map((item) => item.date));
+    return setSelectedDays(days.slice(5).map((item) => item.date));
+  }
+
   return (
     <>
       <button className="scrim" type="button" aria-label="Fechar modal" onClick={onClose} />
@@ -1005,16 +1096,19 @@ function BlockModal({
           </button>
         </div>
         <div className="drawer-body">
-          <WeekPreview days={days} selectedDay={day?.date} />
+          <WeekPreview days={days} selectedDays={selectedDays} onToggleDay={toggleSelectedDay} />
+          <div className="wpp-day-shortcuts" aria-label="Atalhos de dias">
+            <button type="button" onClick={() => setShortcut("weekdays")}>Dias úteis</button>
+            <button type="button" onClick={() => setShortcut("weekend")}>Fim-de-semana</button>
+            <button type="button" onClick={() => setShortcut("all")}>Todos</button>
+            <button type="button" onClick={() => setShortcut("clear")}>Limpar</button>
+          </div>
           <label className="field">
-            Categoria
-            <select
-              value={block.type}
-              onChange={(event) => onChange({ ...block, type: event.target.value as PlanBlockType })}
-            >
-              {blockTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
+            Objetivo mensal
+            <select value={selectedOptionKey} onChange={(event) => selectOption(event.target.value)}>
+              {options.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
                 </option>
               ))}
             </select>
@@ -1041,9 +1135,14 @@ function BlockModal({
           <button className="ep-button secondary" type="button" onClick={onClose}>
             Cancelar
           </button>
-          <button className="ep-button primary" type="button" onClick={onSave} disabled={!block.title.trim()}>
+          <button
+            className="ep-button primary"
+            type="button"
+            onClick={() => onSave(selectedDays)}
+            disabled={!block.title.trim() || selectedDays.length === 0}
+          >
             <Check size={14} aria-hidden="true" />
-            Guardar
+            Guardar em {selectedDays.length || 0} dia{selectedDays.length === 1 ? "" : "s"}
           </button>
         </div>
       </section>
@@ -1051,21 +1150,39 @@ function BlockModal({
   );
 }
 
-function WeekPreview({ days, selectedDay }: { days: PlanDay[]; selectedDay?: string }) {
+function WeekPreview({
+  days,
+  onToggleDay,
+  selectedDays,
+}: {
+  days: PlanDay[];
+  onToggleDay?: (dayDate: string) => void;
+  selectedDays?: string[];
+}) {
   return (
     <section className="wp-week-preview" aria-label="Resumo compacto da semana">
-      {days.map((day) => (
-        <div className={day.date === selectedDay ? "active" : undefined} key={day.date}>
-          <strong>{day.label}</strong>
-          <span>{day.blocks.length}</span>
-          <small>{formatPlanMinutes(getDayMinutes(day))}</small>
-          <div className={day.blocks.length ? "wpp-dist-mini" : "wpp-dist-mini is-empty"} aria-hidden="true">
-            {getDistributionSegments(day.blocks).map((segment) => (
-              <i className={segment.className} key={segment.id} style={{ width: segment.width }} />
-            ))}
-          </div>
-        </div>
-      ))}
+      {days.map((day) => {
+        const active = selectedDays?.includes(day.date);
+
+        return (
+          <button
+            className={active ? "active" : undefined}
+            key={day.date}
+            type="button"
+            onClick={() => onToggleDay?.(day.date)}
+            disabled={!onToggleDay}
+          >
+            <strong>{day.label}</strong>
+            <span>{day.blocks.length}</span>
+            <small>{formatPlanMinutes(getDayMinutes(day))}</small>
+            <div className={day.blocks.length ? "wpp-dist-mini" : "wpp-dist-mini is-empty"} aria-hidden="true">
+              {getDistributionSegments(day.blocks).map((segment) => (
+                <i className={segment.className} key={segment.id} style={{ width: segment.width }} />
+              ))}
+            </div>
+          </button>
+        );
+      })}
     </section>
   );
 }
@@ -1220,6 +1337,87 @@ function SummaryStat({
   );
 }
 
+const categoryToPlanType: Record<MonthlyTargetCategory, PlanBlockType> = {
+  grind: "Grind",
+  study: "Estudo",
+  review: "Review",
+  sport: "Desporto",
+  recovery: "Descanso",
+  custom: "Admin",
+};
+
+const labelByCategory: Record<MonthlyTargetCategory, string> = {
+  grind: "Grind",
+  study: "Estudo",
+  review: "Review",
+  sport: "Sport",
+  recovery: "Recuperação",
+  custom: "Personalizado",
+};
+
+function getTargetIdentity(target: MonthlyTargetContext) {
+  return target.metricKey ?? `${target.category}:${target.metricLabel ?? target.primaryUnit}`;
+}
+
+function getBlockOptionKey(block: BlockDraft | PlanBlock) {
+  if (block.type === "Descanso") return "__off";
+  return block.metricKey ?? `legacy:${block.type}`;
+}
+
+function buildPlanningOptions(targets: MonthlyTargetContext[]): PlanningOption[] {
+  const metricOptions = targets.map((target) => {
+    const label = target.metricLabel ?? labelByCategory[target.category];
+    const type = categoryToPlanType[target.category] ?? "Admin";
+
+    return {
+      key: getTargetIdentity(target),
+      label: `${label} · meta mensal ${formatTargetValue(target.targetValue, target.primaryUnit)}`,
+      type,
+      title: label,
+      target: getDefaultTargetForMonthlyTarget(target),
+      metricKey: getTargetIdentity(target),
+      metricLabel: label,
+      unit: target.primaryUnit,
+    };
+  });
+
+  return [
+    ...metricOptions,
+    {
+      key: "__off",
+      label: "Dia off",
+      type: "Descanso" as const,
+      title: "Dia off",
+      target: "—",
+      isOff: true,
+    },
+  ];
+}
+
+function createDefaultDraftBlock(targets: MonthlyTargetContext[]): BlockDraft {
+  const [option] = buildPlanningOptions(targets);
+
+  return {
+    type: option.type,
+    title: option.title,
+    target: option.target,
+    metricKey: option.metricKey,
+    metricLabel: option.metricLabel,
+  };
+}
+
+function getDefaultTargetForMonthlyTarget(target: MonthlyTargetContext) {
+  if (target.primaryUnit === "horas") return "1h";
+  if (target.primaryUnit === "minutos") return "30m";
+  if (target.primaryUnit === "sessões" || target.primaryUnit === "blocos") return `1 ${target.primaryUnit.slice(0, -1)}`;
+  if (target.primaryUnit === "dias") return "1 dia";
+  return `1 ${target.primaryUnit}`;
+}
+
+function getPlanSnapshot(days: PlanDay[], focus: string) {
+  return JSON.stringify({ days, focus: focus.trim() });
+}
+
 function getWeeklySummary(days: PlanDay[]) {
   const categoryMinutes = planOrder.reduce<Record<(typeof planOrder)[number], number>>(
     (acc, type) => ({ ...acc, [type]: 0 }),
@@ -1265,78 +1463,64 @@ function minutesToUnit(minutes: number, unit: string) {
   return null;
 }
 
+function extractTargetNumber(target?: string) {
+  if (!target) return 0;
+  const number = target.match(/\d+(?:[,.]\d+)?/);
+  return number ? Number(number[0].replace(",", ".")) : 0;
+}
+
+function blockMatchesTarget(block: PlanBlock, target: MonthlyTargetContext) {
+  const identity = getTargetIdentity(target);
+  if (block.metricKey) return block.metricKey === identity;
+  return block.type === categoryToPlanType[target.category];
+}
+
 function getWeeklyPlannedValue(
   target: MonthlyTargetContext,
-  summary: ReturnType<typeof getWeeklySummary>,
+  days: PlanDay[],
 ) {
-  if (target.category === "grind") {
-    if (target.primaryUnit === "sessões") return summary.grindBlocks;
-    return null;
+  const matchingByDay = days.map((day) => ({
+    day,
+    blocks: day.blocks.filter((block) => blockMatchesTarget(block, target)),
+  })).filter((item) => item.blocks.length > 0);
+  const blocks = matchingByDay.flatMap((item) => item.blocks);
+
+  if (target.primaryUnit === "horas" || target.primaryUnit === "minutos") {
+    const minutes = blocks.reduce((total, block) => total + parsePlanTarget(block.target), 0);
+    return minutesToUnit(minutes, target.primaryUnit) ?? 0;
   }
 
-  if (target.category === "study") {
-    return minutesToUnit(summary.categoryMinutes.Estudo, target.primaryUnit);
-  }
+  if (target.primaryUnit === "dias") return matchingByDay.length;
+  if (target.primaryUnit === "sessões" || target.primaryUnit === "blocos") return blocks.length;
 
-  if (target.category === "review") {
-    if (target.primaryUnit === "horas" || target.primaryUnit === "minutos") {
-      return minutesToUnit(summary.categoryMinutes.Review, target.primaryUnit);
-    }
-
-    return null;
-  }
-
-  if (target.category === "sport") {
-    if (target.primaryUnit === "sessões" || target.primaryUnit === "blocos") {
-      return summary.sportBlocks;
-    }
-
-    return minutesToUnit(summary.categoryMinutes.Desporto, target.primaryUnit);
-  }
-
-  return null;
+  const explicitTotal = blocks.reduce((total, block) => total + extractTargetNumber(block.target), 0);
+  return explicitTotal || blocks.length;
 }
 
 function buildMonthlyPlanContext(
   targets: MonthlyTargetContext[],
+  days: PlanDay[],
   summary: ReturnType<typeof getWeeklySummary>,
   annualPlan: AnnualPlanContext | null,
 ) {
-  const labelByCategory: Record<MonthlyTargetCategory, string> = {
-    grind: "Grind",
-    study: "Estudo",
-    review: "Review",
-    sport: "Sport",
-    recovery: "Recuperação",
-    custom: "Personalizado",
-  };
+  void summary;
   const uncoveredCategories: string[] = [];
   const rows = targets.map((target) => {
-    const plannedValue = getWeeklyPlannedValue(target, summary);
+    const plannedValue = getWeeklyPlannedValue(target, days);
     const targetLabel = `Meta mensal: ${formatTargetValue(target.targetValue, target.primaryUnit)}`;
-
-    if (plannedValue === null) {
-      return {
-        category: target.category,
-        kind: "neutral",
-        label: target.metricLabel ?? labelByCategory[target.category],
-        plannedLabel: "Sem comparação direta",
-        targetLabel,
-      };
-    }
-
     const plannedLabel = `Semana: ${formatTargetValue(plannedValue, target.primaryUnit)}`;
     const weeklyShare = target.targetValue > 0 ? plannedValue / target.targetValue : 0;
     const kind = weeklyShare >= 0.2 ? "supporting" : "light";
+    const label = target.metricLabel ?? labelByCategory[target.category];
 
     if (plannedValue <= 0) {
-      uncoveredCategories.push(target.metricLabel ?? labelByCategory[target.category]);
+      uncoveredCategories.push(label);
     }
 
     return {
       category: target.category,
       kind,
-      label: target.metricLabel ?? labelByCategory[target.category],
+      label,
       plannedLabel,
       targetLabel,
     };
@@ -1428,28 +1612,6 @@ function getPresetBlocks(preset: string): { focus: string; days: BlockDraft[][] 
   }
 
   return null;
-}
-
-function getDefaultTitle(type: PlanBlockType) {
-  return {
-    Grind: "Sessão MTT",
-    Estudo: "Estudo",
-    Review: "Rever mãos",
-    Desporto: "Treino",
-    Descanso: "Dia off",
-    Admin: "Admin",
-  }[type];
-}
-
-function getDefaultTarget(type: PlanBlockType) {
-  return {
-    Grind: "12 torneios",
-    Estudo: "45m",
-    Review: "30m",
-    Desporto: "45m",
-    Descanso: "—",
-    Admin: "20m",
-  }[type];
 }
 
 function getPlanStatusLabel(status: PlanStatus) {
